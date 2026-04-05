@@ -1,7 +1,7 @@
 # CODE-WP Local
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/vithanhlam/code-wp-local/main/assets/icon.png" width="96" height="96" alt="CODE-WP Local"/>
+  <img src="https://code-wp.com/wp-content/uploads/2023/05/logo-code-wp-1.png" width="400" height="84" alt="CODE-WP Local"/>
 </p>
 
 <p align="center">
@@ -21,10 +21,10 @@
 
 **[⬇ Download Latest Version](https://github.com/vithanhlam/code-wp-local/releases/latest)**
 
-| File | Description |
-|------|-------------|
-| `CODE-WP Local Setup x.x.x.exe` | Installer (recommended) |
-| `CODE-WP Local x.x.x.exe` | Portable (no install needed) |
+| File                            | Description                  |
+| ------------------------------- | ---------------------------- |
+| `CODE-WP Local Setup x.x.x.exe` | Installer (recommended)      |
+| `CODE-WP Local x.x.x.exe`       | Portable (no install needed) |
 
 ---
 
@@ -39,25 +39,27 @@ It bundles everything you need: **Nginx**, **PHP 8.3**, **MariaDB**, and **phpMy
 ## Features
 
 ### Free
-| Feature | Description |
-|---------|-------------|
-| 🌐 **Multi-site** | Run unlimited projects on different ports (8000, 8001...) |
-| ⚡ **One-click Start** | Start/stop any project instantly |
-| 🔧 **WordPress Install** | Auto-download and install WordPress |
-| 🛠 **WP-CLI** | Run WP-CLI commands from within the app |
-| 🐛 **Debug Logs** | View Nginx, PHP, MariaDB and WP debug logs |
-| 💾 **Full Backup** | Backup source files + database into a single ZIP |
-| 🔁 **Clone WordPress** | Clone any project with automatic URL replacement |
-| 🗄 **Database Manager** | Create, import, export, drop databases |
-| ⚙ **Config Editor** | Edit php.ini and per-project Nginx config |
-| 🏷 **Tags & Search** | Tag and search projects easily |
-| 🖥 **System Tray** | Minimize to background, always accessible |
 
-### Pro *(coming soon)*
-| Feature | Description |
-|---------|-------------|
-| 🔄 **SFTP / FTP Sync** | Push/pull files to remote host |
-| ☁ **Google Drive Backup** | Auto backup to Google Drive |
+| Feature                  | Description                                               |
+| ------------------------ | --------------------------------------------------------- |
+| 🌐 **Multi-site**        | Run unlimited projects on different ports (8000, 8001...) |
+| ⚡ **One-click Start**   | Start/stop any project instantly                          |
+| 🔧 **WordPress Install** | Auto-download and install WordPress                       |
+| 🛠 **WP-CLI**            | Run WP-CLI commands from within the app                   |
+| 🐛 **Debug Logs**        | View Nginx, PHP, MariaDB and WP debug logs                |
+| 💾 **Full Backup**       | Backup source files + database into a single ZIP          |
+| 🔁 **Clone WordPress**   | Clone any project with automatic URL replacement          |
+| 🗄 **Database Manager**  | Create, import, export, drop databases                    |
+| ⚙ **Config Editor**      | Edit php.ini and per-project Nginx config                 |
+| 🏷 **Tags & Search**     | Tag and search projects easily                            |
+| 🖥 **System Tray**       | Minimize to background, always accessible                 |
+
+### Pro _(coming soon)_
+
+| Feature                   | Description                    |
+| ------------------------- | ------------------------------ |
+| 🔄 **SFTP / FTP Sync**    | Push/pull files to remote host |
+| ☁ **Google Drive Backup** | Auto backup to Google Drive    |
 
 ---
 
@@ -65,7 +67,7 @@ It bundles everything you need: **Nginx**, **PHP 8.3**, **MariaDB**, and **phpMy
 
 - **OS:** Windows 10 / 11 (64-bit)
 - **RAM:** 2GB minimum, 4GB recommended
-- **Disk:** 500MB for the app + space for your projects
+- **Disk:** 2G for the app + space for your projects
 - **Admin rights:** Required on first install only
 
 ---
@@ -81,21 +83,49 @@ It bundles everything you need: **Nginx**, **PHP 8.3**, **MariaDB**, and **phpMy
 
 ## Quick Start
 
+### 1. Choose Data Storage Location
+
+When launching for the first time, you will be asked where to store your project data.
+
+**Recommendations:**
+
+- ✅ Use a drive other than `C:` (e.g., `D:\CodeWP`, `E:\LocalDev`)
+- ✅ No spaces in the path (`D:\CodeWP` ✅ vs `D:\Code WP` ❌)
+- ✅ No special characters (`D:\CodeWP` ✅ vs `D:\Code&WP!` ❌)
+- ✅ Short path is better (`D:\CodeWP` ✅ vs `D:\My Documents\Dev\Local\CodeWP` ❌)
+
+| Good paths ✅ | Bad paths ❌                |
+| ------------- | --------------------------- |
+| `D:\CodeWP`   | `C:\Users\John\My Projects` |
+| `E:\LocalDev` | `D:\Code WP Local`          |
+| `D:\Dev`      | `E:\Dev&Test!`              |
+
+> **Why?** Nginx does not support paths with spaces or special characters.  
+> Storing on `D:` or another drive keeps your data safe if Windows needs to be reinstalled.
+
+---
+
+### 2. Create Your First Project
+
 1. Open **CODE-WP Local**
-2. Click **New Project** → enter a name → **Create**
-3. Click **Start** on your project
+2. Click **New Project** → enter a project name → click **Create**
+3. Click **Start** on your project card
 4. Visit `http://yourproject.local:8000` in your browser
 
-**For WordPress:**
-1. Click the WordPress icon on your project card
+### 3. Install WordPress _(optional)_
+
+1. Click the **WordPress icon** on your project card
 2. Click **Install WordPress**
-3. Complete setup at `/wp-admin/install.php`
+3. Complete the setup wizard at `http://yourproject.local:8000/wp-admin/install.php`
+
+> **Tip:** You can change the data storage location anytime in **Settings → Data Storage**.
 
 ---
 
 ## Changelog
 
 ### v1.1.8 — Latest
+
 - System tray — minimize to background, tray right-click menu
 - Full Backup & Restore (free)
 - Clone WordPress with auto URL replacement (free)
@@ -105,6 +135,7 @@ It bundles everything you need: **Nginx**, **PHP 8.3**, **MariaDB**, and **phpMy
 - Service controls with loading state
 
 ### v1.0.0
+
 - Initial release
 
 ---
