@@ -1,7 +1,7 @@
-# CODE-WP Local
+# CodeWP Local
 
 <p align="center">
-  <img src="https://code-wp.com/wp-content/uploads/2023/05/logo-code-wp-1.png" width="400" height="84" alt="CODE-WP Local"/>
+  <img src="https://code-wp.com/wp-content/uploads/2026/04/logochuan-x.svg" width="400" alt="CodeWP Local"/>
 </p>
 
 <p align="center">
@@ -21,16 +21,16 @@
 
 **[⬇ Download Latest Version](https://github.com/vithanhlam/code-wp-local/releases/latest)**
 
-| File                            | Description                  |
-| ------------------------------- | ---------------------------- |
-| `CODE-WP Local Setup x.x.x.exe` | Installer (recommended)      |
-| `CODE-WP Local x.x.x.exe`       | Portable (no install needed) |
+| File                           | Description                  |
+| ------------------------------ | ---------------------------- |
+| `CodeWP Local Setup x.x.x.exe` | Installer (recommended)      |
+| `CodeWP Local x.x.x.exe`       | Portable (no install needed) |
 
 ---
 
-## What is CODE-WP Local?
+## What is CodeWP Local?
 
-CODE-WP Local is a desktop application that lets you run WordPress and PHP websites locally on your Windows machine — no technical knowledge required.
+CodeWP Local is a desktop application that lets you run WordPress and PHP websites locally on your Windows machine — no technical knowledge required.
 
 It bundles everything you need: **Nginx**, **PHP 8.3**, **MariaDB**, and **phpMyAdmin** — all managed through a clean, modern interface.
 
@@ -74,10 +74,10 @@ It bundles everything you need: **Nginx**, **PHP 8.3**, **MariaDB**, and **phpMy
 
 ## Installation
 
-1. Download `CODE-WP Local Setup x.x.x.exe` from [Releases](https://github.com/vithanhlam/code-wp-local/releases)
+1. Download `CodeWP Local Setup x.x.x.exe` from [Releases](https://github.com/vithanhlam/code-wp-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
-4. Launch **CODE-WP Local** from your desktop shortcut
+4. Launch **CodeWP Local** from your desktop shortcut
 
 ---
 
@@ -107,7 +107,7 @@ When launching for the first time, you will be asked where to store your project
 
 ### 2. Create Your First Project
 
-1. Open **CODE-WP Local**
+1. Open **CodeWP Local**
 2. Click **New Project** → enter a project name → click **Create**
 3. Click **Start** on your project card
 4. Visit `http://yourproject.local:8000` in your browser
@@ -124,7 +124,15 @@ When launching for the first time, you will be asked where to store your project
 
 ## Changelog
 
-### v1.1.8 — Latest
+### v1.1.9 — Latest
+
+- Added WP-CLI
+- Added fast WordPress login
+- Added project task list
+- Fixed admin password reset
+- Fixed WordPress debugging
+
+### v1.1.8
 
 - System tray — minimize to background, tray right-click menu
 - Full Backup & Restore (free)
