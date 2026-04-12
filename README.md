@@ -1,11 +1,11 @@
 # CodeWP Local
 
 <p align="center">
-  <img src="https://code-wp.com/wp-content/uploads/2026/04/logochuan-x.svg" width="400" alt="CodeWP Local"/>
+  <img src="https://code-wp.com/wp-content/uploads/2023/05/logotrang-x.svg" width="400" alt="CodeWP Local"/>
 </p>
 
 <p align="center">
-  <strong>A fast, lightweight local development environment for WordPress & PHP on Windows</strong>
+  <strong>A fast, lightweight local development environment for WordPress, Laravel 13 & PHP on Windows</strong>
 </p>
 
 <p align="center">
@@ -24,15 +24,14 @@
 | File                           | Description                  |
 | ------------------------------ | ---------------------------- |
 | `CodeWP Local Setup x.x.x.exe` | Installer (recommended)      |
-| `CodeWP Local x.x.x.exe`       | Portable (no install needed) |
 
 ---
 
 ## What is CodeWP Local?
 
-CodeWP Local is a desktop application that lets you run WordPress and PHP websites locally on your Windows machine — no technical knowledge required.
+CodeWP Local is a desktop application that allows you to run WordPress, Laravel 13, and PHP-based websites locally on your Windows machine — no technical expertise required.
 
-It bundles everything you need: **Nginx**, **PHP 8.3**, **MariaDB**, and **phpMyAdmin** — all managed through a clean, modern interface.
+It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB**, and **phpMyAdmin** — all managed through a clean, modern interface.
 
 ---
 
@@ -42,24 +41,26 @@ It bundles everything you need: **Nginx**, **PHP 8.3**, **MariaDB**, and **phpMy
 
 | Feature                  | Description                                               |
 | ------------------------ | --------------------------------------------------------- |
-| 🌐 **Multi-site**        | Run unlimited projects on different ports (8000, 8001...) |
-| ⚡ **One-click Start**   | Start/stop any project instantly                          |
-| 🔧 **WordPress Install** | Auto-download and install WordPress                       |
-| 🛠 **WP-CLI**            | Run WP-CLI commands from within the app                   |
-| 🐛 **Debug Logs**        | View Nginx, PHP, MariaDB and WP debug logs                |
-| 💾 **Full Backup**       | Backup source files + database into a single ZIP          |
-| 🔁 **Clone WordPress**   | Clone any project with automatic URL replacement          |
-| 🗄 **Database Manager**  | Create, import, export, drop databases                    |
-| ⚙ **Config Editor**      | Edit php.ini and per-project Nginx config                 |
-| 🏷 **Tags & Search**     | Tag and search projects easily                            |
-| 🖥 **System Tray**       | Minimize to background, always accessible                 |
+| **Multi-site**        | Run unlimited projects on different ports (8000, 8001...) |
+| **One-click Start**   | Start/stop any project instantly                          |
+| **WordPress Install** | Auto-download and install WordPress                       |
+| **Laravel Install** 	| Auto-download and install Larvel 13                       |
+| **Terminal** 			| Terminal run, start, build fast                       	|
+| **WP-CLI**            | Run WP-CLI commands from within the app                   |
+| **Debug Logs**        | View Nginx, PHP, MariaDB and WP debug logs                |
+| **Full Backup**       | Backup source files + database into a single ZIP          |
+| **Clone WordPress**   | Clone any project with automatic URL replacement          |
+| **Database Manager**  | Create, import, export, drop databases                    |
+| **Config Editor**     | Edit php.ini and per-project Nginx config                 |
+| **Tags & Search**     | Tag and search projects easily                            |
+| **System Tray**       | Minimize to background, always accessible                 |
 
 ### Pro _(coming soon)_
 
 | Feature                   | Description                    |
 | ------------------------- | ------------------------------ |
-| 🔄 **SFTP / FTP Sync**    | Push/pull files to remote host |
-| ☁ **Google Drive Backup** | Auto backup to Google Drive    |
+| **SFTP / FTP Sync**    | Push/pull files to remote host |
+| **Google Drive Backup** | Auto backup to Google Drive    |
 
 ---
 
@@ -124,7 +125,17 @@ When launching for the first time, you will be asked where to store your project
 
 ## Changelog
 
-### v1.1.9 — Latest
+### v1.2.0  — Latest
+
+- Added support for PHP 8.4
+- Integrated Terminal functionality
+- Added npm commands: start, run, and build
+- Added host path configuration
+- Enabled automatic database backup when stopping the project or application
+- Added my.ini file editing support
+- One-click Laravel installation with automatic configuration
+
+### v1.1.9
 
 - Added WP-CLI
 - Added fast WordPress login
