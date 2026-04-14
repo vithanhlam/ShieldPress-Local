@@ -52,6 +52,7 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 | **Clone WordPress**   | Clone any project with automatic URL replacement          |
 | **Database Manager**  | Create, import, export, drop databases                    |
 | **Config Editor**     | Edit php.ini and per-project Nginx config                 |
+| **SSL (HTTPS)**       | One-click local HTTPS via mkcert, green lock when active  |
 | **Tags & Search**     | Tag and search projects easily                            |
 | **System Tray**       | Minimize to background, always accessible                 |
 
@@ -125,7 +126,24 @@ When launching for the first time, you will be asked where to store your project
 
 ## Changelog
 
-### v1.2.0  — Latest
+### v1.2.1  — Latest
+
+**SSL Support**
+- Added **Install SSL** button on each project card (lock icon)
+- Generates a trusted local HTTPS certificate via **mkcert** (auto-downloaded on first use)
+- SSL is configured directly on the same port — access via `https://yourproject.local:PORT`
+- Lock icon turns **green** when SSL is active
+- Click the lock again to **Remove SSL** and revert to HTTP
+- SSL state is persisted — certificate survives app restarts without reinstalling
+- Opening a project in browser automatically uses `https://` when SSL is enabled
+
+**Shutdown & Quit improvements**
+- Fixed **tray right-click → Quit** bypassing the backup dialog — now correctly prompts for database backup
+- Fixed **window close → Quit** same issue
+- Added **shutdown progress overlay** visible during `Stopping services...` phase so the app no longer appears frozen
+- App window is brought to foreground before showing the backup dialog when minimized to tray
+
+### v1.2.0
 
 - Added support for PHP 8.4
 - Integrated Terminal functionality
@@ -134,6 +152,8 @@ When launching for the first time, you will be asked where to store your project
 - Enabled automatic database backup when stopping the project or application
 - Added my.ini file editing support
 - One-click Laravel installation with automatic configuration
+- Custom MariaDB port — change the default port (3306) from the Config panel
+- Service status bar shows live port numbers for Nginx, PHP-CGI, and MariaDB
 
 ### v1.1.9
 
