@@ -126,7 +126,11 @@ When launching for the first time, you will be asked where to store your project
 
 ## Changelog
 
-### v1.2.1  — Latest
+### v1.2.2  — Latest
+
+- Fixed error when create project
+
+### v1.2.1
 
 **SSL Support**
 - Added **Install SSL** button on each project card (lock icon)
