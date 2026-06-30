@@ -1,7 +1,7 @@
 # ShieldPress Local
 
 <p align="center">
-  <img src="assets/icon.png" width="120" alt="ShieldPress Local"/>
+  <img src="https://github.com/vithanhlam/ShieldPress-Local/blob/main/logo-dark.png" width="120" alt="ShieldPress Local"/>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 ## Screenshots
 
 <p align="center">
-  <img src="https://github.com/vithanhlam/shieldpress-local/blob/main/screenshots/projects.png" width="800" alt="Projects"/>
+  <img src="https://github.com/vithanhlam/ShieldPress-Local/blob/main/projects.png" width="800" alt="Projects"/>
 </p>
 
 ---
