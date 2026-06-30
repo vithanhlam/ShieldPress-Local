@@ -1,7 +1,7 @@
 # ShieldPress Local
 
 <p align="center">
-  <img src="https://github.com/vithanhlam/ShieldPress-Local/blob/main/logo-dark.png" width="120" alt="ShieldPress Local"/>
+  <img src="https://github.com/vithanhlam/ShieldPress-Local/blob/main/logo-dark.png" width="500" alt="ShieldPress Local"/>
 </p>
 
 <p align="center">
