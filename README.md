@@ -19,11 +19,11 @@
 
 ## Download
 
-**[Download Latest Version (v1.2.9)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[Download Latest Version (v2.0.0)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress Local Setup 1.2.9.exe` | Installer (recommended) |
+| `ShieldPress Local Setup 2.0.0.exe` | Installer (recommended) |
 
 ---
 
@@ -104,7 +104,7 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 
 ## Installation
 
-1. Download `ShieldPress Local Setup 1.2.9.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress Local Setup 2.0.0.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from your desktop shortcut
@@ -154,7 +154,17 @@ When launching for the first time, you will be asked where to store your project
 
 ## Changelog
 
-### v1.2.9 — Latest
+### v2.0.0 — Latest
+
+**Star / Pin Projects (New)**
+- Star icon on each project card — starred projects are pinned to the top of the list
+- Click to toggle: starred (gold) = pinned to top, unstarred = normal sort by date
+- Starred state is saved per project in project.json
+
+**Bug Fixes**
+- Fixed Vietnamese (IME) input in Task List — pressing Enter during IME composition no longer submits the form prematurely
+
+### v1.2.9
 
 **Open in Editor (New)**
 - One-click open project folder in VS Code, Notepad++, Sublime Text directly from project card
