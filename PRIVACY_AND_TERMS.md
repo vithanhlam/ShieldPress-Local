@@ -128,7 +128,7 @@ We may update this Privacy Policy and Terms of Use from time to time. Changes wi
 ## Contact
 
 - **Author**: vithanhlam
-- **Email**: vithanhlam@gmail.com
+- **Email**: support@shieldpress.net
 - **GitHub**: [github.com/vithanhlam/shieldpress-local](https://github.com/vithanhlam/shieldpress-local)
 - **Issues**: [GitHub Issues](https://github.com/vithanhlam/shieldpress-local/issues)
 
