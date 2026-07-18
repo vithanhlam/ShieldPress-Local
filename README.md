@@ -19,11 +19,11 @@
 
 ## Download
 
-**[Download Latest Version (v2.0.0)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[Download Latest Version (v2.2.1)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress Local Setup 2.0.0.exe` | Installer (recommended) |
+| `ShieldPress Local Setup 2.2.0.exe` | Installer (recommended) |
 
 ---
 
@@ -104,7 +104,7 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 
 ## Installation
 
-1. Download `ShieldPress Local Setup 2.0.0.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress Local Setup 2.2.0.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from your desktop shortcut
@@ -154,116 +154,22 @@ When launching for the first time, you will be asked where to store your project
 
 ## Changelog
 
-### v2.0.0 — Latest
+**[View Full Changelog](https://github.com/vithanhlam/ShieldPress-Local/blob/main/Changelog.md)**
 
-**Star / Pin Projects (New)**
-- Star icon on each project card — starred projects are pinned to the top of the list
-- Click to toggle: starred (gold) = pinned to top, unstarred = normal sort by date
-- Starred state is saved per project in project.json
+---
 
-**Bug Fixes**
-- Fixed Vietnamese (IME) input in Task List — pressing Enter during IME composition no longer submits the form prematurely
+## Privacy & Terms
 
-### v1.2.9
+**[Privacy Policy & Terms of Use](https://github.com/vithanhlam/ShieldPress-Local/blob/main/PRIVACY_AND_TERMS.md)**
 
-**Open in Editor (New)**
-- One-click open project folder in VS Code, Notepad++, Sublime Text directly from project card
-- Auto-detects installed editor (VS Code → Notepad++ → Sublime Text → Notepad)
-- Configurable custom editor path in Settings → Code Editor
-- Browse and select any .exe editor of your choice
-
-**UI Improvements**
-- Window controls (minimize, maximize, close) moved to top-right titlebar
-- New ShieldPress branding with updated icon and accent color
-
-### v1.2.8
-
-**Extension Manager — Duplicate Fix & New Features**
-- Fixed duplicate extension lines in php.ini — toggle now removes all existing lines before adding one clean line
-- Fixed **UTF-8 BOM** causing PHP to silently ignore all extensions (root cause of persistent mysqli error)
-- Automatic deduplication on startup — `applyPhpIni()` cleans duplicate extension lines
-- New "Fix Duplicates" button — one-click removal of all duplicate lines
-- New "Check Duplicates" diagnostic — modal shows exactly which extensions have duplicates and on which lines
-- Toggle buttons now show spinner animation while processing
-
-**Custom Extension Detection**
-- Extension Manager auto-scans `ext/` directory for DLLs not in the predefined list
-- Custom extensions appear in a new "Custom" category with a CUSTOM badge
-- Custom extensions can be toggled on/off just like built-in ones
-
-**PHP Version Management (New)**
-- Add PHP versions from an existing installation folder (with php-cgi.exe)
-- Remove PHP versions with confirmation
-- Auto-configures `extension_dir` and `php.ini` for newly added versions
-
-### v1.2.7
-
-**Extension Manager — Improved**
-- 45+ extensions organized into 10 categories with clear ON/OFF/Not installed states
-- "Enable Essentials" one-click button and "Fix extension_dir" tool
-
-**Email Testing (New)**
-- SMTP configuration with PHP `mail()` integration — send emails from PHP after setup
-- Bundled sendmail wrapper for authenticated SMTP (Gmail, Mailtrap, etc.)
-
-**SFTP & FTP — Improved**
-- Hidden files (dotfiles) now visible in FTP
-- External editor support (VS Code, Notepad++, Sublime Text) with auto-upload on save
-- Drag & drop upload with overwrite confirmation
-- Directory memory — remembers last browsed folder
-- SSH Terminal with command history and 25+ quick commands
-
-**Bug Fixes**
-- Fixed `mysqli PHP extension is not installed` error — auto-enables essential extensions and fixes duplicate extension_dir
-- Fixed `spawn code ENOENT` crash when opening external editor
-- Data Directory preserved during upgrades (NSIS installer backup)
-- Poppins font and FontAwesome 6.5 bundled offline
-
-### v1.2.6
-
-- Default upload limit increased to 10G
-- Project directory named after domain instead of timestamp
-- Fixed Task List Unicode/Vietnamese text saving
-- phpMyAdmin auto-starts PHP + MariaDB + Nginx
-- Upload limit changes apply instantly without restart
-- New: Extension Manager with ionCube auto-installer
-- New: SFTP & FTP Manager with file browser, SSH terminal, sync, encrypted credentials
-
-### v1.2.2
-
-- Fixed error when creating project
-
-### v1.2.1
-
-- SSL support via mkcert with green lock indicator
-- Shutdown progress overlay and tray quit backup fix
-
-### v1.2.0
-
-- PHP 8.4 support, integrated Terminal, npm commands
-- One-click Laravel install, custom MariaDB port
-- Auto database backup on project/app stop
-- Live service port display
-
-### v1.1.9
-
-- WP-CLI, fast WordPress login, project task list
-
-### v1.1.8
-
-- System tray, full backup/restore, clone WordPress
-- Tags, search, portable mode, debug log viewer
-
-### v1.0.0
-
-- Initial release
+ShieldPress Local does not collect, store, or transmit any of your data. All data stays on your local machine. You have full ownership and control over your projects and files.
 
 ---
 
 ## Support
 
 - **Issues:** [GitHub Issues](https://github.com/vithanhlam/shieldpress-local/issues)
-- **Email:** vithanhlam@gmail.com
+- **Email:** support@shieldpress.net
 
 ---
 
