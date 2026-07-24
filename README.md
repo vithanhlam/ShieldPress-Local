@@ -19,11 +19,11 @@
 
 ## Download
 
-**[Download Latest Version (v2.2.1)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[Download Latest Version (v2.3.0)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress Local Setup 2.2.0.exe` | Installer (recommended) |
+| `ShieldPress Local Setup 2.3.0.exe` | Installer (recommended) |
 
 ---
 
@@ -90,6 +90,9 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 | **ionCube Loader** | Auto-install ionCube for any PHP version |
 | **Enable Essentials** | One-click enable mysqli, curl, gd, mbstring and more |
 | **Email Testing** | Configure SMTP and send test emails — PHP `mail()` works after setup |
+| **Cache Management** | OPcache status, WP cache flush, project cache cleanup, nginx log clear |
+| **Git Push** | Push to GitHub, pull, custom git commands, clone repos |
+| **System Monitor** | Real-time CPU, RAM, Disk usage in titlebar |
 
 ---
 
@@ -104,7 +107,7 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 
 ## Installation
 
-1. Download `ShieldPress Local Setup 2.2.0.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress Local Setup 2.3.0.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from your desktop shortcut
