@@ -1,7 +1,7 @@
 # ShieldPress Local
 
 <p align="center">
-  <img src="https://github.com/vithanhlam/ShieldPress-Local/blob/main/logo-dark.png" width="500" alt="ShieldPress Local"/>
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/logo.png" width="480" alt="ShieldPress Local"/>
 </p>
 
 <p align="center">
@@ -19,11 +19,41 @@
 
 ## Download
 
-**[Download Latest Version (v2.4.0)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.4.0)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress Local Setup 2.4.0.exe` | Installer (recommended) |
+| `ShieldPress.Local.Setup.2.4.0.exe` | Installer (recommended) |
+| `ShieldPress.Local.2.4.0.exe` | Portable — no install needed |
+
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/projects.png" width="800" alt="Projects"/>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/1.png" width="390" alt="Screenshot 1"/>
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/2.png" width="390" alt="Screenshot 2"/>
+</p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/3.png" width="390" alt="Screenshot 3"/>
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/4.png" width="390" alt="Screenshot 4"/>
+</p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/5.png" width="390" alt="Screenshot 5"/>
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/6.png" width="390" alt="Screenshot 6"/>
+</p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/7.png" width="390" alt="Screenshot 7"/>
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/8.png" width="390" alt="Screenshot 8"/>
+</p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/9.png" width="390" alt="Screenshot 9"/>
+  <img src="https://raw.githubusercontent.com/vithanhlam/ShieldPress-Local/main/screenshots/10.png" width="390" alt="Screenshot 10"/>
+</p>
 
 ---
 
@@ -32,14 +62,6 @@
 ShieldPress Local is a desktop application that lets you run WordPress, Laravel, and PHP-based websites locally on your Windows machine — no technical expertise required.
 
 It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB**, and **phpMyAdmin** — all managed through a clean, modern interface.
-
----
-
-## Screenshots
-
-<p align="center">
-  <img src="https://github.com/vithanhlam/ShieldPress-Local/blob/main/projects.png" width="800" alt="Projects"/>
-</p>
 
 ---
 
@@ -58,10 +80,12 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 | **WP-CLI** | Run WP-CLI commands from within the app |
 | **Debug Logs** | View Nginx, PHP, MariaDB and WP debug logs |
 | **Full Backup** | Backup source files + database into a single ZIP |
+| **Cloud Backup** | Backup to Google Drive, OneDrive, or Dropbox — no login required |
 | **Clone WordPress** | Clone any project with automatic URL replacement |
 | **Database Manager** | Create, import, export, drop databases |
 | **Config Editor** | Edit php.ini, my.ini, and per-project Nginx config |
 | **SSL (HTTPS)** | One-click local HTTPS via mkcert |
+| **Git Push** | Push to GitHub, pull, custom git commands, clone repos |
 | **Tags & Search** | Tag and search projects easily |
 | **System Tray** | Minimize to background, always accessible |
 
@@ -72,26 +96,22 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 | **SFTP / FTP Client** | Connect to remote servers via SFTP (SSH) or FTP |
 | **File Browser** | Browse, upload, download, delete, create folders |
 | **Inline Editor** | Edit remote files directly in the app |
-| **External Editor** | Open remote files in VS Code, Notepad++, Sublime Text — auto-uploads on save |
+| **External Editor** | Open remote files in VS Code — auto-uploads on save |
 | **Drag & Drop** | Drag files from Explorer to upload |
-| **ZIP Upload & Extract** | Upload ZIP files and extract on server (SFTP) |
-| **Overwrite Protection** | Asks before overwriting existing files |
-| **Hidden Files** | Shows dotfiles (.htaccess, .env, .git...) |
-| **Directory Memory** | Remembers last browsed folder per connection |
-| **SSH Terminal** | Full SSH terminal with command history (Up/Down arrows), 25+ quick commands |
-| **Sync Upload/Download** | Push/pull files between local and remote with folder picker and exclude paths |
-| **Encrypted Credentials** | Passwords stored with AES-256-GCM encryption |
+| **ZIP Upload & Extract** | Upload ZIP and extract on server |
+| **SSH Terminal** | Full SSH terminal with command history and quick commands |
+| **Sync Upload/Download** | Push/pull files with exclude paths |
+| **Encrypted Credentials** | Passwords stored with AES-256-GCM |
 
 ### Extensions & Tools
 
 | Feature | Description |
 | ------- | ----------- |
-| **Extension Manager** | Toggle 45+ PHP extensions on/off, organized by category |
+| **Extension Manager** | Toggle 45+ PHP extensions on/off by category |
 | **ionCube Loader** | Auto-install ionCube for any PHP version |
-| **Enable Essentials** | One-click enable mysqli, curl, gd, mbstring and more |
-| **Email Testing** | Configure SMTP and send test emails — PHP `mail()` works after setup |
-| **Cache Management** | OPcache status, WP cache flush, project cache cleanup, nginx log clear |
-| **Git Push** | Push to GitHub, pull, custom git commands, clone repos |
+| **Redis** | Download, start/stop/restart Redis, flush cache, port config |
+| **Email Testing** | Configure SMTP — PHP `mail()` works out of the box |
+| **Cache Management** | OPcache config, WP cache flush, project cleanup, Nginx log clear |
 | **System Monitor** | Real-time CPU, RAM, Disk usage in titlebar |
 
 ---
@@ -107,7 +127,7 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 
 ## Installation
 
-1. Download `ShieldPress Local Setup 2.3.0.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.4.0.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from your desktop shortcut
@@ -123,7 +143,7 @@ When launching for the first time, you will be asked where to store your project
 **Recommendations:**
 
 - Use a drive other than `C:` (e.g., `D:\ShieldPress`, `E:\LocalDev`)
-- No spaces in the path (`D:\ShieldPress` vs `D:\Shield Press`)
+- No spaces in the path
 - No special characters
 - Short path is better
 
@@ -135,8 +155,6 @@ When launching for the first time, you will be asked where to store your project
 
 > **Why?** Nginx does not support paths with spaces or special characters.
 > Storing on `D:` or another drive keeps your data safe if Windows needs to be reinstalled.
-
----
 
 ### 2. Create Your First Project
 
@@ -151,21 +169,21 @@ When launching for the first time, you will be asked where to store your project
 2. Click **Install WordPress**
 3. Complete the setup wizard at `http://yourproject.local:8000/wp-admin/install.php`
 
-> **Tip:** You can change the data storage location anytime in **Settings → Data Storage**.
+> **Tip:** You can change the data storage location anytime in **Settings → Data Directory**.
 
 ---
 
 ## Changelog
 
-**[View Full Changelog](https://github.com/vithanhlam/ShieldPress-Local/blob/main/Changelog.md)**
+**[View Full Changelog →](https://github.com/vithanhlam/ShieldPress-Local/blob/main/Changelog.md)**
 
 ---
 
 ## Privacy & Terms
 
-**[Privacy Policy & Terms of Use](https://github.com/vithanhlam/ShieldPress-Local/blob/main/PRIVACY_AND_TERMS.md)**
+**[Privacy Policy & Terms of Use →](https://github.com/vithanhlam/ShieldPress-Local/blob/main/PRIVACY_AND_TERMS.md)**
 
-ShieldPress Local does not collect, store, or transmit any of your data. All data stays on your local machine. You have full ownership and control over your projects and files.
+ShieldPress Local does not collect, store, or transmit any of your data. All data stays on your local machine.
 
 ---
 
