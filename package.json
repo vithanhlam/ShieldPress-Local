@@ -1,0 +1,94 @@
+{
+  "name": "shieldpresslocal",
+  "productName": "ShieldPress Local",
+  "version": "2.4.0",
+  "description": "ShieldPress Local Development Environment Manager",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "pack": "electron-builder --dir",
+    "obfuscate": "javascript-obfuscator app/src --output app/src-obf --compact true --string-array true",
+    "build": "npm run obfuscate && electron-builder --win"
+  },
+  "keywords": [
+    "php",
+    "mariadb",
+    "local",
+    "development"
+  ],
+  "author": "vithanhlam",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
+    "javascript-obfuscator": "^5.4.1"
+  },
+  "dependencies": {
+    "archiver": "^6.0.1",
+    "basic-ftp": "^6.0.1",
+    "extract-zip": "^2.0.1",
+    "fs-extra": "^11.2.0",
+    "node-fetch": "^2.7.0",
+    "ssh2": "^1.17.0",
+    "tree-kill": "^1.2.2"
+  },
+  "build": {
+    "appId": "com.shieldpresslocal.app",
+    "productName": "ShieldPress Local",
+    "copyright": "© 2026 vithanhlam",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "icon": "assets/icon.ico",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ShieldPress Local",
+      "include": "assets/installer.nsh"
+    },
+    "files": [
+      "app/**/*",
+      "assets/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/",
+        "to": "bin/",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "assets/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "asar": true,
+    "compression": "maximum"
+  }
+}
