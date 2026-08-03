@@ -175,7 +175,7 @@ When launching for the first time, you will be asked where to store your project
 
 ## Changelog
 
-**[View Full Changelog →](https://github.com/vithanhlam/ShieldPress-Local/blob/main/Changelog.md)**
+**[View Full Changelog →](https://github.com/vithanhlam/ShieldPress-Local/blob/main/CHANGELOG.md)**
 
 ---
 
