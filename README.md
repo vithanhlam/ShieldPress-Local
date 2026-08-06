@@ -19,7 +19,7 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.4.0)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.3)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
@@ -94,13 +94,16 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 | Feature | Description |
 | ------- | ----------- |
 | **SFTP / FTP Client** | Connect to remote servers via SFTP (SSH) or FTP |
+| **Search & Filter** | Search connections by name, host, or username; filter by protocol type |
 | **File Browser** | Browse, upload, download, delete, create folders |
 | **Inline Editor** | Edit remote files directly in the app |
 | **External Editor** | Open remote files in VS Code — auto-uploads on save |
 | **Drag & Drop** | Drag files from Explorer to upload |
 | **ZIP Upload & Extract** | Upload ZIP and extract on server |
 | **SSH Terminal** | Full SSH terminal with command history and quick commands |
-| **Sync Upload/Download** | Push/pull files with exclude paths |
+| **Sync Upload/Download** | Push/pull files with optional "changed files only" mode |
+| **Auto-Reconnect** | Detects dead connections and reconnects transparently before each operation |
+| **Local Path Validation** | Validates local folder exists before sync starts |
 | **Encrypted Credentials** | Passwords stored with AES-256-GCM |
 
 ### Extensions & Tools
@@ -110,7 +113,7 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 | **Extension Manager** | Toggle 45+ PHP extensions on/off by category |
 | **ionCube Loader** | Auto-install ionCube for any PHP version |
 | **Redis** | Download, start/stop/restart Redis, flush cache, port config |
-| **Email Testing** | Configure SMTP — PHP `mail()` works out of the box |
+| **Email Testing** | Configure SMTP with SSL/TLS/STARTTLS — PHP `mail()` works out of the box |
 | **Cache Management** | OPcache config, WP cache flush, project cleanup, Nginx log clear |
 | **System Monitor** | Real-time CPU, RAM, Disk usage in titlebar |
 

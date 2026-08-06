@@ -1,5 +1,84 @@
 # Changelog
 
+## v2.5.3
+
+**About Page**
+- Redesigned About page: stack badges (Nginx, MariaDB, PHP, WordPress, Laravel, Node.js/Next.js) and feature highlights grid
+- Shows current version with update badge and **Download Update** button when a newer GitHub release is detected
+
+**SFTP & FTP**
+- Search and filter controls aligned to the right side of the page header
+
+---
+
+## v2.5.2
+
+**Check for Updates (New)**
+- App checks GitHub Releases API 6 seconds after startup (non-blocking, works offline gracefully)
+- If a newer version is available, a green **"vX.Y.Z available"** badge appears in the titlebar next to the CPU / RAM monitor
+- Clicking the badge opens the GitHub Releases page in the default browser
+- Version comparison is semver-aware (major → minor → patch)
+
+---
+
+## v2.5.1
+
+**Fix: Data Directory lost after upgrade**
+- Root cause: `customInstallMode` NSIS macro does not run for per-machine installers — `portable.txt` was backed up before uninstall but never restored, so the workspace path was lost on every upgrade
+- NSIS fix: restore `portable.txt` inside `customInstall` (runs after file extraction) instead of `customInstallMode`
+- App-side safety net: workspace path is now also saved to `%APPDATA%\ShieldPress Local\workspace_path.txt` on every launch and every Settings → Data Directory change
+- On startup, if `portable.txt` is missing (e.g. reinstall wipe), the app reads from `%APPDATA%` backup, recreates `portable.txt`, and resumes normally — projects, databases, and config are preserved with zero manual intervention
+
+---
+
+## v2.5.0
+
+**SFTP & FTP — Search & Filter (New)**
+- Search bar in the SFTP & FTP page header — filter connections by name, host, or username in real time
+- Protocol filter dropdown: show All / SFTP only / FTP only
+- "No connections match your search" empty state when filter returns nothing
+- Search is preserved when connecting, disconnecting, or deleting connections
+
+**SFTP & FTP — Sync: Changed Files Only (New)**
+- New "Sync changed files only" checkbox in the Sync Configuration modal
+- Upload: compares local `mtime` against remote `mtime` — skips files where remote is same age or newer
+- Download: compares remote `mtime` against local `mtime` — skips files already up to date
+- Sync result toast shows skipped file count alongside uploaded/downloaded count
+
+**SFTP & FTP — Local Folder Validation**
+- When selecting or pre-filling a local folder for sync, the app validates the path exists and shows file count
+- Upload sync validates the local path before connecting — shows an error instead of silently failing
+- Inline validation indicator (green check / red warning) appears below the Local Folder field
+
+**SFTP & FTP — Auto-Reconnect**
+- Connections are now tested before each operation using a lightweight ping (SFTP: `stat /`, FTP: `pwd`)
+- If the connection is found dead, the app reconnects transparently before retrying the operation
+- Connect button: if an existing connection is stale, it reconnects instead of assuming "already connected"
+
+**SFTP & FTP — Exclude Paths: Expanded Defaults**
+- Default exclude list now covers WordPress, Laravel, and Node.js out of the box:
+  `.env`, `.env.local`, `.env.production`, `bootstrap/cache`, `storage/logs`, `storage/framework/cache`,
+  `storage/framework/sessions`, `storage/framework/views`, `.next`, `dist`, `build`, `__pycache__`,
+  `wp-content/cache`, `wp-content/upgrade` (in addition to existing `node_modules`, `.git`, `vendor`, `.DS_Store`)
+
+**Email Testing — SSL / TLS / STARTTLS Support**
+- Added Security dropdown: `STARTTLS (587)`, `SSL/TLS (465)`, `None — plain`
+- Port 465 now uses implicit TLS (`tls.connect`) — fixes Gmail and other SSL-only SMTP servers that previously hung indefinitely
+- Port 587 uses STARTTLS upgrade: connects plain, sends `STARTTLS` after EHLO, then wraps the socket with TLS
+- Security mode auto-detected when changing port (465 → SSL, 587 → STARTTLS)
+- Connection timeout increased to 20s with a descriptive message (previously timed out silently)
+- `security` field persisted in `email_config.json`
+
+**Email Testing — Save Config UX**
+- Save Config button shows spinner and is disabled while saving — prevents double-submit
+
+**Cache Management — PHP 8.4 Fix**
+- OPcache is enabled by default in PHP 8.0+ — detection logic updated to reflect this:
+  treated as enabled unless `opcache.enable=0` is explicitly set (was previously requiring `opcache.enable=1`)
+- Extension detection regex now matches both `zend_extension=opcache` and `extension=opcache` (PHP 8.4 accepts both forms)
+
+---
+
 ## v2.4.0
 
 **Cloud Backup — Local Folder Sync (New)**
