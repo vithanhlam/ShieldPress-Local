@@ -5,13 +5,13 @@
 </p>
 
 <p align="center">
-  <strong>A fast, lightweight local development environment for WordPress, Laravel & PHP on Windows</strong>
+  <strong>A fast, lightweight local development environment for WordPress, Laravel & PHP on Windows and Ubuntu</strong>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/github/v/release/vithanhlam/shieldpress-local?style=flat-square&color=e07b1a" alt="Release"/>
   <img src="https://img.shields.io/github/downloads/vithanhlam/shieldpress-local/total?style=flat-square&color=22c55e" alt="Downloads"/>
-  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" alt="Platform"/>
+  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Ubuntu-blue?style=flat-square" alt="Platform"/>
   <img src="https://img.shields.io/badge/license-Freeware-orange?style=flat-square" alt="License"/>
 </p>
 
@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.3)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.10)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.4.0.exe` | Installer (recommended) |
-| `ShieldPress.Local.2.4.0.exe` | Portable — no install needed |
+| `ShieldPress.Local.Setup.2.5.10.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.10_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -59,9 +59,9 @@
 
 ## What is ShieldPress Local?
 
-ShieldPress Local is a desktop application that lets you run WordPress, Laravel, and PHP-based websites locally on your Windows machine — no technical expertise required.
+ShieldPress Local is a desktop application that lets you run WordPress, Laravel, and PHP-based websites locally on Windows or Ubuntu — no technical expertise required.
 
-It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB**, and **phpMyAdmin** — all managed through a clean, modern interface.
+It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and multi-version PHP — **PHP 8.3/8.4 on Windows** and **PHP 8.4/8.5 on Ubuntu** — all managed through a clean, modern interface.
 
 ---
 
@@ -82,7 +82,8 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 | **Full Backup** | Backup source files + database into a single ZIP |
 | **Cloud Backup** | Backup to Google Drive, OneDrive, or Dropbox — no login required |
 | **Clone WordPress** | Clone any project with automatic URL replacement |
-| **Database Manager** | Create, import, export, drop databases |
+| **Database Manager** | Create, import, export, and drop databases with progress, table count, and size |
+| **Project Disk Usage** | View total source and metadata size directly on every project card |
 | **Config Editor** | Edit php.ini, my.ini, and per-project Nginx config |
 | **SSL (HTTPS)** | One-click local HTTPS via mkcert |
 | **Git Push** | Push to GitHub, pull, custom git commands, clone repos |
@@ -101,7 +102,7 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 | **Drag & Drop** | Drag files from Explorer to upload |
 | **ZIP Upload & Extract** | Upload ZIP and extract on server |
 | **SSH Terminal** | Full SSH terminal with command history and quick commands |
-| **Sync Upload/Download** | Push/pull files with optional "changed files only" mode |
+| **Sync Upload/Download** | Push/pull files with optional "changed files only" mode and clear busy state |
 | **Auto-Reconnect** | Detects dead connections and reconnects transparently before each operation |
 | **Local Path Validation** | Validates local folder exists before sync starts |
 | **Encrypted Credentials** | Passwords stored with AES-256-GCM |
@@ -121,19 +122,30 @@ It comes bundled with everything you need: **Nginx**, **PHP 8.3/8.4**, **MariaDB
 
 ## Requirements
 
-- **OS:** Windows 10 / 11 (64-bit)
+- **OS:** Windows 10 / 11 (64-bit), or Ubuntu 22.04 and newer (64-bit)
 - **RAM:** 2GB minimum, 4GB recommended
 - **Disk:** 2GB for the app + space for your projects
-- **Admin rights:** Required on first install only
+- **Admin rights:** Required for installation and local hosts-file changes
 
 ---
 
 ## Installation
 
-1. Download `ShieldPress.Local.Setup.2.4.0.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+### Windows
+
+1. Download `ShieldPress.Local.Setup.2.5.10.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
-4. Launch **ShieldPress Local** from your desktop shortcut
+4. Launch **ShieldPress Local** from the desktop shortcut
+
+### Ubuntu
+
+1. Download `shieldpresslocal_2.5.10_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.10_amd64.deb`
+3. Launch **ShieldPress Local** from the application menu
+4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
+
+The Ubuntu package includes an isolated PHP 8.4 runtime and uses the distribution's PHP 8.5 runtime alongside it. Projects always start with the exact PHP version selected in their configuration.
 
 ---
 
@@ -145,19 +157,12 @@ When launching for the first time, you will be asked where to store your project
 
 **Recommendations:**
 
-- Use a drive other than `C:` (e.g., `D:\ShieldPress`, `E:\LocalDev`)
-- No spaces in the path
-- No special characters
-- Short path is better
+- Keep the workspace on a writable local disk
+- Windows examples: `D:\ShieldPress` or `E:\LocalDev`
+- Ubuntu example: `/home/you/Developer/ShieldPress_Projects`
+- Paths containing spaces are supported, although short paths remain easier to use in terminal commands
 
-| Good paths | Bad paths |
-| ---------- | --------- |
-| `D:\ShieldPress` | `C:\Users\John\My Projects` |
-| `E:\LocalDev` | `D:\Shield Press Local` |
-| `D:\Dev` | `E:\Dev&Test!` |
-
-> **Why?** Nginx does not support paths with spaces or special characters.
-> Storing on `D:` or another drive keeps your data safe if Windows needs to be reinstalled.
+Avoid read-only mounts and removable disks that may disappear while services are running. Keeping project data outside the application installation directory also protects it during upgrades.
 
 ### 2. Create Your First Project
 

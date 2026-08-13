@@ -1,5 +1,130 @@
 # Changelog
 
+## v2.5.10
+
+**Ubuntu Installer Reliability**
+- Installs the application in `/opt/ShieldPressLocal` so Electron can launch its Chromium sandbox from a path without spaces
+- Keeps the desktop name as **ShieldPress Local** and updates the command-line launcher to the new installation path
+- Restores the required root ownership and setuid permissions on `chrome-sandbox` after installation
+- Removes the obsolete spaced installation directory automatically during package upgrades
+
+**Writable PHP Runtime**
+- Copies bundled PHP 8.4 into the workspace runtime before projects start on Ubuntu
+- Stores the active `php.ini`, PHP executables, and extensions in a user-writable directory instead of modifying files below `/opt`
+- Preserves customized `php.ini` settings while refreshing bundled PHP binaries during application updates
+- Fixes Laravel and WordPress project startup failing with `EACCES` while applying upload and execution limits
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.10
+
+---
+
+## v2.5.9
+
+**Windows Workspace Startup Fix**
+- Ignores malformed legacy workspace preferences containing only the Windows extended-path prefix
+- Converts valid extended-length drive and UNC paths to stable standard Windows paths
+- Prevents device paths, drive-relative paths, and incomplete root fragments from reaching workspace initialization
+- Allows the app to recover automatically when an old installer restores an invalid `portable.txt`
+
+---
+
+## v2.5.8
+
+**Ubuntu PHP Runtime**
+- Adds simultaneous PHP 8.4 and PHP 8.5 support on Ubuntu
+- Detects every installed versioned PHP-CGI binary instead of exposing only the system default
+- Starts each project with the exact PHP version selected in its configuration
+- Prevents a missing PHP version from silently falling back to a different system version
+
+**Release**
+- Updates the Windows and Ubuntu release packages to version 2.5.8
+
+---
+
+## v2.5.7
+
+**Project Runtime Reliability**
+- Prevents concurrent project and Nginx startup attempts from terminating each other
+- Loads Ubuntu project server configurations and FastCGI parameters from explicit runtime paths
+- Sends reload and stop signals to ShieldPress's Nginx configuration instead of the system Nginx service
+- Reports the actual Nginx startup error when the process exits before binding its ports
+- Waits longer for project ports and uses one PHP-CGI listener on Linux to avoid redundant worker failures
+
+**Database Experience**
+- Migrates Windows root credentials in WordPress and Laravel projects to Ubuntu's passwordless local MariaDB account
+- Detects Ubuntu's system phpMyAdmin installation and activates its Nginx host on demand
+- Keeps phpMyAdmin access and error logs inside ShieldPress's user-writable runtime
+- Configures local phpMyAdmin authentication for the isolated port 3307 during DEB installation
+- Removes stale Windows GSSAPI fallback metadata and limits phpMyAdmin to loopback-only access
+- Adds live byte and percentage progress for database imports and exports
+- Adds a Show in Folder action when an export completes
+- Displays table count and database size in a flexible database list layout
+- Identifies databases linked to WordPress projects
+
+**Backup Experience**
+- Adds live byte and percentage progress while creating project backups
+- Adds real mysqldump progress to the Backup & Stop workflow and reports backup failures
+- Disables backup controls while an archive is being created
+- Adds Show in Folder actions after database/project backup completion and in the backup list
+
+**Project and SFTP Improvements**
+- Displays the total disk usage of every project
+- Disables and dims SFTP/FTP sync buttons while synchronization is running
+- Stops the sync loading animation and restores controls when synchronization completes
+- Uses cross-platform project folder paths for Open Folder and SFTP/FTP sync
+
+---
+
+## v2.5.6
+
+**Ubuntu Workspace Migration**
+- Migrates Windows workspaces from the system MariaDB port 3306 to ShieldPress's isolated Linux port 3307
+- Updates project metadata and local WordPress `DB_HOST` values during migration
+- Updates Laravel MySQL ports without altering projects configured for PostgreSQL
+- Preserves custom database hosts and non-default database ports
+- Starts the isolated MariaDB instance without a workspace option file to remain compatible with Ubuntu security confinement
+- Runs the system MariaDB binary from the workspace runtime so Ubuntu AppArmor permits user-owned database directories
+- Migrates Windows-only MariaDB `gssapi` root authentication to the local Ubuntu authentication scheme on first start
+
+---
+
+## v2.5.5
+
+**Windows Database Fix**
+- Fixed MariaDB client commands connecting as `root` without the configured password
+- Restored normal MariaDB grant checks when migrating configuration files created by older builds
+- Added authenticated database shutdown for the bundled Windows runtime
+
+**Project Website Fix**
+- Open Website now starts a stopped project before launching the browser
+- Project startup now reports Nginx launch failures instead of marking the project as running
+- Project startup now fails with a clear error when the configured website port does not respond
+- Browser launch errors are now returned to the interface instead of failing silently
+
+---
+
+## v2.5.4
+
+**Ubuntu Support**
+- Added native Ubuntu packaging with DEB and AppImage targets
+- Added Linux service discovery for Nginx, PHP-CGI, MariaDB, Redis, and mkcert
+- Added an isolated, user-owned MariaDB instance on port 3307 to avoid conflicts with the system database service
+- Added standard Linux application icons from 16px through 1024px and corrected GNOME window matching
+- Disabled GPU acceleration on Linux to avoid Vulkan startup failures on affected systems
+
+**Workspace Reliability**
+- Fixed the Windows startup failure that could occur after selecting a project directory
+- Added workspace path validation, atomic preference updates, and recovery from invalid saved paths
+- Added support for workspace paths containing spaces
+
+**Cross-Platform Fixes**
+- Updated database, backup, clone, project, and service commands for Windows and Linux
+- Added automated tests for platform detection, workspace handling, and initial configuration
+- Application version is now read directly from package metadata to prevent release version drift
+
+---
+
 ## v2.5.3
 
 **About Page**
