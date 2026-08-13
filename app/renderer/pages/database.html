@@ -1,0 +1,139 @@
+<div class="page-header">
+  <div>
+    <div class="page-title">Database</div>
+    <div class="page-sub">MariaDB management (local user: <strong>root</strong>)</div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-primary btn-sm" onclick="openModal('m-create-db')">
+      <i class="fas fa-plus"></i> New DB
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="Database.importDialog()">
+      <i class="fas fa-upload"></i> Import
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="api.openPhpMyAdmin()">
+      <i class="fas fa-external-link-alt"></i> phpMyAdmin
+    </button>
+    <button class="btn btn-ghost btn-sm" id="db-reload-btn" onclick="Database.reload()">
+      <i class="fas fa-sync"></i> Reload DB
+    </button>
+  </div>
+</div>
+
+<div id="db-operation-progress" class="card" style="display:none;margin-bottom:12px;padding:12px">
+  <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px">
+    <span id="db-operation-label" style="font-size:13px">Preparing...</span>
+    <span id="db-operation-bytes" style="font-size:12px;color:var(--text3)"></span>
+  </div>
+  <div style="height:6px;background:var(--bg3);border-radius:4px;overflow:hidden">
+    <div id="db-operation-bar" style="height:100%;width:0;background:var(--accent);transition:width .2s"></div>
+  </div>
+  <button id="db-operation-folder" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px" onclick="api.revealPath(this.dataset.path)">
+    <i class="fas fa-folder-open"></i> Show in Folder
+  </button>
+</div>
+
+<!-- Port setting bar -->
+<div style="display:flex;align-items:center;gap:10px;padding:10px 0 4px;border-bottom:1px solid var(--border);margin-bottom:12px">
+  <i class="fas fa-plug" style="color:var(--text3);font-size:13px"></i>
+  <span style="font-size:13px;color:var(--text2)">MariaDB Port</span>
+  <input id="db-port-input" type="number" min="1024" max="65535"
+    style="width:90px;padding:4px 8px;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);outline:none"
+    placeholder="3306"
+    onkeydown="if(event.key==='Enter') Database.savePort()"/>
+  <button class="btn btn-ghost btn-sm" onclick="Database.savePort()">
+    <i class="fas fa-save"></i> Save
+  </button>
+  <span id="db-port-status" style="font-size:12px;color:var(--text3)"></span>
+</div>
+
+<div id="db-list">
+  <div class="loading"><i class="fas fa-spinner fa-spin"></i></div>
+</div>
+
+<!-- Modal: Create DB -->
+<div class="overlay" id="m-create-db" onclick="closeIfOverlay(event,'m-create-db')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-database"></i> Create Database</div>
+    <div class="fg">
+      <div><div class="fl">Database name</div>
+        <input class="fi" id="new-db-name" placeholder="my_database"
+          onkeydown="if(event.key==='Enter'){Database.create();closeModal('m-create-db')}"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-create-db')">Cancel</button>
+      <button class="btn btn-primary" onclick="Database.create();closeModal('m-create-db')">
+        <i class="fas fa-plus"></i> Create
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Import DB -->
+<div class="overlay" id="m-import-db" onclick="closeIfOverlay(event,'m-import-db')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-upload"></i> Import Database</div>
+    <div class="fg">
+      <div><div class="fl">Select an existing database</div>
+        <select class="fi" id="import-db-sel"></select>
+      </div>
+      <div style="text-align:center;color:var(--text3)">— or create a new one —</div>
+      <div><div class="fl">New database name</div>
+        <input class="fi" id="import-db-new" placeholder="my_database"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-import-db')">Cancel</button>
+      <button class="btn btn-primary" onclick="Database.doImport()">
+        <i class="fas fa-file-upload"></i> Select SQL/GZ File…
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Database Terminal -->
+<div class="card" style="margin-top:12px">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-terminal" style="color:var(--green)"></i> Database Terminal</span>
+    <button class="btn btn-ghost btn-sm" onclick="DbTerminal.clear()"><i class="fas fa-eraser"></i> Clear</button>
+  </div>
+  <div class="card-body">
+    <div style="background:var(--bg0);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <pre id="db-term-output" style="margin:0;padding:14px;font-family:var(--mono);font-size:12px;color:var(--green);background:transparent;min-height:150px;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;border:none"></pre>
+      <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--border);background:var(--bg1)">
+        <span style="color:var(--green);font-family:var(--mono);font-size:12px;flex-shrink:0">mysql&gt;</span>
+        <input id="db-term-cmd" placeholder="SELECT 1; or SHOW TABLES FROM my_db;"
+          style="flex:1;background:transparent;border:none;outline:none;color:var(--text0);font-family:var(--mono);font-size:12px;padding:4px 0"
+          onkeydown="DbTerminal.keyDown(event)" autocomplete="off"/>
+        <button class="btn btn-ghost btn-xs" onclick="DbTerminal.exec()" style="padding:4px 8px"><i class="fas fa-paper-plane" style="color:var(--green)"></i></button>
+      </div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-xs" onclick="DbTerminal.quick('SHOW DATABASES;')">SHOW DATABASES</button>
+      <button class="btn btn-ghost btn-xs" onclick="DbTerminal.quick('SHOW TABLES;')">SHOW TABLES</button>
+      <button class="btn btn-ghost btn-xs" onclick="DbTerminal.quick('SHOW PROCESSLIST;')">PROCESSLIST</button>
+      <button class="btn btn-ghost btn-xs" onclick="DbTerminal.quick('SHOW VARIABLES LIKE \\'%max_connections%\\';')">max_connections</button>
+      <button class="btn btn-ghost btn-xs" onclick="DbTerminal.quick('SELECT VERSION();')">VERSION</button>
+      <button class="btn btn-ghost btn-xs" onclick="DbTerminal.quick('SHOW STATUS LIKE \\'Uptime\\';')">Uptime</button>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px">
+      <i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px"></i>
+      Use <kbd style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">Up</kbd>/<kbd style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">Down</kbd> for command history.
+      Prefix with database name: <code style="color:var(--accent)">USE my_db; SELECT * FROM wp_options LIMIT 5;</code>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Drop DB -->
+<div class="overlay" id="m-drop-db" onclick="closeIfOverlay(event,'m-drop-db')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-trash" style="color:var(--red)"></i> Drop Database</div>
+    <input type="hidden" id="drop-db-name"/>
+    <p>Drop database <strong id="drop-db-display"></strong>?</p>
+    <p style="color:var(--red);font-size:13px;margin-top:6px">This cannot be undone. No backup will be created.</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-drop-db')">Cancel</button>
+      <button class="btn btn-danger" onclick="Database.doDrop()"><i class="fas fa-trash"></i> Drop</button>
+    </div>
+  </div>
+</div>

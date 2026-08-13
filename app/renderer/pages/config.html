@@ -1,0 +1,54 @@
+<div class="page-header">
+  <div>
+    <div class="page-title">Config Editor</div>
+    <div class="page-sub">Edit PHP & Nginx configs</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn btn-ghost btn-sm" id="cfg-reload-btn" onclick="Config.reload()"
+      title="Reload PHP-CGI for selected version" style="display:none">
+      <i class="fas fa-sync"></i> Reload PHP
+    </button>
+    <button class="btn btn-primary" onclick="Config.save()"><i class="fas fa-save"></i> Save & Apply</button>
+  </div>
+</div>
+
+<!-- Main tabs -->
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+  <div class="tabs">
+    <button class="tab active cfg-tab" data-tab="php" onclick="Config.tab('php')">PHP (php.ini)</button>
+    <button class="tab cfg-tab" data-tab="nginx" onclick="Config.tab('nginx')">Nginx per Project</button>
+    <button class="tab cfg-tab" data-tab="mariadb" onclick="Config.tab('mariadb')">MariaDB (my.ini)</button>
+  </div>
+  <!-- PHP version sub-tabs (hidden when Nginx tab active) -->
+  <div id="cfg-php-ver-tabs" style="display:flex;gap:4px;margin-left:8px"></div>
+  <!-- Nginx project selector -->
+  <select class="fi" id="cfg-proj-sel" onchange="Config.loadNginx()" style="width:200px;display:none">
+    <option value="">-- Select project --</option>
+  </select>
+</div>
+
+<!-- Status bar for PHP -->
+<div id="cfg-php-status" style="font-size:12px;color:var(--text2);margin-bottom:8px;display:none">
+  <i class="fas fa-circle" id="cfg-php-status-dot" style="font-size:8px;margin-right:4px"></i>
+  <span id="cfg-php-status-text">PHP not running</span>
+</div>
+
+<!-- Search bar -->
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+  <div style="position:relative;flex:1;max-width:320px">
+    <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:12px"></i>
+    <input class="fi" id="cfg-search" placeholder="Search in config..." style="padding-left:30px;font-size:12px" autocomplete="off"
+      oninput="ConfigEditor.search()" onkeydown="if(event.key==='Enter'){event.preventDefault();ConfigEditor.searchNext()}" />
+  </div>
+  <button class="btn btn-ghost btn-xs" onclick="ConfigEditor.searchNext()" title="Next match"><i class="fas fa-arrow-down"></i></button>
+  <button class="btn btn-ghost btn-xs" onclick="ConfigEditor.searchPrev()" title="Previous match"><i class="fas fa-arrow-up"></i></button>
+  <span id="cfg-search-count" style="font-size:11px;color:var(--text3)"></span>
+  <span style="margin-left:auto;font-size:11px;color:var(--text3)" id="cfg-cursor-pos">Line 1, Col 1</span>
+</div>
+
+<!-- Editor with line numbers -->
+<div class="cfg-editor-wrap" style="display:flex;border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;height:calc(100vh - 320px)">
+  <pre id="cfg-line-numbers" style="margin:0;padding:10px 8px 10px 8px;background:var(--bg3);color:var(--text3);font-family:var(--mono);font-size:12px;line-height:1.6;text-align:right;min-width:48px;overflow:hidden;user-select:none;border-right:1px solid var(--border)">1</pre>
+  <textarea class="cfg-editor" id="cfg-editor" spellcheck="false" style="border:none;border-radius:0;resize:none;flex:1;line-height:1.6;padding:10px 12px;font-size:12px"
+    oninput="ConfigEditor.updateLines()" onscroll="ConfigEditor.syncScroll()" onclick="ConfigEditor.updateCursor()" onkeyup="ConfigEditor.updateCursor()"># Loading...</textarea>
+</div>

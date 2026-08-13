@@ -1,0 +1,18 @@
+{
+  "name": "shieldpresslocal",
+  "productName": "ShieldPress Local",
+  "version": "2.5.10",
+  "description": "ShieldPress Local Development Environment Manager",
+  "main": "app/main.js",
+  "author": "vithanhlam",
+  "license": "MIT",
+  "dependencies": {
+    "archiver": "^6.0.1",
+    "basic-ftp": "^6.0.1",
+    "extract-zip": "^2.0.1",
+    "fs-extra": "^11.2.0",
+    "node-fetch": "^2.7.0",
+    "ssh2": "^1.17.0",
+    "tree-kill": "^1.2.2"
+  }
+}

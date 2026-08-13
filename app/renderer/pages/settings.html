@@ -1,0 +1,212 @@
+<div class="page-header">
+  <div><div class="page-title">Settings</div></div>
+  <button class="btn btn-primary" onclick="saveSettings()">
+    <i class="fas fa-save"></i> Save
+  </button>
+</div>
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-search"></i> Binary Status</span>
+    <button class="btn btn-ghost btn-sm" onclick="checkBinaries()">
+      <i class="fas fa-sync"></i> Check
+    </button>
+  </div>
+  <div class="card-body" id="binary-status">
+    Click "Check" to verify binaries.
+  </div>
+</div>
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-folder"></i> Paths</span>
+  </div>
+  <div class="card-body">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="font-size: 12px; color: var(--text2)">Data directory</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="data-dir-path" style="font-family: var(--mono); font-size: 12px; color: var(--text1); flex:1">Loading...</div>
+        <button class="btn btn-ghost btn-sm" title="Copy path" onclick="PathsCard.copy('data-dir-path')">
+          <i class="fas fa-copy"></i>
+        </button>
+        <button class="btn btn-ghost btn-sm" title="Open folder" onclick="PathsCard.open('data-dir-path')">
+          <i class="fas fa-folder-open"></i>
+        </button>
+      </div>
+      <div style="font-size: 12px; color: var(--text2)">Binaries directory</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="bin-dir-path" style="font-family: var(--mono); font-size: 12px; color: var(--text1); flex:1">Loading...</div>
+        <button class="btn btn-ghost btn-sm" title="Copy path" onclick="PathsCard.copy('bin-dir-path')">
+          <i class="fas fa-copy"></i>
+        </button>
+        <button class="btn btn-ghost btn-sm" title="Open folder" onclick="PathsCard.open('bin-dir-path')">
+          <i class="fas fa-folder-open"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-folder"></i> Data Directory</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size: 12px; color: var(--text2); margin-bottom: 12px">Stores all data: PHP, Nginx, database, and projects. Default: <span style="font-family: var(--mono)">C:/ShieldPress-Project</span></div>
+    <div id="current-data-dir" style="font-family: var(--mono); font-size: 12px; color: var(--text1); padding: 8px; background: var(--bg3); border-radius: var(--rs); margin-bottom: 12px;"></div>
+    <div style="color: var(--yellow); font-size: 12px; margin-bottom: 12px"><i class="fas fa-exclamation-triangle"></i> Path must NOT contain spaces. App will restart after changing.</div>
+    <div style="display: flex; gap: 8px">
+      <input class="fi" id="data-dir-input" placeholder="C:/ShieldPress-Project" style="flex: 1" />
+      <button class="btn btn-ghost" onclick="StorageSettings.browseDataDir()">
+        <i class="fas fa-folder-open"></i>
+      </button>
+      <button class="btn btn-primary" onclick="StorageSettings.saveDataDir()">
+        <i class="fas fa-save"></i> Apply
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Editor Config -->
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-code"></i> Code Editor</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size: 12px; color: var(--text2); margin-bottom: 12px">
+      Choose which editor to open projects with. Auto-detects VS Code, Notepad++, Sublime Text.
+    </div>
+    <div id="editor-detected" style="font-size: 13px; margin-bottom: 12px; padding: 8px; background: var(--bg3); border-radius: var(--rs);">
+      <i class="fas fa-spinner fa-spin"></i> Detecting...
+    </div>
+    <div style="display: flex; gap: 8px">
+      <input class="fi" id="editor-path-input" placeholder="Custom editor path (leave empty for auto-detect)" style="flex: 1" />
+      <button class="btn btn-ghost" onclick="EditorSettings.browse()">
+        <i class="fas fa-folder-open"></i>
+      </button>
+      <button class="btn btn-primary" onclick="EditorSettings.save()">
+        <i class="fas fa-save"></i> Apply
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PHP Path Config -->
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fab fa-php" style="color:#777BB3"></i> PHP Path</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size: 12px; color: var(--text2); margin-bottom: 12px">
+      Set a custom PHP executable path for running CLI commands (Composer, WP-CLI, etc.).
+      Leave empty to use the bundled PHP.
+    </div>
+    <div id="php-path-detected" style="font-size: 13px; margin-bottom: 12px; padding: 8px; background: var(--bg3); border-radius: var(--rs);">
+      <i class="fas fa-spinner fa-spin"></i> Detecting...
+    </div>
+    <div style="display: flex; gap: 8px">
+      <input class="fi" id="php-path-input" placeholder="Custom PHP path (leave empty for bundled)" style="flex: 1" />
+      <button class="btn btn-ghost" onclick="PhpPathSettings.browse()">
+        <i class="fas fa-folder-open"></i>
+      </button>
+      <button class="btn btn-primary" onclick="PhpPathSettings.save()">
+        <i class="fas fa-save"></i> Apply
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- GitHub Config -->
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fab fa-github"></i> GitHub</span>
+    <span id="gh-status-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--bg3);color:var(--text3)">Not configured</span>
+  </div>
+  <div class="card-body">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+      Configure your GitHub credentials for Git Push. You need a
+      <strong>Personal Access Token (PAT)</strong> — create one at
+      <span style="color:var(--accent);cursor:pointer" onclick="api.openBrowser('https://github.com/settings/tokens/new?scopes=repo&description=ShieldPress+Local')">github.com/settings/tokens</span>
+      with <code>repo</code> scope.
+    </div>
+    <div id="gh-config-status" style="font-size:13px;margin-bottom:12px;padding:8px;background:var(--bg3);border-radius:var(--rs);display:none"></div>
+    <div class="fg" style="gap:10px">
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><div class="fl">GitHub Username</div>
+          <input class="fi" id="gh-username" placeholder="vithanhlam" autocomplete="off"/></div>
+        <div style="flex:1"><div class="fl">Email (for git commits)</div>
+          <input class="fi" id="gh-email" placeholder="you@example.com" autocomplete="off"/></div>
+      </div>
+      <div><div class="fl">Personal Access Token</div>
+        <div style="display:flex;gap:8px">
+          <input class="fi" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="flex:1;font-family:var(--mono)" autocomplete="off"/>
+          <button class="btn btn-ghost btn-sm" onclick="GitHubSettings.toggleToken()" title="Show/hide token"><i class="fas fa-eye" id="gh-token-eye"></i></button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <button class="btn btn-primary" onclick="GitHubSettings.save()">
+        <i class="fas fa-save"></i> Save & Test
+      </button>
+      <button class="btn btn-ghost" onclick="GitHubSettings.clear()">
+        <i class="fas fa-trash"></i> Clear
+      </button>
+      <span id="gh-test-result" style="font-size:12px"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Cloud Backup (local folder) -->
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-cloud-upload-alt" style="color:#4285F4"></i> Cloud Backup Folder</span>
+  </div>
+  <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;color:var(--text2);line-height:1.6">
+      Set the folder where backups will be saved. Use a folder synced by <strong>Google Drive for Desktop</strong>, <strong>OneDrive</strong>, or <strong>Dropbox</strong> — the sync tool handles the upload automatically. No API keys or login required.
+    </div>
+
+    <!-- Auto-detected folders -->
+    <div id="gdrive-detected-wrap" style="display:none">
+      <div class="fl" style="margin-bottom:4px">Detected cloud sync folders</div>
+      <div id="gdrive-detected-list" style="display:flex;flex-direction:column;gap:4px"></div>
+    </div>
+
+    <!-- Current folder -->
+    <div id="gdrive-status-banner" style="padding:8px 12px;border-radius:6px;font-size:13px;background:var(--bg3)">
+      <i class="fas fa-spinner fa-spin"></i> Checking...
+    </div>
+
+    <!-- Folder input -->
+    <div>
+      <div class="fl" style="margin-bottom:4px">Backup folder path</div>
+      <div style="display:flex;gap:8px">
+        <input class="fi" id="gdrive-folder-input" placeholder="C:\Users\You\Google Drive\My Drive" style="flex:1;font-family:var(--mono);font-size:12px" autocomplete="off"/>
+        <button class="btn btn-ghost" onclick="GDriveSettings.browseFolder()">
+          <i class="fas fa-folder-open"></i>
+        </button>
+        <button class="btn btn-primary" onclick="GDriveSettings.saveFolder()">
+          <i class="fas fa-save"></i> Save
+        </button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3)">
+      Backups will be created under: <code>BackupFolder / ShieldPress Local / ProjectName / backup_TIMESTAMP</code>
+    </div>
+  </div>
+</div>
+
+<!-- System Config -->
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-cogs"></i> System</span>
+  </div>
+  <div class="card-body">
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <div style="flex: 1">
+        <div style="font-weight: 500; margin-bottom: 4px;">Windows Hosts File</div>
+        <div style="font-size: 12px; color: var(--text2)">View or manually edit C:\Windows\System32\drivers\etc\hosts.</div>
+      </div>
+      <button class="btn btn-ghost" onclick="Config.openHostsFile()">
+        <i class="fas fa-file-alt"></i> Edit Hosts File
+      </button>
+    </div>
+  </div>
+</div>

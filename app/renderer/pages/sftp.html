@@ -1,0 +1,262 @@
+<div class="page-header">
+  <div>
+    <div class="page-title">SFTP & FTP</div>
+    <div class="page-sub">Manage remote server connections, file transfer & sync</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+    <div class="search-wrap" style="max-width:220px">
+      <i class="fas fa-search"></i>
+      <input id="sftp-search-box" class="fi" placeholder="Search connections..." oninput="SFTP.filter()" style="padding-left:32px"/>
+    </div>
+    <select id="sftp-filter-type" class="fi" style="width:120px" onchange="SFTP.filter()">
+      <option value="">All types</option>
+      <option value="sftp">SFTP</option>
+      <option value="ftp">FTP</option>
+    </select>
+    <button class="btn btn-primary" onclick="SFTP.openAdd()">
+      <i class="fas fa-plus"></i> New Connection
+    </button>
+  </div>
+</div>
+
+<!-- Connection list -->
+<div id="sftp-conn-list">
+  <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+</div>
+
+<!-- Modal: Add/Edit Connection -->
+<div class="overlay" id="m-sftp-edit" onclick="closeIfOverlay(event,'m-sftp-edit')">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title"><i class="fas fa-server"></i> <span id="sftp-modal-title">New Connection</span></div>
+    <input type="hidden" id="sftp-edit-id"/>
+    <div class="fg">
+      <div><div class="fl">Connection Name *</div>
+        <input class="fi" id="sftp-name" placeholder="My Server" autocomplete="off"/></div>
+      <div><div class="fl">Protocol</div>
+        <select class="fi" id="sftp-type" onchange="document.getElementById('sftp-port').value = this.value==='ftp'?21:22">
+          <option value="sftp">SFTP (SSH)</option>
+          <option value="ftp">FTP</option>
+        </select></div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><div class="fl">Host *</div>
+          <input class="fi" id="sftp-host" placeholder="192.168.1.100" autocomplete="off"/></div>
+        <div style="width:100px"><div class="fl">Port</div>
+          <input class="fi" id="sftp-port" type="number" value="22"/></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><div class="fl">Username *</div>
+          <input class="fi" id="sftp-user" placeholder="root" autocomplete="off"/></div>
+        <div style="flex:1"><div class="fl">Password</div>
+          <input class="fi" id="sftp-pass" type="password" placeholder="Password" autocomplete="off"/></div>
+      </div>
+      <div><div class="fl">Private Key (optional, for SFTP)</div>
+        <div style="display:flex;gap:8px">
+          <input class="fi" id="sftp-key" placeholder="C:\Users\...\.ssh\id_rsa" style="flex:1"/>
+          <button class="btn btn-ghost btn-sm" onclick="SFTP.browseKey()"><i class="fas fa-folder-open"></i></button>
+        </div>
+      </div>
+      <div><div class="fl">Remote Path</div>
+        <input class="fi" id="sftp-remote-path" placeholder="/var/www/html" autocomplete="off"/></div>
+      <div><div class="fl">Link to Project</div>
+        <select class="fi" id="sftp-project">
+          <option value="">-- None --</option>
+        </select></div>
+      <div><div class="fl">Exclude Paths (one per line)</div>
+        <textarea class="fi" id="sftp-excludes" rows="3" style="font-family:var(--mono);font-size:12px;resize:vertical" placeholder="node_modules&#10;.git&#10;vendor&#10;.DS_Store"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-sftp-edit')">Cancel</button>
+      <button class="btn btn-primary" onclick="SFTP.save()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: File Browser -->
+<div class="overlay" id="m-sftp-browser" onclick="closeIfOverlay(event,'m-sftp-browser')">
+  <div class="modal" style="max-width:750px;max-height:85vh">
+    <div class="modal-title"><i class="fas fa-folder-open"></i> <span id="sftp-browser-title">Remote Files</span></div>
+    <input type="hidden" id="sftp-browser-conn-id"/>
+
+    <!-- Current path bar -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.browseUp()" title="Parent directory"><i class="fas fa-arrow-up"></i></button>
+      <input class="fi" id="sftp-current-path" style="flex:1;font-family:var(--mono);font-size:13px" readonly/>
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.refreshBrowser()" title="Refresh"><i class="fas fa-sync"></i></button>
+    </div>
+
+    <!-- File list (drop zone) -->
+    <div id="sftp-file-list" style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;transition:outline 0.2s,background 0.2s">
+      <div class="loading"><i class="fas fa-spinner fa-spin"></i></div>
+    </div>
+
+    <!-- Drop hint -->
+    <div style="font-size:11px;color:var(--text3);margin-top:6px;display:flex;align-items:center;gap:6px">
+      <i class="fas fa-cloud-upload-alt"></i> Drag & drop files here to upload. Existing files will ask before overwriting.
+    </div>
+
+    <!-- Action bar -->
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFromDialog()"><i class="fas fa-upload"></i> Upload File</button>
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadZipDialog()"><i class="fas fa-file-archive"></i> Upload ZIP & Extract</button>
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.createDirPrompt()"><i class="fas fa-folder-plus"></i> New Folder</button>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-sftp-browser')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: File Editor -->
+<div class="overlay" id="m-sftp-editor" onclick="closeIfOverlay(event,'m-sftp-editor')">
+  <div class="modal" style="max-width:750px;max-height:85vh">
+    <div class="modal-title"><i class="fas fa-edit"></i> Edit — <span id="sftp-editor-file"></span></div>
+    <input type="hidden" id="sftp-editor-conn-id"/>
+    <input type="hidden" id="sftp-editor-path"/>
+    <textarea id="sftp-editor-content" class="fi" style="font-family:var(--mono);font-size:13px;height:400px;resize:vertical;white-space:pre;overflow-wrap:normal;overflow-x:auto"></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-sftp-editor')">Cancel</button>
+      <button class="btn btn-primary" onclick="SFTP.saveFileEdit()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Terminal -->
+<div class="overlay" id="m-sftp-terminal" onclick="closeIfOverlay(event,'m-sftp-terminal')">
+  <div class="modal" style="max-width:800px;width:95%">
+    <div class="modal-title" style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <i class="fas fa-terminal" style="color:var(--green)"></i>
+      SSH Terminal — <span id="sftp-term-name" style="color:var(--accent)"></span>
+      <span id="sftp-term-status" style="font-size:11px;margin-left:auto;color:var(--green);font-weight:400"><i class="fas fa-circle" style="font-size:7px"></i> Connected</span>
+    </div>
+    <input type="hidden" id="sftp-term-conn-id"/>
+
+    <!-- Terminal output -->
+    <div style="background:var(--bg0);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <pre id="sftp-term-output" style="margin:0;padding:14px;font-family:var(--mono);font-size:12px;color:var(--green);background:transparent;min-height:300px;max-height:440px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;border:none"></pre>
+
+      <!-- Input line inside terminal box -->
+      <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid var(--border);background:var(--bg1)">
+        <span style="color:var(--green);font-family:var(--mono);font-size:12px;flex-shrink:0;white-space:nowrap" id="sftp-term-prompt">$</span>
+        <input id="sftp-term-cmd" placeholder="Type any command..."
+          style="flex:1;background:transparent;border:none;outline:none;color:var(--text0);font-family:var(--mono);font-size:12px;padding:4px 0"
+          onkeydown="SFTP.termKeyDown(event)" autocomplete="off"/>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.execCmd()" style="padding:4px 8px"><i class="fas fa-paper-plane" style="color:var(--green)"></i></button>
+      </div>
+    </div>
+
+    <!-- Quick commands - organized by category -->
+    <div style="margin-top:10px">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Quick Commands</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <!-- Navigation -->
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('ls -la')" title="List files with details">ls -la</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('ls -lah')" title="List with human-readable sizes">ls -lah</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('pwd')" title="Current directory">pwd</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('du -sh *')" title="Folder sizes">du -sh *</button>
+
+        <span style="width:1px;background:var(--border);margin:0 2px"></span>
+
+        <!-- System -->
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('df -h')" title="Disk usage">df -h</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('free -h')" title="Memory usage">free -h</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('uptime')" title="System uptime">uptime</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('whoami')" title="Current user">whoami</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('uname -a')" title="System info">uname</button>
+
+        <span style="width:1px;background:var(--border);margin:0 2px"></span>
+
+        <!-- Services -->
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('systemctl status nginx')" title="Nginx status">nginx</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('systemctl status apache2 || systemctl status httpd')" title="Apache status">apache</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('systemctl status mysql || systemctl status mariadb')" title="MySQL status">mysql</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('php -v')" title="PHP version">php -v</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('node -v')" title="Node version">node -v</button>
+
+        <span style="width:1px;background:var(--border);margin:0 2px"></span>
+
+        <!-- Logs -->
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('tail -30 /var/log/syslog 2>/dev/null || tail -30 /var/log/messages')" title="System log">syslog</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('tail -30 /var/log/nginx/error.log')" title="Nginx error log">nginx err</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('tail -30 /var/log/apache2/error.log 2>/dev/null || tail -30 /var/log/httpd/error_log')" title="Apache error log">apache err</button>
+
+        <span style="width:1px;background:var(--border);margin:0 2px"></span>
+
+        <!-- Process -->
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('top -bn1 | head -20')" title="Top processes">top</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('ps aux --sort=-%mem | head -15')" title="Top memory processes">ps mem</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('netstat -tlnp 2>/dev/null || ss -tlnp')" title="Listening ports">ports</button>
+
+        <span style="width:1px;background:var(--border);margin:0 2px"></span>
+
+        <!-- Misc -->
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('cat /etc/os-release')" title="OS info">os-release</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('crontab -l')" title="Cron jobs">crontab</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('last -10')" title="Last logins">last</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.execClear()" title="Clear terminal"><i class="fas fa-eraser"></i> clear</button>
+      </div>
+    </div>
+
+    <!-- Command history hint -->
+    <div style="font-size:10px;color:var(--text3);margin-top:8px">
+      <i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px"></i>
+      Press <kbd style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">Up</kbd>/<kbd style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">Down</kbd> arrow to navigate command history
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-sftp-terminal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Sync with folder picker -->
+<div class="overlay" id="m-sftp-sync-config" onclick="closeIfOverlay(event,'m-sftp-sync-config')">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title"><i class="fas fa-sync-alt"></i> <span id="sftp-sync-config-title">Sync Configuration</span></div>
+    <input type="hidden" id="sftp-sync-conn-id"/>
+    <input type="hidden" id="sftp-sync-direction"/>
+    <div class="fg">
+      <div>
+        <div class="fl">Local Folder</div>
+        <div style="display:flex;gap:8px">
+          <input class="fi" id="sftp-sync-local" placeholder="Select local folder..." style="flex:1;font-family:var(--mono);font-size:13px" readonly/>
+          <button class="btn btn-ghost btn-sm" onclick="SFTP.browseSyncLocal()"><i class="fas fa-folder-open"></i></button>
+        </div>
+        <div id="sftp-sync-local-info" style="font-size:11px;margin-top:4px;display:none"></div>
+      </div>
+      <div>
+        <div class="fl">Remote Folder</div>
+        <input class="fi" id="sftp-sync-remote" placeholder="/var/www/html"/>
+      </div>
+      <div>
+        <div class="fl">Exclude Paths (one per line)</div>
+        <textarea class="fi" id="sftp-sync-excludes" rows="4" style="font-family:var(--mono);font-size:12px;resize:vertical" placeholder="node_modules&#10;.git&#10;vendor&#10;.env&#10;.DS_Store&#10;storage/logs"></textarea>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">
+          Each line is a folder or file name to exclude from sync
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0">
+        <input type="checkbox" id="sftp-sync-changed-only" style="width:16px;height:16px;cursor:pointer"/>
+        <label for="sftp-sync-changed-only" style="font-size:13px;cursor:pointer">
+          <strong>Sync changed files only</strong>
+          <span style="color:var(--text3);font-size:12px"> — skip files that haven't been modified</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-sftp-sync-config')">Cancel</button>
+      <button class="btn btn-primary" id="sftp-sync-start-btn" onclick="SFTP.startSync()"><i class="fas fa-sync-alt"></i> Start Sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sync Progress Modal -->
+<div class="overlay" id="m-sftp-sync">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title"><i id="sftp-sync-icon" class="fas fa-sync-alt fa-spin"></i> <span id="sftp-sync-title">Syncing...</span></div>
+    <pre id="sftp-sync-output" class="cli-output" style="min-height:150px;max-height:300px;overflow-y:auto"></pre>
+    <div class="modal-footer" id="sftp-sync-footer" style="display:none">
+      <button class="btn btn-ghost" onclick="closeModal('m-sftp-sync')">Close</button>
+    </div>
+  </div>
+</div>

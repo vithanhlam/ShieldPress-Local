@@ -1,0 +1,350 @@
+<div style="display: flex; flex-direction: column; gap: 20px">
+  <!-- Backup -->
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-title"
+        ><i class="fas fa-download"></i> Create Full Backup</span
+      >
+    </div>
+    <div class="card-body">
+      <div class="fg">
+        <div>
+          <div class="fl">Select Project</div>
+          <select class="fi" id="bkf-proj-sel">
+            <option value="">-- Select project --</option>
+          </select>
+        </div>
+      </div>
+      <div
+        style="margin-top: 14px; display: flex; gap: 8px; align-items: center"
+      >
+        <button
+          class="btn btn-primary"
+          id="bkf-btn-backup"
+          onclick="BackupFullPlugin.doBackup()"
+        >
+          <i class="fas fa-archive"></i> Start Backup
+        </button>
+        <span style="font-size: 12px; color: var(--text2)"
+          >Includes: source files + database + nginx config</span
+        >
+      </div>
+      <pre
+        id="bkf-backup-log"
+        class="cli-output"
+        style="display: none; margin-top: 12px; max-height: 150px"
+      ></pre>
+    </div>
+  </div>
+
+  <!-- Backup list -->
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-title"><i class="fas fa-list"></i> Full Backups</span>
+      <button
+        class="btn btn-ghost btn-sm"
+        onclick="BackupFullPlugin.loadList()"
+      >
+        <i class="fas fa-sync"></i> Refresh
+      </button>
+    </div>
+    <div class="card-body" id="bkf-list">
+      <div class="loading"><i class="fas fa-spinner fa-spin"></i></div>
+    </div>
+  </div>
+
+  <!-- Restore -->
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-title"><i class="fas fa-undo"></i> Restore</span>
+    </div>
+    <div class="card-body">
+      <div class="fg">
+        <div>
+          <div class="fl">Restore mode</div>
+          <div style="display: flex; gap: 10px; margin-top: 4px">
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+              "
+            >
+              <input
+                type="radio"
+                name="restore-mode"
+                value="new"
+                checked
+                onchange="BackupFullPlugin.toggleRestoreMode(this.value)"
+              />
+              <span>Create new project</span>
+            </label>
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+              "
+            >
+              <input
+                type="radio"
+                name="restore-mode"
+                value="existing"
+                onchange="BackupFullPlugin.toggleRestoreMode(this.value)"
+              />
+              <span>Overwrite existing project</span>
+            </label>
+          </div>
+        </div>
+        <div id="bkf-existing-sel" style="display: none">
+          <div class="fl">
+            Target Project
+            <span style="color: var(--red)"
+              >⚠ Will overwrite all files + DB</span
+            >
+          </div>
+          <select class="fi" id="bkf-restore-proj-sel">
+            <option value="">-- Select project --</option>
+          </select>
+        </div>
+        <div>
+          <div class="fl">Backup file (ZIP)</div>
+          <div style="display: flex; gap: 8px">
+            <input
+              class="fi"
+              id="bkf-zip-path"
+              placeholder="Path to FULL_*.zip"
+              readonly
+              style="flex: 1"
+            />
+            <button class="btn btn-ghost" onclick="BackupFullPlugin.pickZip()">
+              <i class="fas fa-folder-open"></i> Browse
+            </button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 14px">
+        <button
+          class="btn btn-primary"
+          id="bkf-btn-restore"
+          onclick="BackupFullPlugin.doRestore()"
+        >
+          <i class="fas fa-undo"></i> Start Restore
+        </button>
+      </div>
+      <pre
+        id="bkf-restore-log"
+        class="cli-output"
+        style="display: none; margin-top: 12px; max-height: 150px"
+      ></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.BackupFullPlugin = {
+    async init() {
+      await this._fillProjectSelects();
+      await this.loadList();
+    },
+
+    async _fillProjectSelects() {
+      const projects = await api.getProjects();
+      ["bkf-proj-sel", "bkf-restore-proj-sel"].forEach((id) => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        sel.innerHTML = '<option value="">-- Select project --</option>';
+        projects.forEach((p) => {
+          const o = document.createElement("option");
+          o.value = p.id;
+          o.textContent = p.name;
+          sel.appendChild(o);
+        });
+      });
+    },
+
+    async loadList() {
+      const el = document.getElementById("bkf-list");
+      if (!el) return;
+      el.innerHTML =
+        '<div class="loading"><i class="fas fa-spinner fa-spin"></i></div>';
+      const r = await api.runPlugin({
+        pluginId: "backup-full",
+        action: "listBackups",
+        data: {},
+      });
+      if (!r.success || !r.backups?.length) {
+        el.innerHTML =
+          '<div class="empty-state"><i class="fas fa-archive"></i><p>No full backups yet</p></div>';
+        return;
+      }
+      el.innerHTML = r.backups
+        .map(
+          (b) => `
+<div class="backup-row">
+  <div style="display:flex;align-items:center;gap:8px">
+    <i class="fas fa-file-archive" style="color:var(--accent)"></i>
+    <span style="font-size:13px">${b.name}</span>
+  </div>
+  <div class="backup-meta">
+    <span>${(b.size / 1024 / 1024).toFixed(1)} MB</span>
+    <span>${new Date(b.createdAt).toLocaleString("vi-VN")}</span>
+    <button class="btn btn-sm btn-ghost" onclick="BackupFullPlugin.useForRestore('${b.path.replace(/\\/g, "/")}')">
+      <i class="fas fa-undo"></i> Restore this
+    </button>
+    <button class="btn btn-sm btn-ghost" onclick="api.openFolder('${b.path.replace(/[^/\\]*$/, "").replace(/\\/g, "/")}')">
+      <i class="fas fa-folder-open"></i>
+    </button>
+  </div>
+</div>`,
+        )
+        .join("");
+    },
+
+    async doBackup() {
+      const projId = document.getElementById("bkf-proj-sel")?.value;
+      if (!projId) {
+        toast("Select a project", "warn");
+        return;
+      }
+
+      const btn = document.getElementById("bkf-btn-backup");
+      const log = document.getElementById("bkf-backup-log");
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Backing up...';
+      log.style.display = "block";
+      log.textContent = "Starting backup...\n";
+      log.className = "cli-output";
+
+      toast("Creating full backup... please wait", "info", 10000);
+      const r = await api.runPlugin({
+        pluginId: "backup-full",
+        action: "backup",
+        data: { projId },
+      });
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-archive"></i> Start Backup';
+
+      if (r.success) {
+        log.textContent += `✅ Done! Size: ${(r.size / 1024 / 1024).toFixed(1)} MB\nPath: ${r.path}`;
+        toast("Backup created: " + r.name, "success");
+        await this.loadList();
+      } else {
+        log.className = "cli-output error";
+        log.textContent += "❌ Failed: " + r.message;
+        toast("Backup failed: " + r.message, "error");
+      }
+    },
+
+    toggleRestoreMode(mode) {
+      const el = document.getElementById("bkf-existing-sel");
+      if (el) el.style.display = mode === "existing" ? "block" : "none";
+    },
+
+    async pickZip() {
+      const file = await api.openFileDialog({
+        properties: ["openFile"],
+        filters: [{ name: "Full Backup ZIP", extensions: ["zip"] }],
+      });
+      if (file) {
+        const input = document.getElementById("bkf-zip-path");
+        if (input) input.value = file;
+      }
+    },
+
+    useForRestore(zipPath) {
+      const input = document.getElementById("bkf-zip-path");
+      if (input) input.value = zipPath;
+      // Scroll to restore section
+      input?.scrollIntoView({ behavior: "smooth" });
+    },
+
+    async doRestore() {
+      const zipPath = document.getElementById("bkf-zip-path")?.value.trim();
+      const mode =
+        document.querySelector('input[name="restore-mode"]:checked')?.value ||
+        "new";
+      const projId =
+        mode === "existing"
+          ? document.getElementById("bkf-restore-proj-sel")?.value
+          : null;
+      const createNew = mode === "new";
+
+      if (!zipPath) {
+        toast("Select a backup ZIP file", "warn");
+        return;
+      }
+      if (mode === "existing" && !projId) {
+        toast("Select target project", "warn");
+        return;
+      }
+
+      // Validate trước
+      const log = document.getElementById("bkf-restore-log");
+      log.style.display = "block";
+      log.className = "cli-output";
+      log.textContent = "🔍 Validating backup file...\n";
+
+      const v = await api.runPlugin({
+        pluginId: "backup-full",
+        action: "validateBackup",
+        data: { zipPath },
+      });
+      if (!v.valid) {
+        log.className = "cli-output error";
+        log.textContent += `❌ ${v.message}`;
+        toast(v.message, "error", 6000);
+        return;
+      }
+
+      // Show info từ meta
+      const p = v.meta.project;
+      log.textContent += `✅ Valid backup!\n`;
+      log.textContent += `   Project : ${p.name}\n`;
+      log.textContent += `   Domain  : ${p.domain}\n`;
+      log.textContent += `   Type    : ${p.projectType}\n`;
+      log.textContent += `   Created : ${new Date(v.meta.createdAt).toLocaleString("vi-VN")}\n\n`;
+
+      if (!createNew) {
+        const ok = confirm(
+          `⚠️ Overwrite project?\n\nBackup from: ${p.name} (${p.domain})\nAll files and DB will be replaced.`,
+        );
+        if (!ok) {
+          log.textContent += "Cancelled.\n";
+          return;
+        }
+      }
+
+      const btn = document.getElementById("bkf-btn-restore");
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restoring...';
+      log.textContent += "Starting restore...\n";
+      toast("Restoring... please wait", "info", 30000);
+
+      const r = await api.runPlugin({
+        pluginId: "backup-full",
+        action: "restore",
+        data: { zipPath, projId, createNew },
+      });
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-undo"></i> Start Restore';
+
+      if (r.success) {
+        log.textContent += `✅ ${r.message}`;
+        toast(r.message, "success", 6000);
+        if (r.url) setTimeout(() => api.openBrowser(r.url), 1000);
+      } else {
+        log.className = "cli-output error";
+        log.textContent += "❌ Failed: " + r.message;
+        toast("Restore failed: " + r.message, "error");
+      }
+    },
+  };
+
+  // Auto-init khi page load
+  BackupFullPlugin.init();
+</script>

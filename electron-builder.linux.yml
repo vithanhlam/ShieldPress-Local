@@ -1,0 +1,48 @@
+appId: com.shieldpress.local
+# Keep the Linux installation directory free of spaces. electron-builder uses
+# productName as the directory below /opt, while the desktop entry below keeps
+# the user-facing application name unchanged.
+productName: ShieldPressLocal
+asar: true
+npmRebuild: false
+asarUnpack:
+  - node_modules/ssh2/**
+directories:
+  output: dist
+files:
+  - app/**
+  - assets/**
+  - package.json
+extraResources:
+  - from: assets/phpmyadmin-shieldpress.php
+    to: phpmyadmin-shieldpress.php
+  - from: .build-runtime/linux/php
+    to: bin/php
+linux:
+  target:
+    - AppImage
+    - deb
+  icon: assets/icons
+  executableName: shieldpresslocal
+  category: Development
+  synopsis: Local PHP, WordPress, Laravel and Node development manager
+  maintainer: vithanhlam <vithanhlam@users.noreply.github.com>
+  desktop:
+    Name: ShieldPress Local
+    StartupWMClass: ShieldPress Local
+deb:
+  afterInstall: scripts/linux-after-install.sh
+  depends:
+    - nginx
+    - php-cgi
+    - php-mysql
+    - php-curl
+    - php-mbstring
+    - php-xml
+    - php-gd
+    - php-zip
+    - mariadb-server
+    - mariadb-client
+    - redis-server
+    - mkcert
+    - phpmyadmin
