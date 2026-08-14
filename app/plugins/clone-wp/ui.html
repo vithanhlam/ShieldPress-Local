@@ -1,0 +1,446 @@
+<div style="display: flex; flex-direction: column; gap: 20px">
+  <!-- Form -->
+  <div id="clone-form">
+    <div class="fg">
+      <div>
+        <div class="fl">Source Project</div>
+        <select class="fi" id="clone-source-sel">
+          <option value="">-- Select project --</option>
+        </select>
+      </div>
+
+      <!-- Source info preview -->
+      <div
+        id="clone-source-info"
+        style="
+          display: none;
+          padding: 10px;
+          background: var(--bg3);
+          border-radius: var(--rs);
+          font-size: 12px;
+          color: var(--text2);
+        "
+      ></div>
+
+      <div style="border-top: 1px solid var(--border); padding-top: 4px">
+        <div class="fl" style="margin-bottom: 8px">Destination</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 4px">
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              cursor: pointer;
+            "
+          >
+            <input
+              type="radio"
+              name="clone-dest-mode"
+              value="new"
+              checked
+              onchange="CloneWP.toggleDestMode('new')"
+            />
+            <span style="font-size: 13px">Create project</span>
+          </label>
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              cursor: pointer;
+            "
+          >
+            <input
+              type="radio"
+              name="clone-dest-mode"
+              value="existing"
+              onchange="CloneWP.toggleDestMode('existing')"
+            />
+            <span style="font-size: 13px">Clone into existing project</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- New project fields -->
+      <div id="clone-new-fields">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
+          <div>
+            <div class="fl">New Project Name *</div>
+            <input
+              class="fi"
+              id="clone-new-name"
+              placeholder="my-site-clone"
+              oninput="CloneWP.autoFill()"
+            />
+          </div>
+          <div>
+            <div class="fl">Domain (auto-fill if empty)</div>
+            <input
+              class="fi"
+              id="clone-new-domain"
+              placeholder="my-site-clone.local"
+            />
+          </div>
+        </div>
+        <div style="margin-top: 10px">
+          <div class="fl">Database name (auto-fill if empty)</div>
+          <input class="fi" id="clone-new-db" placeholder="db_my_site_clone" />
+        </div>
+      </div>
+
+      <!-- Existing project -->
+      <div id="clone-existing-fields" style="display: none">
+        <div class="fl" style="color: var(--red)">
+          ⚠ All files and DB of the destination project will be overwritten!
+          Make sure to backup if needed.
+        </div>
+        <select class="fi" id="clone-dest-sel" style="margin-top: 6px">
+          <option value="">-- Select destination project --</option>
+        </select>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px">
+        <label
+          style="
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 13px;
+          "
+        >
+          <input type="checkbox" id="clone-auto-start" checked />
+          Automatically start and open browser after clone
+        </label>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px; display: flex; gap: 8px">
+      <button class="btn btn-primary" id="clone-btn" onclick="CloneWP.start()">
+        <i class="fas fa-copy"></i> Start Clone
+      </button>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div id="clone-progress-panel" style="display: none">
+    <div
+      style="margin-bottom: 10px; font-size: 13px; font-weight: 600"
+      id="clone-step-label"
+    >
+      Preparing...
+    </div>
+
+    <!-- Progress bar -->
+    <div
+      style="
+        background: var(--bg3);
+        border-radius: 20px;
+        height: 12px;
+        overflow: hidden;
+        margin-bottom: 8px;
+      "
+    >
+      <div
+        id="clone-bar"
+        style="
+          height: 100%;
+          background: linear-gradient(90deg, var(--accent), var(--green));
+          border-radius: 20px;
+          width: 0%;
+          transition: width 0.4s ease;
+        "
+      ></div>
+    </div>
+    <div
+      style="
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--text3);
+      "
+    >
+      <span id="clone-progress-msg">Starting...</span>
+      <span id="clone-pct">0%</span>
+    </div>
+
+    <!-- Step indicators -->
+    <div
+      style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px"
+      id="clone-steps"
+    >
+      <span class="clone-step" data-step="create">📁 Create</span>
+      <span class="clone-step" data-step="copy">📋 Copy files</span>
+      <span class="clone-step" data-step="db">🗄 Clone DB</span>
+      <span class="clone-step" data-step="config">⚙ Config</span>
+      <span class="clone-step" data-step="nginx">🌐 Nginx</span>
+      <span class="clone-step" data-step="start">🚀 Start</span>
+      <span class="clone-step" data-step="done">✅ Done</span>
+    </div>
+
+    <!-- Log -->
+    <pre
+      id="clone-log"
+      class="cli-output"
+      style="margin-top: 12px; max-height: 180px; font-size: 11px"
+    ></pre>
+  </div>
+</div>
+
+<style>
+  .clone-step {
+    padding: 3px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--text3);
+    transition: 0.3s;
+  }
+  .clone-step.active {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .clone-step.done {
+    background: var(--green-bg);
+    border-color: var(--green);
+    color: var(--green);
+  }
+</style>
+
+<script>
+  window.CloneWP = {
+    async init() {
+      const projects = await api.getProjects();
+
+      // Source: only WordPress projects (check projectType AND wp-config.php)
+      const sourceSel = document.getElementById("clone-source-sel");
+      if (sourceSel) {
+        sourceSel.innerHTML = '<option value="">-- Select WordPress project --</option>';
+        for (const p of projects) {
+          // Only show projects that are WordPress type
+          if (p.projectType !== "wordpress" && p.projectType !== "php") continue;
+          const o = document.createElement("option");
+          o.value = p.id;
+          o.textContent = `${p.name} (${p.domain}:${p.port})`;
+          sourceSel.appendChild(o);
+        }
+      }
+
+      // Destination: all projects (clone creates a new one anyway)
+      const destSel = document.getElementById("clone-dest-sel");
+      if (destSel) {
+        destSel.innerHTML = '<option value="">-- Select destination project --</option>';
+        projects.forEach((p) => {
+          const o = document.createElement("option");
+          o.value = p.id;
+          o.textContent = `${p.name} (${p.domain}:${p.port})`;
+          destSel.appendChild(o);
+        });
+      }
+
+      // Listen progress events
+      api.onCloneProgress(({ step, percent, message }) => {
+        this._updateProgress(step, percent, message);
+      });
+
+      // Source select change
+      document
+        .getElementById("clone-source-sel")
+        ?.addEventListener("change", () => {
+          this._showSourceInfo();
+        });
+    },
+
+    _showSourceInfo() {
+      const sel = document.getElementById("clone-source-sel");
+      const info = document.getElementById("clone-source-info");
+      const id = sel?.value;
+      if (!id) {
+        info.style.display = "none";
+        return;
+      }
+
+      const opt = sel.options[sel.selectedIndex];
+      info.style.display = "block";
+      info.innerHTML = `<i class="fas fa-info-circle"></i> Source: <strong>${opt.textContent}</strong>`;
+    },
+
+    autoFill() {
+      const name = document.getElementById("clone-new-name")?.value.trim();
+      const domain = document.getElementById("clone-new-domain");
+      const db = document.getElementById("clone-new-db");
+      if (domain && !domain.dataset.manual) {
+        domain.value =
+          name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".local";
+      }
+      if (db && !db.dataset.manual) {
+        db.value = "db_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      }
+    },
+
+    toggleDestMode(mode) {
+      document.getElementById("clone-new-fields").style.display =
+        mode === "new" ? "block" : "none";
+      document.getElementById("clone-existing-fields").style.display =
+        mode === "existing" ? "block" : "none";
+    },
+
+    async start() {
+      const sourceId = document.getElementById("clone-source-sel")?.value;
+      if (!sourceId) {
+        toast("Chọn project nguồn", "warn");
+        return;
+      }
+
+      const mode =
+        document.querySelector('input[name="clone-dest-mode"]:checked')
+          ?.value || "new";
+
+      let newName, newDomain, newDbName, destProjId;
+
+      if (mode === "new") {
+        newName = document.getElementById("clone-new-name")?.value.trim();
+        newDomain =
+          document.getElementById("clone-new-domain")?.value.trim() || "";
+        newDbName = document.getElementById("clone-new-db")?.value.trim() || "";
+        if (!newName) {
+          toast("Nhập tên project mới", "warn");
+          return;
+        }
+      } else {
+        destProjId = document.getElementById("clone-dest-sel")?.value;
+        if (!destProjId) {
+          toast("Select destination project", "warn");
+          return;
+        }
+        if (destProjId === sourceId) {
+          toast("Source and destination projects cannot be the same", "warn");
+          return;
+        }
+        const ok = confirm(
+          "⚠️ All files and DB of the destination project will be overwritten! Make sure to backup if needed.",
+        );
+        if (!ok) return;
+        // Lấy info project đích
+        const projects = await api.getProjects();
+        const dest = projects.find((p) => p.id === destProjId);
+        newName = dest?.name;
+        newDomain = dest?.domain;
+        newDbName = dest?.dbName;
+      }
+
+      const autoStart =
+        document.getElementById("clone-auto-start")?.checked !== false;
+
+      // Show progress panel
+      document.getElementById("clone-form").style.display = "none";
+      document.getElementById("clone-progress-panel").style.display = "block";
+      this._resetProgress();
+
+      const btn = document.getElementById("clone-btn");
+      if (btn) btn.disabled = true;
+
+      const r = await api.runPlugin({
+        pluginId: "clone-wp",
+        action: "clone",
+        data: { sourceId, newName, newDomain, newDbName, autoStart },
+      });
+
+      if (r.success) {
+        toast(`Clone thành công! → ${r.url}`, "success", 6000);
+        if (autoStart && r.url) {
+          setTimeout(() => api.openBrowser(r.url), 1500);
+        }
+        // Reset form sau 3s
+        setTimeout(() => {
+          document.getElementById("clone-form").style.display = "block";
+          document.getElementById("clone-progress-panel").style.display =
+            "none";
+          if (btn) btn.disabled = false;
+          this.init();
+        }, 3000);
+      } else {
+        const logEl = document.getElementById("clone-log");
+        if (logEl) {
+          logEl.className = "cli-output error";
+          logEl.textContent += "\n❌ Failed: " + r.message;
+        }
+        toast("Clone thất bại: " + r.message, "error");
+        // Show form lại
+        setTimeout(() => {
+          document.getElementById("clone-form").style.display = "block";
+          document.getElementById("clone-progress-panel").style.display =
+            "none";
+          if (btn) btn.disabled = false;
+        }, 2000);
+      }
+    },
+
+    _resetProgress() {
+      document.getElementById("clone-bar").style.width = "0%";
+      document.getElementById("clone-pct").textContent = "0%";
+      document.getElementById("clone-progress-msg").textContent = "Starting...";
+      document.getElementById("clone-step-label").textContent = "Preparing...";
+      document.getElementById("clone-log").textContent = "";
+      document.querySelectorAll(".clone-step").forEach((s) => {
+        s.classList.remove("active", "done");
+      });
+    },
+
+    _doneSteps: [],
+
+    _updateProgress(step, percent, message) {
+      const bar = document.getElementById("clone-bar");
+      const pct = document.getElementById("clone-pct");
+      const msg = document.getElementById("clone-progress-msg");
+      const lbl = document.getElementById("clone-step-label");
+      const log = document.getElementById("clone-log");
+
+      if (bar) bar.style.width = percent + "%";
+      if (pct) pct.textContent = percent + "%";
+      if (msg) msg.textContent = message;
+      if (lbl) lbl.textContent = message;
+      if (log) {
+        log.textContent += message + "\n";
+        log.scrollTop = log.scrollHeight;
+      }
+
+      // Update step indicators
+      const stepEl = document.querySelector(`.clone-step[data-step="${step}"]`);
+      if (stepEl) {
+        // Mark previous steps as done
+        document.querySelectorAll(".clone-step").forEach((s) => {
+          if (s !== stepEl && !s.classList.contains("done")) {
+            const steps = [
+              "create",
+              "copy",
+              "db",
+              "config",
+              "nginx",
+              "start",
+              "done",
+            ];
+            const curIdx = steps.indexOf(step);
+            const thisIdx = steps.indexOf(s.dataset.step);
+            if (thisIdx < curIdx) {
+              s.classList.remove("active");
+              s.classList.add("done");
+            }
+          }
+        });
+        stepEl.classList.add("active");
+        if (step === "done") {
+          document.querySelectorAll(".clone-step").forEach((s) => {
+            s.classList.remove("active");
+            s.classList.add("done");
+          });
+        }
+      }
+    },
+  };
+
+  // Auto init
+  CloneWP.init();
+</script>

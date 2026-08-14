@@ -1,0 +1,42 @@
+<div class="page-header">
+  <div>
+    <div class="page-title">Backups</div>
+    <div class="page-sub">Project file & DB backups</div>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('m-backup');setTimeout(()=>Backups.fillProjects(),50)">
+    <i class="fas fa-plus"></i> Create Backup
+  </button>
+</div>
+<div id="backup-list">
+  <div class="loading"><i class="fas fa-spinner fa-spin"></i></div>
+</div>
+
+<!-- Modal: Backup -->
+<div class="overlay" id="m-backup" onclick="closeIfOverlay(event,'m-backup')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-archive"></i> Create Backup</div>
+    <div class="fg">
+      <div><div class="fl">Select project</div>
+        <select class="fi" id="backup-proj-sel"></select>
+      </div>
+      <div id="backup-progress" style="display:none">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+          <span id="backup-progress-label">Preparing backup...</span>
+          <span id="backup-progress-bytes" style="color:var(--text3)"></span>
+        </div>
+        <div style="height:6px;background:var(--bg3);border-radius:4px;overflow:hidden">
+          <div id="backup-progress-bar" style="height:100%;width:0;background:var(--accent);transition:width .2s"></div>
+        </div>
+        <button id="backup-open-folder" class="btn btn-ghost btn-sm" style="display:none;margin-top:10px" onclick="api.revealPath(this.dataset.path)">
+          <i class="fas fa-folder-open"></i> Show in Folder
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="backup-cancel-btn" onclick="closeModal('m-backup')">Cancel</button>
+      <button class="btn btn-primary" id="backup-start-btn" onclick="Backups.backup()">
+        <i class="fas fa-archive"></i> Create Backup
+      </button>
+    </div>
+  </div>
+</div>

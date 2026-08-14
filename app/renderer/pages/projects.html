@@ -1,0 +1,529 @@
+<div class="page-header">
+  <div>
+    <div class="page-title">Projects</div>
+    <div class="page-sub">Manage your local dev sites</div>
+  </div>
+  <button class="btn btn-primary" onclick="CreateProject.open()">
+    <i class="fas fa-plus"></i> New Project
+  </button>
+</div>
+<div class="proj-toolbar">
+  <div class="search-wrap">
+    <i class="fas fa-search"></i>
+    <input id="search-box" class="fi" placeholder="Search projects..." oninput="Projects.filter()"/>
+  </div>
+  <select id="filter-tag" onchange="Projects.filter()">
+    <option value="">All tags</option>
+  </select>
+  <button class="btn btn-ghost btn-sm" onclick="Projects.load()">
+    <i class="fas fa-sync"></i>
+  </button>
+</div>
+<div id="project-list">
+  <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+</div>
+
+<!-- Modal: Create Project -->
+<div class="overlay" id="m-create" onclick="closeIfOverlay(event,'m-create')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-plus"></i> New Project</div>
+    <form id="create-form" onsubmit="return false">
+      <div class="fg">
+        <div><div class="fl">Project Name *</div>
+          <input class="fi" id="cp-name" placeholder="My Site" autocomplete="off"/></div>
+        <div><div class="fl">Domain (auto if empty)</div>
+          <input class="fi" id="cp-domain" placeholder="mysite.local" autocomplete="off"/></div>
+        <div><div class="fl">PHP Version</div>
+          <select class="fi" id="cp-phpver">
+            <option value="8.3">PHP 8.3</option>
+          </select></div>
+        <div><div class="fl">Project Type</div>
+          <select class="fi" id="cp-type">
+            <option value="php">PHP</option>
+            <option selected value="wordpress">WordPress</option>
+            <option value="laravel">Laravel</option>
+            <option value="node">Node.js</option>
+            <option value="nextjs">Next.js</option>
+          </select></div>
+        <div><div class="fl">Database Name (auto if empty)</div>
+          <input class="fi" id="cp-db" placeholder="db_mysite" autocomplete="off"/></div>
+        <div><div class="fl">Tags (comma separated)</div>
+          <input class="fi" id="cp-tags" placeholder="client, wordpress, production"/></div>
+      </div>
+    </form>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-create')">Cancel</button>
+      <button class="btn btn-primary" id="cp-submit" onclick="CreateProject.submit()">
+        <i class="fas fa-plus"></i> Create
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Edit Project -->
+<div class="overlay" id="m-edit" onclick="closeIfOverlay(event,'m-edit')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-cog"></i> Project Settings</div>
+    <input type="hidden" id="edit-proj-id"/>
+    <div class="fg">
+      <div><div class="fl">Name</div><input class="fi" id="edit-proj-name"/></div>
+      <div><div class="fl">PHP Version</div>
+        <select class="fi" id="edit-phpver">
+          <option value="8.3">PHP 8.3</option>
+        </select>
+      </div>
+      <div><div class="fl">Upload Limit</div><input class="fi" id="edit-upload-limit" placeholder="10G"/></div>
+      <div><div class="fl">Nginx Timeout (s)</div><input class="fi" id="edit-nginx-timeout" type="number"/></div>
+      <div><div class="fl">Tags (comma separated)</div><input class="fi" id="edit-tags" placeholder="client, prod"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-edit')">Cancel</button>
+      <button class="btn btn-primary" onclick="Projects.saveEdit()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Stop Project (Backup Prompt) -->
+<div class="overlay" id="m-stop-backup">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-stop-circle" style="color:var(--yellow)"></i> Stop Project</div>
+    <input type="hidden" id="stop-backup-proj-id"/>
+    <p style="color:var(--text1);margin-bottom:12px">Stop <strong id="stop-backup-proj-name"></strong>?</p>
+    <p style="font-size:13px;color:var(--yellow);background:var(--yellow-bg);padding:10px 12px;border-radius:6px;line-height:1.5">
+      <i class="fas fa-exclamation-triangle"></i>
+      <strong>Warning:</strong> Without a backup, any unsaved database changes may be lost if something goes wrong.
+    </p>
+    <!-- Progress (shown during backup) -->
+    <div id="stop-backup-progress" style="display:none;margin-top:16px">
+      <div id="stop-backup-status" style="font-size:13px;color:var(--text2);margin-bottom:8px">
+        <i class="fas fa-spinner fa-spin"></i> Backing up database, please wait...
+      </div>
+      <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden">
+        <div id="stop-backup-bar" style="height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width 0.4s ease"></div>
+      </div>
+      <div id="stop-backup-bytes" style="font-size:12px;color:var(--text3);margin-top:7px"></div>
+      <div id="stop-backup-complete-actions" style="display:none;gap:8px;margin-top:12px">
+        <button id="stop-backup-open-folder" class="btn btn-ghost btn-sm" onclick="api.revealPath(this.dataset.path)">
+          <i class="fas fa-folder-open"></i> Show Backup in Folder
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="closeModal('m-stop-backup')">Close</button>
+      </div>
+    </div>
+    <div class="modal-footer" id="stop-backup-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-stop-backup')">Cancel</button>
+      <button class="btn btn-ghost" onclick="Projects.stopWithoutBackup()" style="color:var(--red);border-color:var(--red)">
+        <i class="fas fa-stop"></i> Stop Without Backup
+      </button>
+      <button class="btn btn-primary" onclick="Projects.stopWithBackup()">
+        <i class="fas fa-database"></i> Backup &amp; Stop
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Delete Project -->
+<div class="overlay" id="m-delete" onclick="closeIfOverlay(event,'m-delete')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-trash" style="color:var(--red)"></i> Delete Project</div>
+    <input type="hidden" id="del-proj-id"/>
+    <p style="color:var(--text1);margin-bottom:8px">Delete <strong id="del-proj-name"></strong>?</p>
+    <p style="color:var(--text2);font-size:13px">This will remove all files and drop the database. <strong style="color:var(--red)">Cannot be undone.</strong></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="del-cancel-btn" onclick="closeModal('m-delete')">Cancel</button>
+      <button class="btn btn-danger" id="del-confirm-btn" onclick="Projects.doDelete()"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Task List -->
+<div class="overlay" id="m-tasklist" onclick="closeIfOverlay(event,'m-tasklist')">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-title"><i class="fas fa-tasks"></i> Task List — <span id="tl-proj-name"></span></div>
+
+    <!-- Progress bar -->
+    <div class="tl-progress-wrap">
+      <div class="tl-progress-track">
+        <div class="tl-progress-bar" id="tl-progress-bar"></div>
+      </div>
+      <div class="tl-progress-label" id="tl-progress-label">No tasks yet</div>
+    </div>
+
+    <!-- Add task form -->
+    <div class="tl-add-form">
+      <input class="fi" id="tl-new-content" placeholder="Task description..." autocomplete="off"
+        onkeydown="if(event.key==='Enter' && !event.isComposing) TaskList.addTask()"/>
+      <input class="fi tl-date" id="tl-new-deadline" type="date" title="Deadline"/>
+      <button class="btn btn-primary btn-sm" onclick="TaskList.addTask()"><i class="fas fa-plus"></i></button>
+    </div>
+
+    <!-- Task list -->
+    <div id="tl-task-list" class="tl-list"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-tasklist')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Quick Login -->
+<div class="overlay" id="m-quicklogin" onclick="closeIfOverlay(event,'m-quicklogin')">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-title"><i class="fas fa-unlock-alt"></i> Quick Login — <span id="ql-proj-name"></span></div>
+    <input type="hidden" id="ql-proj-id"/>
+    <div class="fg">
+      <div>
+        <div class="fl">Login as</div>
+        <select class="fi" id="ql-user-sel">
+          <option value="">Loading users...</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-quicklogin')">Cancel</button>
+      <button class="btn btn-primary" onclick="QuickLogin.login()"><i class="fas fa-sign-in-alt"></i> Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Laravel -->
+<div class="overlay" id="m-laravel" onclick="closeIfOverlay(event,'m-laravel')">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title"><i class="fab fa-laravel" style="color:#ff2d20"></i> Laravel — <span id="lv-proj-name"></span></div>
+    <input type="hidden" id="lv-proj-id"/>
+
+    <!-- Install card -->
+    <div class="card" style="margin-bottom:12px" id="lv-install-card">
+      <div class="card-hdr"><span class="card-title"><i class="fas fa-download"></i> Install Laravel</span></div>
+      <div class="card-body">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:10px">
+          Downloads the latest Laravel via Composer, configures <code>.env</code> with your DB credentials, generates the app key and runs migrations automatically.
+        </p>
+        <button class="btn btn-primary" id="lv-install-btn" onclick="Laravel.install()">
+          <i class="fab fa-laravel"></i> Install Laravel (latest)
+        </button>
+        <div id="lv-already" style="display:none;color:var(--green);font-size:13px;margin-top:8px">
+          <i class="fas fa-check-circle"></i> Laravel is installed
+        </div>
+        <pre id="lv-progress" class="cli-output" style="display:none;margin-top:10px;max-height:200px;overflow-y:auto"></pre>
+      </div>
+    </div>
+
+    <!-- Artisan card -->
+    <div class="card">
+      <div class="card-hdr"><span class="card-title"><i class="fas fa-terminal"></i> Artisan</span></div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-xs" onclick="Laravel.quickCmd('migrate')">migrate</button>
+          <button class="btn btn-ghost btn-xs" onclick="Laravel.quickCmd('migrate:fresh --seed')">migrate:fresh</button>
+          <button class="btn btn-ghost btn-xs" onclick="Laravel.quickCmd('db:seed')">db:seed</button>
+          <button class="btn btn-ghost btn-xs" onclick="Laravel.quickCmd('cache:clear')">cache:clear</button>
+          <button class="btn btn-ghost btn-xs" onclick="Laravel.quickCmd('config:clear')">config:clear</button>
+          <button class="btn btn-ghost btn-xs" onclick="Laravel.quickCmd('route:list')">route:list</button>
+          <button class="btn btn-ghost btn-xs" onclick="Laravel.quickCmd('storage:link')">storage:link</button>
+          <button class="btn btn-ghost btn-xs" onclick="Laravel.quickCmd('optimize:clear')">optimize:clear</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input class="fi" id="lv-artisan-cmd" placeholder="make:controller HomeController" style="flex:1"
+            onkeydown="if(event.key==='Enter') Laravel.runArtisan()"/>
+          <button class="btn btn-primary" onclick="Laravel.runArtisan()"><i class="fas fa-play"></i></button>
+        </div>
+        <pre id="lv-artisan-output" class="cli-output" style="display:none;margin-top:8px"></pre>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-hdr"><span class="card-title"><i class="fab fa-node-js" style="color:#68a063"></i> Node / NPM Tools</span></div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('lv-proj-id', '')"><i class="fas fa-terminal"></i> Open Terminal</button>
+          <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('lv-proj-id', 'npm install')">npm install</button>
+          <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('lv-proj-id', 'npm run dev')">npm run dev</button>
+          <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('lv-proj-id', 'npm run build')">npm run build</button>
+          <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('lv-proj-id', 'npm run start')">npm run start</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-laravel')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Node/NextJS -->
+<div class="overlay" id="m-node" onclick="closeIfOverlay(event,'m-node')">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title"><i class="fab fa-node-js" style="color:#68a063"></i> Node.js / Next.js — <span id="node-proj-name"></span></div>
+    <input type="hidden" id="node-proj-id"/>
+    
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hdr"><span class="card-title"><i class="fas fa-terminal" style="color:var(--text1)"></i> Interactive Terminal</span></div>
+      <div class="card-body">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px">
+          These actions will open a native OS Command Prompt in your project's directory. 
+          Use it to monitor logs, build processes, or hot-reload servers like <code>npm run dev</code>.
+        </p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('node-proj-id', '')"><i class="fas fa-terminal"></i> Open Terminal (Empty)</button>
+          <button class="btn btn-primary btn-sm" onclick="NodeTools.runCmd('node-proj-id', 'npm run dev')"><i class="fas fa-play"></i> npm run dev</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-xs" onclick="NodeTools.runCmd('node-proj-id', 'npm install')">npm install</button>
+          <button class="btn btn-ghost btn-xs" onclick="NodeTools.runCmd('node-proj-id', 'npm run build')">npm run build</button>
+          <button class="btn btn-ghost btn-xs" onclick="NodeTools.runCmd('node-proj-id', 'npm run start')">npm run start</button>
+          <button class="btn btn-ghost btn-xs" onclick="NodeTools.runCmd('node-proj-id', 'npm test')">npm test</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-node')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Git Push -->
+<div class="overlay" id="m-git" onclick="closeIfOverlay(event,'m-git')">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-title"><i class="fab fa-github"></i> Git Push — <span id="git-proj-name"></span></div>
+    <input type="hidden" id="git-proj-id"/>
+
+    <!-- Setup card (shown if not initialized) -->
+    <div id="git-setup-section">
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hdr"><span class="card-title"><i class="fas fa-cog"></i> Repository Setup</span></div>
+        <div class="card-body">
+          <div class="fg">
+            <div><div class="fl">Repository URL *</div>
+              <input class="fi" id="git-repo-url" placeholder="https://github.com/user/repo.git" autocomplete="off"/></div>
+            <div><div class="fl">Branch</div>
+              <input class="fi" id="git-branch" value="main" autocomplete="off"/></div>
+            <div><div class="fl">Include Paths (one per line)</div>
+              <textarea class="fi" id="git-includes" rows="3" style="font-family:var(--mono);font-size:12px;resize:vertical" placeholder="wp-content/plugins&#10;wp-content/themes"></textarea>
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">Leave empty or "." to push everything</div></div>
+            <div><div class="fl">Exclude Paths (one per line)</div>
+              <textarea class="fi" id="git-excludes" rows="4" style="font-family:var(--mono);font-size:12px;resize:vertical" placeholder="node_modules&#10;.git&#10;vendor"></textarea></div>
+          </div>
+          <div style="margin-top:12px">
+            <button class="btn btn-primary" id="git-save-btn" onclick="GitPush.saveConfig()">
+              <i class="fas fa-save"></i> Save & Initialize
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Push card (shown if initialized) -->
+    <div id="git-push-section" style="display:none">
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hdr">
+          <span class="card-title"><i class="fas fa-info-circle"></i> Status</span>
+          <button class="btn btn-ghost btn-sm" onclick="GitPush.refreshStatus()"><i class="fas fa-sync"></i></button>
+        </div>
+        <div class="card-body">
+          <div id="git-status-info" style="font-size:12px;font-family:var(--mono);color:var(--text2)">Loading...</div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-hdr"><span class="card-title"><i class="fas fa-cloud-upload-alt"></i> Push & Pull</span></div>
+        <div class="card-body">
+          <div class="fg">
+            <div><div class="fl">Commit Message</div>
+              <input class="fi" id="git-commit-msg" placeholder="Update changes" autocomplete="off"
+                onkeydown="if(event.key==='Enter' && !event.isComposing) GitPush.push()"/></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="git-push-btn" onclick="GitPush.push()">
+              <i class="fas fa-cloud-upload-alt"></i> Commit & Push
+            </button>
+            <button class="btn btn-ghost" id="git-pull-btn" onclick="GitPush.pull()">
+              <i class="fas fa-cloud-download-alt"></i> Pull
+            </button>
+            <button class="btn btn-ghost" onclick="GitPush.showSetup()">
+              <i class="fas fa-cog"></i> Settings
+            </button>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:5px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-xs" onclick="GitPush.cmd('status')">status</button>
+            <button class="btn btn-ghost btn-xs" onclick="GitPush.cmd('log --oneline -20')">log</button>
+            <button class="btn btn-ghost btn-xs" onclick="GitPush.cmd('diff --stat')">diff</button>
+            <button class="btn btn-ghost btn-xs" onclick="GitPush.cmd('branch -a')">branches</button>
+            <button class="btn btn-ghost btn-xs" onclick="GitPush.cmd('remote -v')">remotes</button>
+            <button class="btn btn-ghost btn-xs" onclick="GitPush.cmd('stash')">stash</button>
+            <button class="btn btn-ghost btn-xs" onclick="GitPush.cmd('stash pop')">stash pop</button>
+            <button class="btn btn-ghost btn-xs" onclick="GitPush.cmd('fetch')">fetch</button>
+          </div>
+          <pre id="git-push-log" class="cli-output" style="display:none;margin-top:12px;max-height:200px;overflow-y:auto"></pre>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title"><i class="fas fa-history"></i> Recent Commits</span></div>
+        <div class="card-body">
+          <pre id="git-recent-commits" class="cli-output" style="max-height:120px;overflow-y:auto;font-size:11px">No commits yet</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-git')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: SSL -->
+<div class="overlay" id="m-ssl" onclick="closeIfOverlay(event,'m-ssl')">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title"><i class="fas fa-lock" id="ssl-modal-icon" style="color:var(--accent)"></i> <span id="ssl-modal-title">Install SSL</span> — <span id="ssl-proj-name"></span></div>
+    <input type="hidden" id="ssl-proj-id"/>
+    <input type="hidden" id="ssl-proj-domain"/>
+    <div class="fg">
+      <div>
+        <div class="fl">Domain</div>
+        <input class="fi" id="ssl-domain" readonly/>
+      </div>
+    </div>
+
+    <!-- Install state -->
+    <div id="ssl-install-section">
+      <p style="font-size:13px;color:var(--text2);margin-top:8px;line-height:1.5">
+        Generates a trusted local certificate using <strong>mkcert</strong> and reconfigures Nginx to serve HTTPS on the same port.
+      </p>
+    </div>
+
+    <!-- Active state -->
+    <div id="ssl-active-section" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:10px 12px;background:var(--green-bg,rgba(40,200,80,.08));border-radius:6px;font-size:13px;color:var(--green)">
+        <i class="fas fa-check-circle"></i> SSL is active on this project.
+      </div>
+    </div>
+
+    <div id="ssl-progress" style="display:none;margin-top:12px">
+      <pre id="ssl-output" class="cli-output" style="max-height:180px;overflow-y:auto"></pre>
+    </div>
+    <div class="modal-footer" id="ssl-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-ssl')">Cancel</button>
+      <button class="btn btn-primary" id="ssl-install-btn" onclick="SSL.install()">
+        <i class="fas fa-lock"></i> Install SSL
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: WordPress -->
+<div class="overlay" id="m-wordpress" onclick="closeIfOverlay(event,'m-wordpress')">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title"><i class="fab fa-wordpress"></i> WordPress — <span id="wp-proj-name"></span></div>
+    <input type="hidden" id="wp-proj-id"/>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hdr"><span class="card-title"><i class="fas fa-download"></i> Install WordPress</span></div>
+      <div class="card-body">
+        <button class="btn btn-primary" id="wp-install-btn" onclick="WordPress.install()">
+          <i class="fab fa-wordpress"></i> Install WordPress (latest)
+        </button>
+        <div id="wp-already" style="display:none">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="color:var(--green);font-size:13px"><i class="fas fa-check-circle"></i> WordPress is installed</span>
+            <button class="btn btn-ghost btn-sm" id="wp-reinstall-btn" onclick="WordPress.confirmReinstall()" style="color:var(--yellow);border-color:var(--yellow)">
+              <i class="fas fa-redo"></i> Reinstall
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hdr"><span class="card-title"><i class="fas fa-bug"></i> WP Debug</span></div>
+      <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-ghost btn-sm" id="wp-debug-toggle-btn" onclick="WordPress.toggleDebug()">
+          <i class="fas fa-toggle-off" id="wp-debug-icon"></i> <span id="wp-debug-label">Debug OFF — Enable</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="wp-debug-log-btn" onclick="WordPress.openDebugLog()" style="display:none">
+          <i class="fas fa-external-link-alt"></i> Open debug.log
+        </button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hdr"><span class="card-title"><i class="fas fa-key"></i> Reset Password</span></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+        <select class="fi" id="wp-reset-user" disabled>
+          <option value="">Loading users...</option>
+        </select>
+        <div style="display:flex;gap:8px">
+          <input class="fi" id="wp-new-pass" type="password" placeholder="New password" style="flex:1"/>
+          <button class="btn btn-ghost" onclick="WordPress.resetPassword()"><i class="fas fa-key"></i> Reset</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><span class="card-title"><i class="fas fa-terminal"></i> WP-CLI</span></div>
+      <div class="card-body" id="wpcli-missing" style="display:none">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:8px">wp-cli.phar không tìm thấy.</p>
+        <button class="btn btn-ghost btn-sm" id="wpcli-dl-btn" onclick="WordPress.downloadCli()">
+          <i class="fas fa-download"></i> Download WP-CLI
+        </button>
+      </div>
+      <div class="card-body" id="wpcli-ready">
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-xs" onclick="WordPress.quickCmd('plugin list')">plugin list</button>
+          <button class="btn btn-ghost btn-xs" onclick="WordPress.quickCmd('theme list')">theme list</button>
+          <button class="btn btn-ghost btn-xs" onclick="WordPress.quickCmd('user list')">user list</button>
+          <button class="btn btn-ghost btn-xs" onclick="WordPress.quickCmd('core version')">core version</button>
+          <button class="btn btn-ghost btn-xs" onclick="WordPress.quickCmd('cache flush')">cache flush</button>
+          <button class="btn btn-ghost btn-xs" onclick="WordPress.quickCmd('cron event list')">cron list</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input class="fi" id="wpcli-cmd" placeholder="plugin update --all" style="flex:1"
+            onkeydown="if(event.key==='Enter') WordPress.runCli()"/>
+          <button class="btn btn-primary" onclick="WordPress.runCli()"><i class="fas fa-play"></i></button>
+        </div>
+        <pre id="wpcli-output" class="cli-output" style="display:none"></pre>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-wordpress')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cloud Backup -->
+<div class="overlay" id="m-gdrive" onclick="closeIfOverlay(event,'m-gdrive')">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-title"><i class="fas fa-cloud-upload-alt" style="color:#4285F4"></i> Cloud Backup — <span id="gd-proj-name"></span></div>
+    <input type="hidden" id="gd-proj-id"/>
+
+    <!-- Backup folder status banner -->
+    <div id="gd-folder-banner" style="padding:8px 12px;border-radius:6px;font-size:13px;background:var(--bg3);color:var(--text2);margin-bottom:12px">
+      <i class="fas fa-spinner fa-spin"></i> Checking backup folder...
+    </div>
+
+    <!-- Config -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-hdr"><span class="card-title"><i class="fas fa-sliders-h"></i> Backup Settings</span></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="gd-include-db" style="accent-color:var(--accent)"/>
+          <span>Include database export (.sql)</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="gd-auto-backup" style="accent-color:var(--accent)"/>
+          <span>Auto-backup to cloud folder when stopping with backup</span>
+        </label>
+        <div>
+          <div class="fl" style="margin-bottom:4px">Folders to zip &amp; backup (one per line)</div>
+          <textarea class="fi" id="gd-folders" rows="4" placeholder="wp-content/plugins&#10;wp-content/themes&#10;wp-content/uploads" style="font-family:var(--mono);font-size:12px;resize:vertical"></textarea>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Paths relative to the project's www folder</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sync progress -->
+    <div id="gd-sync-progress" style="display:none;margin-bottom:12px">
+      <pre id="gd-sync-log" class="cli-output" style="max-height:160px;overflow-y:auto;font-size:12px"></pre>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-gdrive')">Close</button>
+      <button class="btn btn-ghost" id="gd-save-btn" onclick="GDriveBackup.saveConfig()"><i class="fas fa-save"></i> Save Config</button>
+      <button class="btn btn-primary" id="gd-sync-btn" onclick="GDriveBackup.syncNow()"><i class="fas fa-cloud-upload-alt"></i> Backup Now</button>
+    </div>
+  </div>
+</div>

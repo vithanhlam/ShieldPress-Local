@@ -1,0 +1,21 @@
+<div class="page-header">
+  <div>
+    <div class="page-title">Debug Logs</div>
+    <div class="page-sub">Project: <b id="debug-proj-label">Global</b></div>
+  </div>
+  <div style="display:flex;gap:6px">
+    <button class="btn btn-ghost btn-sm" onclick="Debug.refresh()"><i class="fas fa-sync"></i></button>
+    <button class="btn btn-ghost btn-sm" onclick="Debug.copyLog()"><i class="fas fa-copy"></i></button>
+    <button class="btn btn-ghost btn-sm" onclick="Debug.clearLog()"><i class="fas fa-trash"></i></button>
+  </div>
+</div>
+<div class="debug-tabs" id="debug-proj-tabs" style="display:none">
+  <button class="debug-tab active" data-tab="app" onclick="Debug.showTab('app')"><i class="fas fa-list"></i> App Log</button>
+  <button class="debug-tab" data-tab="nginx_error" onclick="Debug.showTab('nginx_error')"><i class="fas fa-exclamation-triangle"></i> Nginx Error</button>
+  <button class="debug-tab" data-tab="nginx_access" onclick="Debug.showTab('nginx_access')"><i class="fas fa-list-alt"></i> Nginx Access</button>
+  <button class="debug-tab" data-tab="wp_debug" onclick="Debug.showTab('wp_debug')"><i class="fab fa-wordpress"></i> WP Debug</button>
+  <button class="debug-tab" data-tab="mariadb" onclick="Debug.showTab('mariadb')"><i class="fas fa-database"></i> MariaDB</button>
+  <button class="debug-tab" data-tab="nginx_conf" onclick="Debug.showTab('nginx_conf')"><i class="fas fa-file-code"></i> Nginx Conf</button>
+  <button class="debug-tab" data-tab="proj_info" onclick="Debug.showTab('proj_info')"><i class="fas fa-info-circle"></i> Project Info</button>
+</div>
+<pre id="debug-log"></pre>

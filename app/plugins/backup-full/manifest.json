@@ -1,0 +1,9 @@
+{
+  "name": "Full Backup & Restore",
+  "description": "Backup full source + database into ZIP. Restore to same or new project.",
+  "version": "1.0.0",
+  "icon": "fas fa-archive",
+  "author": "vithanhlam",
+  "requiresLicense": false,
+  "actions": ["backup", "restore", "listBackups"]
+}

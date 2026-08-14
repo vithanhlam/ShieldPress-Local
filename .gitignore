@@ -1,0 +1,28 @@
+node_modules/
+dist/
+out/
+release/
+*.log
+/data/
+nul
+
+# Local agent/editor state
+.agents/
+.codex/
+.vscode/
+.idea/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Bundled runtimes are supplied separately and must not be committed.
+bin/
+.build-runtime/

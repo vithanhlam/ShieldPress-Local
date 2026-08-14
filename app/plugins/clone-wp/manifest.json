@@ -1,0 +1,9 @@
+{
+  "name": "Clone WordPress",
+  "description": "Clone a WordPress site to a new project. Copies files and database.",
+  "version": "1.0.0",
+  "icon": "fas fa-copy",
+  "author": "vithanhlam",
+  "requiresLicense": false,
+  "actions": ["clone"]
+}

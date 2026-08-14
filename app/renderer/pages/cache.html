@@ -1,0 +1,164 @@
+<div class="page-header">
+  <div>
+    <div class="page-title">Cache Management</div>
+    <div class="page-sub">PHP OPcache, WordPress Object Cache & project cache tools</div>
+  </div>
+  <button class="btn btn-primary" onclick="CacheManager.refreshAll()">
+    <i class="fas fa-sync"></i> Refresh
+  </button>
+</div>
+
+<!-- OPcache -->
+<div class="card" style="margin-bottom:12px">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-bolt" style="color:var(--yellow)"></i> PHP OPcache</span>
+    <div style="display:flex;gap:6px">
+      <span id="opcache-status-badge" class="tag" style="background:var(--bg3);color:var(--text3)">Checking...</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div id="opcache-info" style="font-size:13px;color:var(--text2);margin-bottom:12px">
+      <i class="fas fa-spinner fa-spin"></i> Loading...
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.opcacheReset()">
+        <i class="fas fa-redo"></i> Reset OPcache (Restart PHP)
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.toggleOpcache()">
+        <i class="fas fa-toggle-on" id="opcache-toggle-icon"></i> <span id="opcache-toggle-label">Toggle</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- WordPress Cache per project -->
+<div class="card" style="margin-bottom:12px">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fab fa-wordpress" style="color:#21759b"></i> WordPress Cache</span>
+  </div>
+  <div class="card-body">
+    <div class="fg">
+      <div>
+        <div class="fl">Select WordPress Project</div>
+        <select class="fi" id="cache-wp-project" onchange="CacheManager.loadWpCache()">
+          <option value="">-- Select project --</option>
+        </select>
+      </div>
+    </div>
+    <div id="cache-wp-info" style="margin-top:12px;font-size:13px;color:var(--text2)"></div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap" id="cache-wp-actions" style="display:none">
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.wpCacheFlush()">
+        <i class="fas fa-eraser"></i> WP Cache Flush
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.wpTransientFlush()">
+        <i class="fas fa-clock"></i> Delete Transients
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.wpRewriteFlush()">
+        <i class="fas fa-link"></i> Flush Rewrite Rules
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Project Cache Cleanup -->
+<div class="card" style="margin-bottom:12px">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-broom" style="color:var(--green)"></i> Project Cache Cleanup</span>
+  </div>
+  <div class="card-body">
+    <div class="fg">
+      <div>
+        <div class="fl">Select Project</div>
+        <select class="fi" id="cache-clean-project">
+          <option value="">-- Select project --</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.cleanProjectCache()">
+        <i class="fas fa-broom"></i> Clean Cache Dirs
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.cleanNodeModules()">
+        <i class="fas fa-trash"></i> Delete node_modules
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.cleanVendor()">
+        <i class="fas fa-trash"></i> Delete vendor
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px">
+      Removes cache directories and heavy dependencies to free disk space. Re-run npm install or composer install after.
+    </div>
+    <pre id="cache-clean-log" class="cli-output" style="display:none;margin-top:10px;max-height:150px;overflow-y:auto"></pre>
+  </div>
+</div>
+
+<!-- Nginx Cache -->
+<div class="card" style="margin-bottom:12px">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-server" style="color:var(--accent)"></i> Nginx & PHP</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.restartNginx()">
+        <i class="fas fa-redo"></i> Restart Nginx
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.restartPhp()">
+        <i class="fas fa-redo"></i> Restart PHP
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="CacheManager.clearNginxLogs()">
+        <i class="fas fa-eraser"></i> Clear Nginx Logs
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Redis -->
+<div class="card">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-database" style="color:#D9304F"></i> Redis</span>
+    <span id="redis-status-badge" class="tag" style="background:var(--bg3);color:var(--text3)">Checking...</span>
+  </div>
+  <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+    <div id="redis-info" style="font-size:13px;color:var(--text2)">
+      <i class="fas fa-spinner fa-spin"></i> Loading...
+    </div>
+
+    <!-- Not installed -->
+    <div id="redis-not-installed" style="display:none">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:8px;line-height:1.5">
+        Redis is not installed. Download <strong>tporadowski/redis</strong> (Windows port of Redis 5.0) to use as an in-memory cache for Laravel, WordPress Object Cache, or session storage.
+      </p>
+      <button class="btn btn-primary btn-sm" id="redis-download-btn" onclick="RedisManager.download()">
+        <i class="fas fa-download"></i> Download Redis for Windows
+      </button>
+      <pre id="redis-download-log" class="cli-output" style="display:none;margin-top:8px;max-height:120px;overflow-y:auto;font-size:11px"></pre>
+    </div>
+
+    <!-- Installed controls -->
+    <div id="redis-controls" style="display:none;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="Services._run('redis','start')">
+          <i class="fas fa-play"></i> Start
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="Services._run('redis','stop')">
+          <i class="fas fa-stop"></i> Stop
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="Services._run('redis','restart')">
+          <i class="fas fa-redo"></i> Restart
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="RedisManager.flush()">
+          <i class="fas fa-eraser"></i> Flush All Keys
+        </button>
+      </div>
+
+      <!-- Port config -->
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="fl" style="white-space:nowrap">Port:</div>
+        <input class="fi" id="redis-port-input" type="number" value="6379" style="width:100px"/>
+        <button class="btn btn-ghost btn-sm" onclick="RedisManager.savePort()">
+          <i class="fas fa-save"></i> Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
