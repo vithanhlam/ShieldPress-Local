@@ -1,5 +1,183 @@
 # Changelog
 
+## v2.5.20
+
+**Release Packaging**
+- Publishes synchronized Windows and Ubuntu package names for the 2.5.20 release
+- Documents the current SFTP/SSH terminal lifecycle and nested file dialogs
+- Keeps the release documentation aligned with the application version
+
+---
+
+## v2.5.19
+
+**Modal Layering & Terminal Lifecycle**
+- Keeps New File, New Folder, and file editor dialogs above Browse Files and SSH Terminal windows
+- Fully stops the remote PTY and disposes Xterm when the Terminal is closed or the user leaves the SFTP page
+- Starts every reopened Terminal with a clean session instead of restoring a stale cached interface
+- Ignores delayed output from an older SSH shell after a new session has started
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.19
+
+---
+
+## v2.5.18
+
+**Real Interactive SSH Terminal**
+- Replaces per-command SSH execution with a persistent `ssh2.shell()` PTY session
+- Integrates Xterm.js with `xterm-256color` support, ANSI colors, cursor control, scrollback, selection, and terminal resizing
+- Supports native remote-shell Tab completion, command history, interactive prompts, `sudo`, `top`, installers, and the ShieldPress VPS menu
+- Sends every keystroke directly to the VPS and keeps Ctrl+Shift+C/V, right-click paste, font sizing, clear, and quick commands
+- Adds a prominent `shieldpress` quick command for opening the ShieldPress VPS menu
+
+**Reliable Create File / Folder Dialog**
+- Replaces browser-native prompts with an in-app New File/New Folder modal
+- Shows the exact destination directory before creation
+- Displays a Creating state while the remote operation is running
+- Keeps server errors visible inside the modal instead of failing silently
+- Uses the same dialog in Browse Files and the Terminal file manager
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.18
+
+---
+
+## v2.5.17
+
+**Verified Remote File & Folder Creation**
+- Reconnects automatically before creating files or folders from Browse Files or the Terminal file manager
+- Normalizes and validates remote paths before sending mutations to the server
+- Verifies that the requested file or folder exists after the server reports success
+- Provides clearer server errors when permissions or remote creation fail
+- Adds automated SFTP and FTP creation tests, including permission modes and FTP working-directory restoration
+
+**ShieldPress VPS Command**
+- Adds `shieldpress` to SSH terminal autocomplete for opening the ShieldPress VPS menu
+- Stops showing suggestions once the complete `shieldpress` command is entered so Enter executes immediately
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.17
+
+---
+
+## v2.5.16
+
+**Terminal Input Experience**
+- Stops showing autocomplete when a complete command such as `ls`, `pwd`, or `clear` is entered
+- Replaces the single-line command input with an auto-growing multiline command editor
+- Preserves multiline clipboard content instead of flattening pasted scripts into one line
+- Uses Enter to run, Shift+Enter to insert a line break, and Ctrl+Enter to run multiline commands
+- Keeps normal cursor movement inside multiline commands without triggering command history
+
+**Remote Linux Detection & Commands**
+- Detects the remote distribution, shell, service tools, and package manager through `/etc/os-release`
+- Adds tailored commands for Ubuntu/Debian, Fedora/RHEL/CentOS/Rocky/AlmaLinux, Alpine, Arch, and SUSE
+- Expands suggestions for networking, archives, permissions, processes, logs, web servers, databases, Redis, and system administration
+- Displays the detected remote operating system in the terminal status area
+
+**Portable Remote Connection Data**
+- Stores SFTP, FTP, FTPS, SSH usernames, encrypted passwords, and vault metadata under `data/remote-connections/`
+- Automatically moves existing connection and vault files into the dedicated portable directory
+- Keeps file and directory permissions restricted to the current user on Linux
+
+**Remote File Creation Fixes**
+- Creates empty SFTP files through explicit remote file handles and permissions
+- Creates empty FTP files through a reliable zero-byte upload
+- Restores the FTP working directory after creating a remote folder
+- Applies standard permissions when creating SFTP folders
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.16
+
+---
+
+## v2.5.15
+
+**Terminal File Manager Actions**
+- Adds the full remote context menu to the file manager beside the SSH terminal
+- Supports New File, New Folder, Refresh, Download, Edit, Open With, Copy Path, Duplicate, Move, and Delete
+- Keeps terminal-side file actions synchronized with the current remote folder
+
+**Professional Terminal Clipboard & Display**
+- Automatically copies selected terminal output to the system clipboard
+- Pastes clipboard text into the command line with right-click
+- Adds Ctrl+Shift+C and Ctrl+Shift+V terminal shortcuts
+- Adds Copy, Paste, Clear, and persistent font-size controls to a compact terminal toolbar
+- Preserves command autocomplete and history navigation alongside the new clipboard shortcuts
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.15
+
+---
+
+## v2.5.14
+
+**SFTP & FTP File Context Menu**
+- Adds a dedicated right-click menu to the SFTP, FTP, and FTPS remote file browser
+- Adds New File, New Folder, Refresh, Download, Edit, Delete, Copy Path, Duplicate, and Move actions
+- Supports recursive remote folder duplication on both SFTP and FTP connections
+- Prevents duplicate and move operations from overwriting an existing remote destination
+- Fixes downloaded file paths on Ubuntu while preserving Windows compatibility
+
+**Selectable External Editor**
+- Adds Open With so users can choose a local application for each remote file
+- Keeps watching files opened in the selected editor and automatically uploads saved changes
+- Retains Open in Default Editor for the existing auto-detected editor workflow
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.14
+
+---
+
+## v2.5.13
+
+**SSH Terminal Autocomplete**
+- Adds context-aware Linux command suggestions while typing in the integrated SSH terminal
+- Completes live remote file and directory paths for commands such as `cd`, `ls`, `cat`, `cp`, `mv`, and `rm`
+- Adds curated suggestions for npm, Composer, Git, Laravel Artisan, WP-CLI, systemctl, logs, and common server tools
+- Supports Up/Down selection, Tab or Enter to apply, Escape to dismiss, and mouse selection
+- Keeps normal command-history navigation when the suggestion list is closed
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.13
+
+---
+
+## v2.5.12
+
+**SSH Terminal File Manager**
+- Adds a remote file manager beside the SSH terminal with responsive two-column layout
+- Supports folder navigation, editable path entry, refresh, create folder, file editing, and recursive deletion
+- Adds file uploads from the picker and drag-and-drop uploads with overwrite confirmation
+- Adds Copy Path actions for files, folders, and the current remote directory
+- Keeps the file manager synchronized with the terminal working directory after `cd` commands
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.12
+
+---
+
+## v2.5.11
+
+**SFTP & FTP Credential Vault**
+- Replaces hostname-bound password encryption with a portable Master Password vault
+- Derives the in-memory encryption key with scrypt and protects credentials with authenticated AES-256-GCM encryption
+- Never stores the Master Password and locks saved credentials between application sessions
+- Restricts credential files to the current user on Linux and disconnects remote sessions when the vault is locked
+- Migrates legacy credentials automatically when they can still be decrypted on the original machine
+- Detects credentials copied from another machine that cannot be decrypted and asks the user to enter the password again instead of attempting a blank password
+
+**Ubuntu SFTP & FTP Reliability**
+- Fixes SFTP and FTP authentication failing on Ubuntu after moving a workspace from Windows
+- Adds optional explicit FTPS/TLS support to protect FTP credentials in transit
+- Adds automated encryption, wrong-password, tamper-detection, and vault integration coverage
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.11
+
+---
+
 ## v2.5.10
 
 **Ubuntu Installer Reliability**
