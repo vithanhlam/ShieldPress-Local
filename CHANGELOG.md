@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.5.23
+
+**SFTP & FTP**
+- Stops the main-process crash dialog when connecting to a VPS that drops the SSH socket (`write EPIPE`)
+- Uploads dropped folders recursively instead of creating an empty remote directory
+- Asks before overwriting files and merges into an existing remote folder
+- Shows upload file counts, a progress bar, and a per-file success/failure list
+- Adds Stop, Retry on failed files, connection-loss handling, and a collapsible panel after a successful upload
+- Shows CPU core count plus RAM and disk capacity next to the live usage meters
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.23
+
+---
+
 ## v2.5.22
 
 **SFTP & FTP**

@@ -11,6 +11,26 @@ test("normalizes and validates remote mutation paths", () => {
   assert.throws(() => __test.normalizeRemoteMutationPath("/"));
 });
 
+test("joins remote upload paths without duplicating slashes", () => {
+  assert.equal(__test.joinRemotePath("/var/www/", "theme"), "/var/www/theme");
+  assert.equal(__test.joinRemotePath("/", "home"), "/home");
+  assert.equal(__test.joinRemotePath("/public_html", "index.php"), "/public_html/index.php");
+});
+
+test("collects nested local files for upload progress", async () => {
+  const fs = require("fs-extra");
+  const os = require("os");
+  const path = require("path");
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "shieldpress-upload-"));
+  await fs.ensureDir(path.join(root, "css"));
+  await fs.writeFile(path.join(root, "index.html"), "ok");
+  await fs.writeFile(path.join(root, "css", "app.css"), "body{}");
+  const files = await __test.collectLocalFiles(root);
+  const names = files.map((file) => file.relativePath).sort();
+  assert.deepEqual(names, ["css/app.css", "index.html"]);
+  await fs.remove(root);
+});
+
 test("creates an SFTP directory and empty file with explicit modes", async () => {
   const calls = [];
   const connection = {

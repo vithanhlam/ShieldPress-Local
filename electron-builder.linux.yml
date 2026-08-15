@@ -24,7 +24,9 @@ linux:
     - deb
     - snap
   icon: assets/icons
-  executableName: shieldpresslocal
+  # Snap Store package name is this value. Deb still uses package.json name
+  # (shieldpresslocal); keep a compatibility launcher in after-install.
+  executableName: shieldpress-local
   category: Development
   synopsis: Local PHP, WordPress, Laravel and Node development manager
   maintainer: vithanhlam <vithanhlam@users.noreply.github.com>
@@ -32,17 +34,13 @@ linux:
     Name: ShieldPress Local
     StartupWMClass: ShieldPress Local
 snap:
-  confinement: strict
+  # Classic is required so the app can drive system nginx, MariaDB, Redis,
+  # mkcert, /etc/hosts and project workspaces outside the snap sandbox.
+  # Strict builds cannot provide the same Ubuntu experience as the .deb.
+  confinement: classic
   grade: stable
   base: core22
   summary: Local PHP, WordPress, Laravel and Node development manager
-  plugs:
-    - default
-    - home
-    - network
-    - network-bind
-    - removable-media
-    - process-control
 deb:
   afterInstall: scripts/linux-after-install.sh
   depends:

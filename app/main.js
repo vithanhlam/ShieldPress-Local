@@ -102,6 +102,18 @@ const setup = require("./src/main/setup");
 const services = require("./src/main/services");
 const ipc = require("./src/main/ipc");
 
+// ssh2 / child-process writes to a closed socket throw EPIPE as an uncaught
+// exception. Without this handler Electron shows "A JavaScript error occurred
+// in the main process" when connecting to a VPS that drops the handshake.
+process.on("uncaughtException", (err) => {
+  const code = err && err.code;
+  if (code === "EPIPE" || code === "ECONNRESET" || code === "ERR_STREAM_DESTROYED" || code === "ENOTCONN") {
+    try { require("./src/main/logger").err("Ignored pipe error: " + (err.message || code)); } catch {}
+    return;
+  }
+  console.error(err);
+});
+
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;

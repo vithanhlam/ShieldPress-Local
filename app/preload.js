@@ -139,6 +139,8 @@ contextBridge.exposeInMainWorld("api", {
   sftpList: (id, remotePath) => ipcRenderer.invoke("sftp-list", { id, remotePath }),
   sftpDownload: (id, remotePath, localPath) => ipcRenderer.invoke("sftp-download", { id, remotePath, localPath }),
   sftpUpload: (id, localPath, remotePath) => ipcRenderer.invoke("sftp-upload", { id, localPath, remotePath }),
+  sftpUploadBatch: (id, items, opts) => ipcRenderer.invoke("sftp-upload-batch", { id, items, ...(opts || {}) }),
+  sftpUploadCancel: () => ipcRenderer.invoke("sftp-upload-cancel"),
   sftpSyncUpload: (id, opts) => ipcRenderer.invoke("sftp-sync-upload", { id, ...(opts || {}) }),
   sftpSyncDownload: (id, opts) => ipcRenderer.invoke("sftp-sync-download", { id, ...(opts || {}) }),
   sftpValidatePath: (localPath) => ipcRenderer.invoke("sftp-validate-path", localPath),
@@ -162,8 +164,10 @@ contextBridge.exposeInMainWorld("api", {
   sftpToggleStar: (id) => ipcRenderer.invoke("sftp-toggle-star", id),
   sftpSaveLastPath: (id, path) => ipcRenderer.invoke("sftp-save-last-path", { id, path }),
   sftpCheckExists: (id, remotePath) => ipcRenderer.invoke("sftp-check-exists", { id, remotePath }),
+  sftpStatLocal: (localPath) => ipcRenderer.invoke("sftp-stat-local", localPath),
   sftpOpenExternal: (id, remotePath, editorPath) => ipcRenderer.invoke("sftp-open-external", { id, remotePath, editorPath }),
   onSftpProgress: (cb) => ipcRenderer.on("sftp-progress", (_e, msg) => cb(msg)),
+  onSftpUploadProgress: (cb) => ipcRenderer.on("sftp-upload-progress", (_e, msg) => cb(msg)),
   onSftpExternalSave: (cb) => ipcRenderer.on("sftp-external-save", (_e, data) => cb(data)),
 
   // Email

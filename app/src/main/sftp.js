@@ -233,6 +233,41 @@ async function getRawConnection(id) {
 // ─── SFTP Operations ─────────────────────────────────────────────────────────
 let activeConnections = {}; // { connId: { client, sftp } }
 
+function isPipeError(err) {
+  const code = err && err.code;
+  return code === "EPIPE" || code === "ECONNRESET" || code === "ERR_STREAM_DESTROYED" || code === "ENOTCONN";
+}
+
+function sinkStreamErrors(stream) {
+  if (!stream || typeof stream.on !== "function") return;
+  stream.on("error", (err) => {
+    if (!isPipeError(err)) log.err("SSH stream: " + (err.message || err));
+  });
+}
+
+function safeCloseSsh(client) {
+  if (!client) return;
+  try {
+    client.removeAllListeners("error");
+    client.on("error", () => {});
+    if (typeof client.destroy === "function") client.destroy();
+    else client.end();
+  } catch {}
+}
+
+function dropActiveConnection(id) {
+  const ac = activeConnections[id];
+  if (!ac) return;
+  delete activeConnections[id];
+  delete remoteSystemCache[id];
+  delete remoteStatsCache[id];
+  stopShell(id);
+  try {
+    if (ac.type === "sftp") safeCloseSsh(ac.client);
+    else if (ac.type === "ftp") ac.client.close();
+  } catch {}
+}
+
 async function pingConnection(id) {
   const ac = activeConnections[id];
   if (!ac) return false;
@@ -240,7 +275,12 @@ async function pingConnection(id) {
     if (ac.type === "sftp") {
       return await new Promise((resolve) => {
         const t = setTimeout(() => resolve(false), 5000);
-        ac.sftp.stat("/", (err) => { clearTimeout(t); resolve(!err); });
+        try {
+          ac.sftp.stat("/", (err) => { clearTimeout(t); resolve(!err); });
+        } catch {
+          clearTimeout(t);
+          resolve(false);
+        }
       });
     } else if (ac.type === "ftp") {
       await ac.client.pwd();
@@ -267,12 +307,7 @@ async function connect(id, progressCb) {
       await touchLastConnected(id);
       return { success: true, message: "Already connected" };
     }
-    try {
-      const ac = activeConnections[id];
-      if (ac.type === "sftp") ac.client.end();
-      else if (ac.type === "ftp") ac.client.close();
-    } catch {}
-    delete activeConnections[id];
+    dropActiveConnection(id);
     progressCb && progressCb(`Reconnecting to ${conn.host}:${conn.port}...`);
   } else {
     progressCb && progressCb(`Connecting to ${conn.host}:${conn.port}...`);
@@ -292,14 +327,7 @@ async function ensureConnected(id) {
   // Reconnect silently
   const conn = await getRawConnection(id);
   if (!conn) return { success: false, message: "Connection config not found" };
-  try {
-    const ac = activeConnections[id];
-    if (ac.type === "sftp") ac.client.end();
-    else if (ac.type === "ftp") ac.client.close();
-  } catch {}
-  delete activeConnections[id];
-  delete remoteSystemCache[id];
-  delete remoteStatsCache[id];
+  dropActiveConnection(id);
   log.info(`Auto-reconnecting ${id}...`);
   const r = await connect(id);
   return r;
@@ -309,39 +337,68 @@ async function connectSftp(id, conn, progressCb) {
   const { Client } = require("ssh2");
   return new Promise((resolve) => {
     const client = new Client();
+    let settled = false;
+    const done = (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
     const connectOpts = {
       host: conn.host,
       port: conn.port,
       username: conn.username,
       readyTimeout: 15000,
+      keepaliveInterval: 10000,
+      keepaliveCountMax: 3,
     };
 
     if (conn.privateKey && fs.existsSync(conn.privateKey)) {
       connectOpts.privateKey = fs.readFileSync(conn.privateKey);
     } else if (conn.password) {
       connectOpts.password = conn.password;
+    } else {
+      return done({ success: false, message: "No password or private key configured" });
     }
 
     client.on("ready", () => {
       client.sftp((err, sftp) => {
         if (err) {
-          client.end();
           log.err("SFTP session error: " + err.message);
-          return resolve({ success: false, message: err.message });
+          safeCloseSsh(client);
+          return done({ success: false, message: err.message });
         }
+        sinkStreamErrors(sftp);
         activeConnections[id] = { client, sftp, type: "sftp" };
         progressCb && progressCb("Connected!");
         log.ok(`SFTP connected: ${conn.host}`);
-        resolve({ success: true });
+        done({ success: true });
       });
     });
 
     client.on("error", (err) => {
+      if (isPipeError(err) && activeConnections[id] && activeConnections[id].client === client) {
+        dropActiveConnection(id);
+        log.err("SSH connection dropped: " + err.message);
+        return;
+      }
       log.err("SSH error: " + err.message);
-      resolve({ success: false, message: err.message });
+      if (activeConnections[id] && activeConnections[id].client === client) dropActiveConnection(id);
+      else safeCloseSsh(client);
+      done({ success: false, message: err.message });
     });
 
-    client.connect(connectOpts);
+    client.on("close", () => {
+      if (activeConnections[id] && activeConnections[id].client === client) {
+        dropActiveConnection(id);
+      }
+      if (!settled) done({ success: false, message: "SSH connection closed" });
+    });
+
+    try {
+      client.connect(connectOpts);
+    } catch (err) {
+      done({ success: false, message: err.message });
+    }
   });
 }
 
@@ -369,19 +426,8 @@ async function connectFtp(id, conn, progressCb) {
 }
 
 async function disconnect(id) {
-  const ac = activeConnections[id];
-  if (!ac) return { success: true };
-  stopShell(id);
-  try {
-    if (ac.type === "sftp") {
-      ac.client.end();
-    } else if (ac.type === "ftp") {
-      ac.client.close();
-    }
-  } catch {}
-  delete activeConnections[id];
-  delete remoteSystemCache[id];
-  delete remoteStatsCache[id];
+  if (!activeConnections[id]) return { success: true };
+  dropActiveConnection(id);
   log.info(`Disconnected: ${id}`);
   return { success: true };
 }
@@ -466,28 +512,277 @@ async function downloadFile(id, remotePath, localPath, progressCb) {
   }
 }
 
-async function uploadFile(id, localPath, remotePath, progressCb) {
+function joinRemotePath(base, name) {
+  const root = String(base || "/").replace(/\/+$/, "") || "";
+  return `${root}/${name}`.replace(/\/{2,}/g, "/");
+}
+
+async function ensureRemoteDir(id, remotePath) {
+  if (!remotePath || remotePath === "/") return { success: true };
+  const exists = await checkRemoteExists(id, remotePath);
+  if (exists.exists) {
+    if (exists.isDirectory) return { success: true };
+    return { success: false, message: `A file already exists at ${remotePath}` };
+  }
+  const parent = path.posix.dirname(remotePath);
+  if (parent && parent !== "." && parent !== remotePath) {
+    const parentResult = await ensureRemoteDir(id, parent);
+    if (!parentResult.success) return parentResult;
+  }
+  try {
+    await createRemoteDirOnConnection(activeConnections[id], remotePath);
+    return { success: true };
+  } catch (error) {
+    if (/exist/i.test(error.message || "")) {
+      const again = await checkRemoteExists(id, remotePath);
+      if (again.exists && again.isDirectory) return { success: true };
+    }
+    return { success: false, message: error.message };
+  }
+}
+
+async function collectLocalFiles(localPath) {
+  const items = [];
+  async function walk(abs, rel) {
+    let stat;
+    try { stat = await fs.stat(abs); } catch { return; }
+    if (stat.isDirectory()) {
+      const names = await fs.readdir(abs);
+      for (const name of names) {
+        if (name === "." || name === "..") continue;
+        await walk(path.join(abs, name), rel ? `${rel}/${name}` : name);
+      }
+      return;
+    }
+    if (stat.isFile()) items.push({ localPath: abs, relativePath: rel || path.basename(abs), size: stat.size });
+  }
+  const stat = await fs.stat(localPath);
+  if (stat.isFile()) return [{ localPath, relativePath: path.basename(localPath), size: stat.size }];
+  if (stat.isDirectory()) await walk(localPath, "");
+  return items;
+}
+
+async function putLocalFile(id, localPath, remotePath) {
   const ac = activeConnections[id];
   if (!ac) return { success: false, message: "Not connected" };
-
-  progressCb && progressCb(`Uploading ${path.basename(localPath)}...`);
-
   try {
     if (ac.type === "sftp") {
-      return new Promise((resolve) => {
+      return await new Promise((resolve) => {
         ac.sftp.fastPut(localPath, remotePath, {}, (err) => {
           if (err) return resolve({ success: false, message: err.message });
-          progressCb && progressCb(`Uploaded: ${path.basename(localPath)}`);
-          resolve({ success: true });
+          resolve({ success: true, uploaded: 1 });
         });
       });
-    } else if (ac.type === "ftp") {
+    }
+    if (ac.type === "ftp") {
       await ac.client.uploadFrom(localPath, remotePath);
-      progressCb && progressCb(`Uploaded: ${path.basename(localPath)}`);
-      return { success: true };
+      return { success: true, uploaded: 1 };
     }
   } catch (err) {
     return { success: false, message: err.message };
+  }
+  return { success: false, message: "Unsupported connection type" };
+}
+
+function emitUploadProgress(progressCb, payload) {
+  if (!progressCb) return;
+  progressCb(payload);
+  if (payload && payload.type && payload.name) {
+    if (payload.type === "file-start") progressCb(`Uploading ${payload.name}...`);
+    if (payload.type === "file-done" && payload.success) progressCb(`Uploaded: ${payload.name}`);
+    if (payload.type === "file-done" && !payload.success) progressCb(`Failed: ${payload.name} — ${payload.message || ""}`);
+  }
+}
+
+function isDisconnectError(message) {
+  return /not connected|epipe|econnreset|enotconn|etimedout|timed out|connection (lost|closed|reset)|socket|ssh connection closed|no response/i.test(String(message || ""));
+}
+
+let uploadCancelled = false;
+
+function cancelUpload() {
+  uploadCancelled = true;
+  return { success: true };
+}
+
+function emitRemainingFailed(progressCb, files, startIndex, total, retry, message) {
+  for (let j = startIndex; j < files.length; j++) {
+    const left = files[j];
+    emitUploadProgress(progressCb, {
+      type: "file-done",
+      index: retry && left.index ? left.index : j + 1,
+      total,
+      name: left.name,
+      localPath: left.localPath,
+      remotePath: left.remotePath,
+      success: false,
+      cancelled: message === "Stopped",
+      message,
+    });
+  }
+  return files.length - startIndex;
+}
+
+async function uploadBatch(id, items, progressCb, opts = {}) {
+  uploadCancelled = false;
+  const retry = !!opts.retry;
+  const connected = await ensureConnected(id);
+  if (!connected.success) return connected;
+  const files = [];
+  for (const item of items || []) {
+    if (!item?.localPath || !fs.existsSync(item.localPath)) {
+      emitUploadProgress(progressCb, {
+        type: "file-done",
+        name: path.basename(item?.localPath || "unknown"),
+        localPath: item?.localPath,
+        remotePath: item?.remotePath,
+        success: false,
+        message: "Local path not found",
+        index: item?.index || 0,
+        total: 0,
+        retry,
+      });
+      continue;
+    }
+    const stat = await fs.stat(item.localPath);
+    if (stat.isDirectory()) {
+      const nested = await collectLocalFiles(item.localPath);
+      const dirOk = await ensureRemoteDir(id, item.remotePath);
+      if (!dirOk.success) return dirOk;
+      for (const file of nested) {
+        files.push({
+          localPath: file.localPath,
+          remotePath: joinRemotePath(item.remotePath, file.relativePath),
+          name: `${path.basename(item.localPath)}/${file.relativePath}`.replace(/\\/g, "/"),
+          index: item.index,
+        });
+      }
+    } else if (stat.isFile()) {
+      files.push({
+        localPath: item.localPath,
+        remotePath: item.remotePath,
+        name: item.name || path.basename(item.localPath),
+        index: item.index,
+      });
+    }
+  }
+
+  if (!retry) emitUploadProgress(progressCb, { type: "batch-start", total: files.length });
+  let uploaded = 0;
+  let failed = 0;
+  let stopped = false;
+  let disconnect = false;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const index = retry && file.index ? file.index : i + 1;
+    if (uploadCancelled) {
+      stopped = true;
+      failed += emitRemainingFailed(progressCb, files, i, files.length, retry, "Stopped");
+      break;
+    }
+    emitUploadProgress(progressCb, {
+      type: "file-start",
+      index,
+      total: files.length,
+      name: file.name,
+      path: file.remotePath,
+      localPath: file.localPath,
+      remotePath: file.remotePath,
+      retry,
+    });
+    const parent = path.posix.dirname(file.remotePath);
+    if (parent && parent !== "." && parent !== file.remotePath) {
+      const dirOk = await ensureRemoteDir(id, parent);
+      if (!dirOk.success) {
+        failed++;
+        emitUploadProgress(progressCb, {
+          type: "file-done",
+          index,
+          total: files.length,
+          name: file.name,
+          localPath: file.localPath,
+          remotePath: file.remotePath,
+          success: false,
+          message: isDisconnectError(dirOk.message) ? "Connection lost" : dirOk.message,
+        });
+        if (isDisconnectError(dirOk.message)) {
+          const recon = await ensureConnected(id);
+          if (!recon.success) {
+            disconnect = true;
+            failed += emitRemainingFailed(progressCb, files, i + 1, files.length, retry, "Connection lost");
+            break;
+          }
+        }
+        continue;
+      }
+    }
+    let result = await putLocalFile(id, file.localPath, file.remotePath);
+    if (!result.success && isDisconnectError(result.message) && !uploadCancelled) {
+      const recon = await ensureConnected(id);
+      if (recon.success) result = await putLocalFile(id, file.localPath, file.remotePath);
+      else {
+        disconnect = true;
+        result = { success: false, message: "Connection lost" };
+      }
+    }
+    if (result.success) uploaded++;
+    else failed++;
+    emitUploadProgress(progressCb, {
+      type: "file-done",
+      index,
+      total: files.length,
+      name: file.name,
+      localPath: file.localPath,
+      remotePath: file.remotePath,
+      success: !!result.success,
+      message: result.message,
+      retry,
+    });
+    if (disconnect && !result.success) {
+      failed += emitRemainingFailed(progressCb, files, i + 1, files.length, retry, "Connection lost");
+      break;
+    }
+  }
+  if (!retry) {
+    emitUploadProgress(progressCb, {
+      type: "batch-end",
+      uploaded,
+      failed,
+      total: files.length,
+      cancelled: stopped,
+      disconnect,
+    });
+  }
+  return {
+    success: failed === 0 && !stopped,
+    uploaded,
+    failed,
+    total: files.length,
+    cancelled: stopped,
+    disconnect,
+    message: disconnect ? "Connection lost" : (stopped ? "Upload stopped" : (failed ? `${failed} file(s) failed` : undefined)),
+  };
+}
+
+async function uploadFile(id, localPath, remotePath, progressCb) {
+  const ac = activeConnections[id];
+  if (!ac) return { success: false, message: "Not connected" };
+  if (!fs.existsSync(localPath)) return { success: false, message: "Local path not found" };
+  return uploadBatch(id, [{ localPath, remotePath }], progressCb);
+}
+
+async function statLocalPath(localPath) {
+  try {
+    const stat = await fs.stat(localPath);
+    return {
+      success: true,
+      exists: true,
+      isDirectory: stat.isDirectory(),
+      size: stat.size,
+      name: path.basename(localPath),
+    };
+  } catch {
+    return { success: true, exists: false };
   }
 }
 
@@ -575,7 +870,8 @@ async function syncUpload(id, progressCb, opts = {}) {
               continue; // remote is same age or newer → skip
             }
           }
-          const r = await uploadFile(id, localP, remoteP, progressCb);
+          progressCb && progressCb(`Uploading ${entry.name}...`);
+          const r = await putLocalFile(id, localP, remoteP);
           if (r.success) uploaded++;
           else errors++;
         } catch {
@@ -678,6 +974,7 @@ async function startShell(id, cols = 100, rows = 30) {
     ac.client.shell({ term: "xterm-256color", cols, rows }, (error, stream) => {
       if (error) return resolve({ success: false, message: error.message });
       activeShells[id] = stream;
+      sinkStreamErrors(stream);
       stream.on("data", (data) => global.STATE.mainWindow?.webContents?.send("sftp-shell-data", { id, data: data.toString("utf8") }));
       stream.stderr?.on("data", (data) => global.STATE.mainWindow?.webContents?.send("sftp-shell-data", { id, data: data.toString("utf8") }));
       stream.on("close", () => {
@@ -691,9 +988,15 @@ async function startShell(id, cols = 100, rows = 30) {
 
 function writeShell(id, data) {
   const stream = activeShells[id];
-  if (!stream || stream.destroyed) return { success: false, message: "SSH shell is not running" };
-  stream.write(String(data || ""));
-  return { success: true };
+  if (!stream || stream.destroyed || stream.writable === false) {
+    return { success: false, message: "SSH shell is not running" };
+  }
+  try {
+    stream.write(String(data || ""));
+    return { success: true };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
 }
 
 function resizeShell(id, cols, rows) {
@@ -720,6 +1023,7 @@ async function getRemoteSystemInfo(id) {
   return new Promise((resolve) => {
     ac.client.exec(command, (error, stream) => {
       if (error) return resolve({ success: false, message: error.message });
+      sinkStreamErrors(stream);
       let output = "";
       stream.on("data", (chunk) => { output += chunk.toString(); });
       stream.stderr.on("data", () => {});
@@ -754,6 +1058,7 @@ function sshExecText(ac, command, timeoutMs = 8000) {
         clearTimeout(timer);
         return resolve({ success: false, message: error.message });
       }
+      sinkStreamErrors(stream);
       let output = "";
       stream.on("data", (chunk) => { output += chunk.toString(); });
       stream.stderr.on("data", () => {});
@@ -778,6 +1083,8 @@ async function getRemoteStats(id) {
   const command = [
     "printf '__CPU__\\n'",
     "grep '^cpu ' /proc/stat",
+    "printf '__CORES__\\n'",
+    "nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo",
     "printf '__MEM__\\n'",
     "awk '/MemTotal:/{t=$2} /MemAvailable:/{a=$2} END{print t+0,a+0}' /proc/meminfo",
     "printf '__DISK__\\n'",
@@ -788,11 +1095,13 @@ async function getRemoteStats(id) {
   const result = await sshExecText(ac, command);
   if (!result.success) return result;
   const output = result.output || "";
-  const cpuLine = (output.split("__CPU__\n")[1] || "").split("__MEM__\n")[0].trim();
+  const cpuLine = (output.split("__CPU__\n")[1] || "").split("__CORES__\n")[0].trim();
+  const coresLine = (output.split("__CORES__\n")[1] || "").split("__MEM__\n")[0].trim();
   const memLine = (output.split("__MEM__\n")[1] || "").split("__DISK__\n")[0].trim();
   const diskLine = (output.split("__DISK__\n")[1] || "").split("__NET__\n")[0].trim();
   const netLine = (output.split("__NET__\n")[1] || "").trim();
   const cpuSample = parseCpuLine(cpuLine);
+  const cpuCores = parseInt(coresLine, 10);
   const [memTotal, memAvail] = memLine.split(/\s+/).map(Number);
   const [diskTotal, diskUsed, diskPctRaw] = diskLine.split(/\s+/).map(Number);
   const [rx, tx] = netLine.split(/\s+/).map(Number);
@@ -817,6 +1126,7 @@ async function getRemoteStats(id) {
   return {
     success: true,
     cpuPct,
+    cpuCores: Number.isFinite(cpuCores) && cpuCores > 0 ? cpuCores : null,
     ramPct,
     diskPct,
     ramUsedKb: memTotal > 0 ? memTotal - memAvail : null,
@@ -856,6 +1166,7 @@ async function execCommand(id, command) {
     return new Promise((resolve) => {
       ac.client.exec(verifyCmd, { pty: true }, (err, stream) => {
         if (err) return resolve({ success: false, message: err.message });
+        sinkStreamErrors(stream);
         let out = "";
         stream.on("data", (data) => { out += data.toString(); });
         stream.on("close", (code) => {
@@ -877,6 +1188,7 @@ async function execCommand(id, command) {
   return new Promise((resolve) => {
     ac.client.exec(fullCmd, { pty: true }, (err, stream) => {
       if (err) return resolve({ success: false, message: err.message });
+      sinkStreamErrors(stream);
 
       let stdout = "";
 
@@ -1016,7 +1328,7 @@ async function uploadAndExtract(id, localZipPath, remotePath, progressCb) {
   const remoteZip = remotePath.replace(/\/+$/, "") + "/" + zipName;
 
   progressCb && progressCb(`Uploading ${zipName}...`);
-  const uploadResult = await uploadFile(id, localZipPath, remoteZip, progressCb);
+  const uploadResult = await putLocalFile(id, localZipPath, remoteZip);
   if (!uploadResult.success) return uploadResult;
 
   // Extract via SSH (only for SFTP)
@@ -1144,8 +1456,8 @@ async function copyRemote(id, sourcePath, destinationPath, isDirectory) {
     return { success: false, message: "Destination cannot be inside the source" };
   }
   if (!isDirectory) return copyRemoteFile(id, sourcePath, destinationPath);
-  const created = await createRemoteDir(id, destinationPath);
-  if (!created.success && !/exist/i.test(created.message || "")) return created;
+  const created = await ensureRemoteDir(id, destinationPath);
+  if (!created.success) return created;
   const listed = await listRemote(id, sourcePath);
   if (!listed.success) return listed;
   for (const item of listed.items) {
@@ -1238,7 +1550,7 @@ async function openInExternalEditor(id, remotePath, progressCb, editorPath) {
         uploading = true;
         log.info(`[ExternalEdit] ${fileName} changed, uploading...`);
 
-        const upResult = await uploadFile(id, localFile, remotePath);
+        const upResult = await putLocalFile(id, localFile, remotePath);
         if (upResult.success) {
           log.ok(`[ExternalEdit] ${fileName} uploaded`);
           global.STATE.mainWindow?.webContents?.send("sftp-external-save", {
@@ -1414,6 +1726,8 @@ module.exports = {
   listRemote,
   downloadFile,
   uploadFile,
+  uploadBatch,
+  cancelUpload,
   syncUpload,
   syncDownload,
   execCommand,
@@ -1438,5 +1752,6 @@ module.exports = {
   updateLastBrowsedPath,
   checkRemoteExists,
   validateLocalPath,
-  __test: { normalizeRemoteMutationPath, createRemoteDirOnConnection, createRemoteFileOnConnection },
+  statLocalPath,
+  __test: { normalizeRemoteMutationPath, createRemoteDirOnConnection, createRemoteFileOnConnection, joinRemotePath, collectLocalFiles },
 };

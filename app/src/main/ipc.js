@@ -527,11 +527,19 @@ function register(ipcMain, shell, dialog) {
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
     }),
   );
+  const sendSftpProgress = (msg) => {
+    const win = global.STATE.mainWindow?.webContents;
+    if (!win) return;
+    if (msg && typeof msg === "object") win.send("sftp-upload-progress", msg);
+    else win.send("sftp-progress", msg);
+  };
   ipcMain.handle("sftp-upload", (_e, { id, localPath, remotePath }) =>
-    sftp.uploadFile(id, localPath, remotePath, (msg) => {
-      global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
-    }),
+    sftp.uploadFile(id, localPath, remotePath, sendSftpProgress),
   );
+  ipcMain.handle("sftp-upload-batch", (_e, { id, items, retry }) =>
+    sftp.uploadBatch(id, items, sendSftpProgress, { retry: !!retry }),
+  );
+  ipcMain.handle("sftp-upload-cancel", () => sftp.cancelUpload());
   ipcMain.handle("sftp-sync-upload", (_e, { id, changedOnly }) =>
     sftp.syncUpload(id, (msg) => {
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
@@ -565,6 +573,7 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-toggle-star", (_e, id) => sftp.toggleStar(id));
   ipcMain.handle("sftp-save-last-path", (_e, { id, path: p }) => sftp.updateLastBrowsedPath(id, p));
   ipcMain.handle("sftp-check-exists", (_e, { id, remotePath }) => sftp.checkRemoteExists(id, remotePath));
+  ipcMain.handle("sftp-stat-local", (_e, localPath) => sftp.statLocalPath(localPath));
   ipcMain.handle("sftp-open-external", (_e, { id, remotePath, editorPath }) =>
     sftp.openInExternalEditor(id, remotePath, (msg) => {
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);

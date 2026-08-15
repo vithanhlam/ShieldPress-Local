@@ -14,11 +14,12 @@ window.SFTP = {
     if (!this._listening) {
       api.onSftpProgress((msg) => {
         const syncOut = document.getElementById("sftp-sync-output");
-        if (syncOut && document.getElementById("m-sftp-sync")?.classList.contains("open")) {
+        if (syncOut && document.getElementById("m-sftp-sync")?.classList.contains("open") && typeof msg === "string") {
           syncOut.textContent += msg + "\n";
           syncOut.scrollTop = syncOut.scrollHeight;
         }
       });
+      api.onSftpUploadProgress((msg) => this._onUploadProgress(msg));
       api.onSftpExternalSave((data) => {
         toast(`${data.file} saved to server!`, "success");
       });
@@ -425,32 +426,10 @@ window.SFTP = {
       zone.style.outlineOffset = "";
       zone.style.background = "";
 
-      const files = e.dataTransfer?.files;
-      if (!files || files.length === 0) return;
-
+      const paths = [...(e.dataTransfer?.files || [])].map((file) => file.path).filter(Boolean);
+      if (!paths.length) return;
       const id = document.getElementById("sftp-browser-conn-id").value;
-      let uploaded = 0;
-      for (const file of files) {
-        const localPath = file.path;
-        const fileName = file.name;
-        const remotePath = this._currentPath.replace(/\/+$/, "") + "/" + fileName;
-
-        // Check if exists → ask overwrite
-        const exists = await api.sftpCheckExists(id, remotePath);
-        if (exists.exists) {
-          const overwrite = confirm(`"${fileName}" already exists on server (${this._fmtSize(exists.size)}).\n\nOverwrite?`);
-          if (!overwrite) continue;
-        }
-
-        toast("Uploading " + fileName + "...", "info");
-        const r = await api.sftpUpload(id, localPath, remotePath);
-        if (r.success) uploaded++;
-        else toast("Upload failed: " + fileName + " — " + r.message, "error");
-      }
-      if (uploaded > 0) {
-        toast(`Uploaded ${uploaded} file(s)`, "success");
-        this._loadDir();
-      }
+      await this._uploadLocalPaths(id, paths, this._currentPath, () => this._loadDir());
     });
   },
 
@@ -547,30 +526,228 @@ window.SFTP = {
   async uploadFromDialog() {
     const localFile = await api.openFileDialog({ properties: ["openFile", "multiSelections"] });
     if (!localFile) return;
-    // openFileDialog with multiSelections may return string or be single
     const files = Array.isArray(localFile) ? localFile : [localFile];
     const id = document.getElementById("sftp-browser-conn-id").value;
-    let uploaded = 0;
+    await this._uploadLocalPaths(id, files, this._currentPath, () => this._loadDir());
+  },
 
-    for (const filePath of files) {
-      const fileName = filePath.split(/[/\\]/).pop();
-      const remotePath = this._currentPath.replace(/\/+$/, "") + "/" + fileName;
+  async uploadFolderDialog() {
+    const localDir = await api.openFileDialog({ properties: ["openDirectory"] });
+    if (!localDir) return;
+    const id = document.getElementById("sftp-browser-conn-id").value;
+    await this._uploadLocalPaths(id, [localDir], this._currentPath, () => this._loadDir());
+  },
 
-      // Check overwrite
+  async _uploadLocalPaths(id, localPaths, remoteDir, onDone) {
+    if (this._xferBusy) return toast("An upload is already in progress", "warn");
+    const jobs = [];
+    this._xferReset();
+    this._xferShow(true);
+    this._xferSetMeta("Checking files...", "0 / 0", 0);
+
+    for (const localPath of localPaths) {
+      const info = await api.sftpStatLocal(localPath);
+      if (!info.exists) {
+        this._xferAddRow("skip-" + localPath, localPath, "fail", "Not found");
+        continue;
+      }
+      const name = info.name;
+      const remotePath = (remoteDir.replace(/\/+$/, "") || "") + "/" + name;
       const exists = await api.sftpCheckExists(id, remotePath);
       if (exists.exists) {
-        const overwrite = confirm(`"${fileName}" already exists on server (${this._fmtSize(exists.size)}).\n\nOverwrite?`);
-        if (!overwrite) continue;
+        if (exists.isDirectory && !info.isDirectory) {
+          this._xferAddRow("skip-" + name, name, "fail", "Cannot overwrite a folder with a file");
+          continue;
+        }
+        if (!exists.isDirectory && info.isDirectory) {
+          this._xferAddRow("skip-" + name, name, "fail", "Cannot overwrite a file with a folder");
+          continue;
+        }
+        const message = info.isDirectory
+          ? `"${name}" folder already exists on the server.\n\nMerge contents? Existing files inside will be overwritten.`
+          : `"${name}" already exists on server (${this._fmtSize(exists.size)}).\n\nOverwrite?`;
+        if (!confirm(message)) {
+          this._xferAddRow("skip-" + name, name, "skip", "Skipped");
+          continue;
+        }
       }
-
-      toast("Uploading " + fileName + "...", "info");
-      const r = await api.sftpUpload(id, filePath, remotePath);
-      if (r.success) uploaded++;
-      else toast("Upload failed: " + r.message, "error");
+      jobs.push({ localPath, remotePath });
     }
-    if (uploaded > 0) {
-      toast(`Uploaded ${uploaded} file(s)`, "success");
-      this._loadDir();
+
+    if (!jobs.length) {
+      this._xferSetMeta("Nothing to upload", "0 / 0", 0);
+      return;
+    }
+
+    this._xferBusy = true;
+    this._xferConnId = id;
+    this._xferOnDone = onDone;
+    this._xferSetBusy(true);
+    this._xferSetMeta("Uploading...", "0 / ?", 0);
+    try {
+      const result = await api.sftpUploadBatch(id, jobs);
+      const uploaded = result.uploaded || 0;
+      const failed = result.failed || 0;
+      if (result.cancelled) toast("Upload stopped", "warn");
+      else if (result.disconnect) toast("Connection lost during upload", "error");
+      else if (uploaded && !failed) toast(`Uploaded ${uploaded} file(s)`, "success");
+      else if (uploaded) toast(`Uploaded ${uploaded} file(s), ${failed} failed`, "warn");
+      else toast(result.message || "Upload failed", "error");
+      if (uploaded > 0 && onDone) await onDone();
+    } finally {
+      this._xferBusy = false;
+      this._xferSetBusy(false);
+    }
+  },
+
+  async stopUpload() {
+    await api.sftpUploadCancel();
+    this._xferSetMeta("Stopping...", null, null);
+  },
+
+  toggleTransfer(collapse) {
+    this._xferEls("root").forEach((el) => {
+      el.classList.toggle("is-collapsed", collapse !== false);
+    });
+  },
+
+  async retryUpload(index) {
+    const job = this._xferFiles?.[index];
+    if (!job || this._xferBusy) return;
+    const id = this._xferConnId;
+    if (!id) return;
+    this._xferBusy = true;
+    this._xferSetBusy(true);
+    this._xferUpdateRow(index, job.name, "pending");
+    try {
+      const result = await api.sftpUploadBatch(id, [{ ...job, index }], { retry: true });
+      if (result.success && this._xfer) {
+        this._xfer.ok++;
+        this._xfer.fail = Math.max(0, (this._xfer.fail || 0) - 1);
+      }
+      if (result.success && this._xferOnDone) await this._xferOnDone();
+      if (!result.success) toast(result.message || "Retry failed", "error");
+    } finally {
+      this._xferBusy = false;
+      this._xferSetBusy(false);
+    }
+  },
+
+  _xferPanels() {
+    return [
+      { root: "sftp-xfer", label: "sftp-xfer-label", count: "sftp-xfer-count", bar: "sftp-xfer-bar", current: "sftp-xfer-current", list: "sftp-xfer-list" },
+      { root: "sftp-term-xfer", label: "sftp-term-xfer-label", count: "sftp-term-xfer-count", bar: "sftp-term-xfer-bar", current: "sftp-term-xfer-current", list: "sftp-term-xfer-list" },
+    ];
+  },
+
+  _xferEls(key) {
+    return this._xferPanels().map((panel) => document.getElementById(panel[key])).filter(Boolean);
+  },
+
+  _xferShow(visible) {
+    this._xferEls("root").forEach((el) => { el.style.display = visible ? "" : "none"; });
+  },
+
+  _xferReset() {
+    this._xfer = { total: 0, done: 0, ok: 0, fail: 0 };
+    this._xferFiles = {};
+    this._xferEls("root").forEach((el) => el.classList.remove("is-collapsed", "is-busy"));
+    this._xferEls("list").forEach((el) => { el.innerHTML = ""; });
+    this._xferEls("current").forEach((el) => { el.textContent = ""; });
+    this._xferEls("bar").forEach((el) => { el.style.width = "0%"; });
+  },
+
+  _xferSetBusy(busy) {
+    this._xferEls("root").forEach((el) => el.classList.toggle("is-busy", !!busy));
+  },
+
+  _xferSetMeta(label, count, pct) {
+    this._xferEls("label").forEach((el) => { el.textContent = label; });
+    if (count != null) this._xferEls("count").forEach((el) => { el.textContent = count; });
+    if (pct != null) this._xferEls("bar").forEach((el) => { el.style.width = Math.max(0, Math.min(100, pct)) + "%"; });
+  },
+
+  _xferAddRow(id, name, status, detail) {
+    const html = this._xferRowHtml(id, name, status, detail);
+    this._xferEls("list").forEach((el) => { el.insertAdjacentHTML("afterbegin", html); });
+  },
+
+  _xferRowHtml(id, name, status, detail) {
+    const map = {
+      pending: { cls: "sftp-xfer-pending", icon: "fa-spinner fa-spin", text: "Uploading" },
+      ok: { cls: "sftp-xfer-ok", icon: "fa-check", text: "Done" },
+      fail: { cls: "sftp-xfer-fail", icon: "fa-times", text: detail || "Failed" },
+      skip: { cls: "sftp-xfer-skip", icon: "fa-minus", text: detail || "Skipped" },
+    };
+    const meta = map[status] || map.pending;
+    const retry = status === "fail" && this._xferFiles?.[id]
+      ? `<button class="btn btn-ghost btn-xs sftp-xfer-retry" title="Retry" onclick="SFTP.retryUpload(${Number(id)})"><i class="fas fa-redo"></i></button>`
+      : "";
+    return `<div class="sftp-xfer-row" data-xfer-id="${this._esc(String(id))}">
+      <span class="sftp-xfer-status ${meta.cls}"><i class="fas ${meta.icon}"></i> ${this._esc(meta.text)}</span>
+      <span class="sftp-xfer-name" title="${this._esc(name)}">${this._esc(name)}</span>
+      ${retry}
+    </div>`;
+  },
+
+  _xferUpdateRow(id, name, status, detail) {
+    const html = this._xferRowHtml(id, name, status, detail);
+    this._xferEls("list").forEach((list) => {
+      const row = list.querySelector(`[data-xfer-id="${CSS.escape(String(id))}"]`);
+      if (row) row.outerHTML = html;
+      else list.insertAdjacentHTML("afterbegin", html);
+    });
+  },
+
+  _onUploadProgress(msg) {
+    if (!msg || typeof msg !== "object") return;
+    this._xferShow(true);
+    if (msg.localPath && msg.remotePath && msg.index) {
+      this._xferFiles ||= {};
+      this._xferFiles[msg.index] = { localPath: msg.localPath, remotePath: msg.remotePath, name: msg.name };
+    }
+    if (msg.type === "batch-start") {
+      this._xfer = { total: msg.total || 0, done: 0, ok: 0, fail: 0 };
+      this._xferSetBusy(true);
+      this._xferSetMeta(msg.total ? `Uploading 0 / ${msg.total} files` : "No files to upload", `0 / ${msg.total || 0}`, 0);
+    }
+    if (msg.type === "file-start") {
+      this._xferUpdateRow(msg.index, msg.name, "pending");
+      this._xferEls("current").forEach((el) => { el.textContent = msg.name || ""; });
+      this._xferSetMeta(`Uploading ${msg.index} / ${msg.total} files`, `${this._xfer?.ok || 0} done · ${this._xfer?.fail || 0} failed`, msg.total ? ((msg.index - 1) / msg.total) * 100 : 0);
+    }
+    if (msg.type === "file-done") {
+      if (this._xfer && !msg.retry) {
+        if (msg.success) this._xfer.ok++;
+        else this._xfer.fail++;
+        this._xfer.done = msg.index;
+      }
+      this._xferUpdateRow(msg.index, msg.name, msg.success ? "ok" : "fail", msg.message);
+      const total = this._xfer?.total || msg.total || 0;
+      const ok = this._xfer?.ok || 0;
+      const fail = this._xfer?.fail || 0;
+      this._xferSetMeta(`Uploading ${msg.index} / ${total} files`, `${ok} done · ${fail} failed`, total ? (Math.max(ok + fail, msg.index) / total) * 100 : 0);
+    }
+    if (msg.type === "batch-end") {
+      const uploaded = msg.uploaded || 0;
+      const failed = msg.failed || 0;
+      const total = msg.total || 0;
+      this._xferSetBusy(false);
+      let label = `Uploaded ${uploaded} file(s)`;
+      let current = "All files uploaded";
+      if (msg.cancelled) {
+        label = "Upload stopped";
+        current = "Remaining files were not uploaded";
+      } else if (msg.disconnect) {
+        label = "Connection lost";
+        current = "Reconnect, then retry failed files";
+      } else if (failed) {
+        label = `Finished with ${failed} failed file(s)`;
+        current = "Retry failed files or hide this panel";
+      }
+      this._xferSetMeta(label, `${uploaded} / ${total}`, 100);
+      this._xferEls("current").forEach((el) => { el.textContent = current; });
+      if (!failed && !msg.cancelled && !msg.disconnect) this.toggleTransfer(true);
     }
   },
 
@@ -1142,6 +1319,28 @@ window.SFTP = {
     return pct == null || Number.isNaN(pct) ? "--" : `${pct}%`;
   },
 
+  _formatSizeKb(kb) {
+    if (kb == null || Number.isNaN(kb) || kb <= 0) return "";
+    const units = [
+      { size: 1073741824, suffix: "T" },
+      { size: 1048576, suffix: "G" },
+      { size: 1024, suffix: "M" },
+      { size: 1, suffix: "K" },
+    ];
+    for (const unit of units) {
+      if (kb >= unit.size) {
+        const value = kb / unit.size;
+        const text = value >= 10 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, "");
+        return text + unit.suffix;
+      }
+    }
+    return "0K";
+  },
+
+  _metricExtra(text) {
+    return text ? ` · ${text}` : "";
+  },
+
   _renderRemoteMetrics(stats) {
     const el = document.getElementById("sftp-term-metrics");
     if (!el) return;
@@ -1151,10 +1350,19 @@ window.SFTP = {
     const cpuColor = this._metricColor(cpu);
     const ramColor = this._metricColor(ram);
     const diskColor = this._metricColor(disk);
+    const cores = stats?.cpuCores > 0 ? `${stats.cpuCores} core` : "";
+    const ramSize = this._formatSizeKb(stats?.ramTotalKb);
+    const diskSize = this._formatSizeKb(stats?.diskTotalKb);
+    const ramTitle = stats?.ramTotalKb
+      ? `RAM ${this._formatSizeKb(stats.ramUsedKb)} / ${ramSize}`
+      : "RAM usage";
+    const diskTitle = stats?.diskTotalKb
+      ? `Disk ${this._formatSizeKb(stats.diskUsedKb)} / ${diskSize}`
+      : "Disk usage (/)";
     el.innerHTML = `
-      <span class="sftp-term-metric" style="color:${cpuColor}" title="CPU usage"><i class="fas fa-microchip"></i> CPU ${this._formatPct(cpu)}</span>
-      <span class="sftp-term-metric" style="color:${ramColor}" title="RAM usage"><i class="fas fa-memory"></i> RAM ${this._formatPct(ram)}</span>
-      <span class="sftp-term-metric" style="color:${diskColor}" title="Disk usage (/)"><i class="fas fa-hdd"></i> Disk ${this._formatPct(disk)}</span>
+      <span class="sftp-term-metric" style="color:${cpuColor}" title="CPU usage${cores ? ` · ${cores}` : ""}"><i class="fas fa-microchip"></i> CPU ${this._formatPct(cpu)}${this._metricExtra(cores)}</span>
+      <span class="sftp-term-metric" style="color:${ramColor}" title="${ramTitle}"><i class="fas fa-memory"></i> RAM ${this._formatPct(ram)}${this._metricExtra(ramSize)}</span>
+      <span class="sftp-term-metric" style="color:${diskColor}" title="${diskTitle}"><i class="fas fa-hdd"></i> Disk ${this._formatPct(disk)}${this._metricExtra(diskSize)}</span>
       <span class="sftp-term-metric" style="color:var(--accent)" title="Network upload / download">
         <i class="fas fa-arrow-up"></i> ${this._formatRate(stats?.netUp)}
         <i class="fas fa-arrow-down" style="margin-left:6px"></i> ${this._formatRate(stats?.netDown)}
@@ -1199,19 +1407,15 @@ window.SFTP = {
     await this._termUploadPaths(Array.isArray(selected) ? selected : [selected]);
   },
 
+  async termUploadFolder() {
+    const selected = await api.openFileDialog({ properties: ["openDirectory"] });
+    if (!selected) return;
+    await this._termUploadPaths([selected]);
+  },
+
   async _termUploadPaths(paths) {
     const id = document.getElementById("sftp-term-conn-id").value;
-    let uploaded = 0;
-    for (const localPath of paths) {
-      const fileName = localPath.split(/[/\\]/).pop();
-      const remotePath = this._termPath.replace(/\/+$/, "") + "/" + fileName;
-      const exists = await api.sftpCheckExists(id, remotePath);
-      if (exists.exists && !confirm(`"${fileName}" already exists. Overwrite?`)) continue;
-      const r = await api.sftpUpload(id, localPath, remotePath);
-      if (r.success) uploaded++;
-      else toast("Upload failed: " + fileName + " — " + r.message, "error");
-    }
-    if (uploaded) { toast(`Uploaded ${uploaded} file(s)`, "success"); await this.loadTermFiles(); }
+    await this._uploadLocalPaths(id, paths, this._termPath, () => this.loadTermFiles());
   },
 
   termCreateDir() { this.openRemoteCreate("terminal", "folder"); },

@@ -135,12 +135,28 @@
 
     <!-- Drop hint -->
     <div style="font-size:11px;color:var(--text3);margin-top:6px;display:flex;align-items:center;gap:6px">
-      <i class="fas fa-cloud-upload-alt"></i> Drag & drop files here to upload. Existing files will ask before overwriting.
+      <i class="fas fa-cloud-upload-alt"></i> Drag & drop files or folders to upload. Existing items will ask before overwriting.
+    </div>
+
+    <div id="sftp-xfer" class="sftp-xfer" style="display:none">
+      <div class="sftp-xfer-head">
+        <span id="sftp-xfer-label">Preparing upload...</span>
+        <span class="sftp-xfer-head-right">
+          <span id="sftp-xfer-count">0 / 0</span>
+          <button class="btn btn-ghost btn-xs sftp-xfer-stop" onclick="SFTP.stopUpload()" title="Stop upload"><i class="fas fa-stop"></i> Stop</button>
+          <button class="btn btn-ghost btn-xs sftp-xfer-hide" onclick="SFTP.toggleTransfer(true)" title="Hide"><i class="fas fa-chevron-down"></i></button>
+          <button class="btn btn-ghost btn-xs sftp-xfer-expand" onclick="SFTP.toggleTransfer(false)" title="Show details"><i class="fas fa-chevron-up"></i></button>
+        </span>
+      </div>
+      <div class="sftp-xfer-track"><div id="sftp-xfer-bar" class="sftp-xfer-bar"></div></div>
+      <div id="sftp-xfer-current" class="sftp-xfer-current"></div>
+      <div id="sftp-xfer-list" class="sftp-xfer-list"></div>
     </div>
 
     <!-- Action bar -->
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFromDialog()"><i class="fas fa-upload"></i> Upload File</button>
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFolderDialog()"><i class="fas fa-folder-open"></i> Upload Folder</button>
       <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadZipDialog()"><i class="fas fa-file-archive"></i> Upload ZIP & Extract</button>
       <button class="btn btn-ghost btn-sm" onclick="SFTP.createDirPrompt()"><i class="fas fa-folder-plus"></i> New Folder</button>
     </div>
@@ -195,8 +211,23 @@
         <div id="sftp-term-files" data-terminal-remote-browser="true" style="height:410px;overflow:auto;transition:outline .2s,background .2s"></div>
         <div style="display:flex;gap:5px;padding:7px;border-top:1px solid var(--border);flex-wrap:wrap">
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termUploadFiles()"><i class="fas fa-upload"></i> Upload</button>
+          <button class="btn btn-ghost btn-xs" onclick="SFTP.termUploadFolder()"><i class="fas fa-folder-open"></i> Folder</button>
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termCreateDir()"><i class="fas fa-folder-plus"></i> Folder</button>
-          <span style="font-size:10px;color:var(--text3);align-self:center;margin-left:auto">Drop files to upload</span>
+          <span style="font-size:10px;color:var(--text3);align-self:center;margin-left:auto">Drop files or folders to upload</span>
+        </div>
+        <div id="sftp-term-xfer" class="sftp-xfer" style="display:none;margin:8px">
+          <div class="sftp-xfer-head">
+            <span id="sftp-term-xfer-label">Preparing upload...</span>
+            <span class="sftp-xfer-head-right">
+              <span id="sftp-term-xfer-count">0 / 0</span>
+              <button class="btn btn-ghost btn-xs sftp-xfer-stop" onclick="SFTP.stopUpload()" title="Stop upload"><i class="fas fa-stop"></i> Stop</button>
+              <button class="btn btn-ghost btn-xs sftp-xfer-hide" onclick="SFTP.toggleTransfer(true)" title="Hide"><i class="fas fa-chevron-down"></i></button>
+              <button class="btn btn-ghost btn-xs sftp-xfer-expand" onclick="SFTP.toggleTransfer(false)" title="Show details"><i class="fas fa-chevron-up"></i></button>
+            </span>
+          </div>
+          <div class="sftp-xfer-track"><div id="sftp-term-xfer-bar" class="sftp-xfer-bar"></div></div>
+          <div id="sftp-term-xfer-current" class="sftp-xfer-current"></div>
+          <div id="sftp-term-xfer-list" class="sftp-xfer-list"></div>
         </div>
       </aside>
 

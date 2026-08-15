@@ -2,15 +2,17 @@
 set -e
 
 APP_DIR="/opt/ShieldPressLocal"
-EXECUTABLE="$APP_DIR/shieldpresslocal"
+EXECUTABLE="$APP_DIR/shieldpress-local"
 SANDBOX="$APP_DIR/chrome-sandbox"
 PMA_SOURCE="$APP_DIR/resources/phpmyadmin-shieldpress.php"
 
 # A custom after-install script replaces electron-builder's default one, so
 # keep its command-line launcher registration here as well.
 if command -v update-alternatives >/dev/null 2>&1; then
-  update-alternatives --install /usr/bin/shieldpresslocal shieldpresslocal "$EXECUTABLE" 100
+  update-alternatives --install /usr/bin/shieldpress-local shieldpress-local "$EXECUTABLE" 100
+  update-alternatives --install /usr/bin/shieldpresslocal shieldpresslocal "$EXECUTABLE" 80
 else
+  ln -sf "$EXECUTABLE" /usr/bin/shieldpress-local
   ln -sf "$EXECUTABLE" /usr/bin/shieldpresslocal
 fi
 
