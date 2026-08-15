@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.5.25
+
+**Windows Visual C++ runtime**
+- Bundles the Microsoft Visual C++ 2015-2022 x64 redistributable and installs it quietly during Setup when the machine is missing a current runtime
+- If PHP 8.4/8.5 still cannot load, the app installs the same redistributable automatically instead of only showing an error
+
+**Release**
+- Updates the Windows installer to version 2.5.25
+
+---
+
 ## v2.5.24
 
 **PHP 8.3 / 8.4 / 8.5**
