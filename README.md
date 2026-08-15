@@ -102,9 +102,11 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **Inline Editor** | Edit remote files directly in the app |
 | **External Editor** | Open remote files in VS Code — auto-uploads on save |
 | **Open With** | Choose any installed local editor for a remote file while retaining automatic upload on save |
-| **Drag & Drop** | Drag files from Explorer to upload |
+| **Drag & Drop** | Drag files or folders to upload, with overwrite/merge prompts |
+| **Upload Progress** | File count, progress bar, per-file success/failure, Stop, Retry, and a collapsible panel |
 | **ZIP Upload & Extract** | Upload ZIP and extract on server |
 | **Interactive SSH Terminal** | Persistent SSH PTY powered by Xterm.js with ANSI colors, native Tab completion, interactive programs, a resizable layout, selection, paste, and quick commands |
+| **Remote Resource Meters** | Live CPU, RAM, Disk, and network rates in SSH Terminal, including core count and RAM/disk capacity |
 | **Terminal File Manager** | Full right-click file management beside the SSH terminal: create, refresh, download, edit, duplicate, move, delete, upload, and copy paths |
 | **Terminal Autocomplete** | Complete live remote paths with Tab and choose context-aware Linux, npm, Git, Composer, Artisan, and WP-CLI commands with the keyboard |
 | **Linux-Aware Commands** | Detect Ubuntu/Debian, RHEL/Fedora, Alpine, Arch, or SUSE and suggest matching package and service commands |
