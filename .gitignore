@@ -26,3 +26,4 @@ nul
 # Bundled runtimes are supplied separately and must not be committed.
 bin/
 .build-runtime/
+assets/vc_redist.x64.exe

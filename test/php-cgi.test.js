@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { quotePhpIniValue, phpDllNotFound, getPhpPort } = require("../app/src/main/services");
+const { quotePhpIniValue, phpDllNotFound, getPhpPort, vcRedistSucceeded } = require("../app/src/main/services");
 
 test("PHP 8.3, 8.4, and 8.5 use distinct CGI ports", () => {
   assert.equal(getPhpPort("8.3"), 9083);
@@ -16,7 +16,9 @@ test("quotes PHP extension_dir values that contain spaces", () => {
   assert.equal(quotePhpIniValue("/opt/shieldpress/php/8.3/ext"), "/opt/shieldpress/php/8.3/ext");
 });
 
-test("detects Windows missing Visual C++ exit status for PHP 8.4", () => {
-  assert.equal(phpDllNotFound(3221225781), true);
-  assert.equal(phpDllNotFound(0), false);
+test("treats Visual C++ installer success, already-installed, and reboot-needed as OK", () => {
+  assert.equal(vcRedistSucceeded(0), true);
+  assert.equal(vcRedistSucceeded(1638), true);
+  assert.equal(vcRedistSucceeded(3010), true);
+  assert.equal(vcRedistSucceeded(1603), false);
 });

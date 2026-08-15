@@ -1,7 +1,7 @@
 {
   "name": "shieldpresslocal",
   "productName": "ShieldPress Local",
-  "version": "2.5.24",
+  "version": "2.5.25",
   "description": "ShieldPress Local Development Environment Manager",
   "main": "app/main.js",
   "author": {
@@ -13,7 +13,7 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist:win": "electron-builder --win nsis --x64",
+    "dist:win": "bash scripts/prepare-vc-redist.sh && electron-builder --win nsis --x64",
     "dist:linux": "bash scripts/build-linux.sh",
     "test": "node --test test/*.test.js"
   },
@@ -56,6 +56,10 @@
       {
         "from": "assets/icon.ico",
         "to": "icon.ico"
+      },
+      {
+        "from": "assets/vc_redist.x64.exe",
+        "to": "vc_redist.x64.exe"
       }
     ],
     "win": {

@@ -247,6 +247,42 @@ function phpDllNotFound(code) {
   return code === 3221225781 || code === 0xC0000135;
 }
 
+function vcRedistSucceeded(code) {
+  return code === 0 || code === 1638 || code === 3010;
+}
+
+function windowsHasCppRuntime() {
+  const root = process.env.SystemRoot || "C:\\Windows";
+  return fs.existsSync(path.join(root, "System32", "vcruntime140.dll"))
+    && fs.existsSync(path.join(root, "System32", "vcruntime140_1.dll"));
+}
+
+function vcRedistInstallerPath() {
+  const candidates = [
+    path.join(process.resourcesPath || "", "vc_redist.x64.exe"),
+    global.CONST?.BIN_DIR ? path.join(global.CONST.BIN_DIR, "vc_redist.x64.exe") : "",
+    path.join(__dirname, "..", "..", "..", "assets", "vc_redist.x64.exe"),
+  ];
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || null;
+}
+
+function ensureWindowsCppRuntime(force = false) {
+  if (!platform.isWindows) return { success: true, skipped: true };
+  if (!force && windowsHasCppRuntime()) return { success: true, alreadyPresent: true };
+  const exe = vcRedistInstallerPath();
+  if (!exe) return { success: false, message: "Visual C++ installer was not bundled" };
+  log.info("Installing Microsoft Visual C++ Redistributable (x64)...");
+  const result = require("child_process").spawnSync(exe, ["/install", "/quiet", "/norestart"], {
+    windowsHide: true,
+    timeout: 180000,
+  });
+  if (result.error) return { success: false, message: result.error.message };
+  const ok = vcRedistSucceeded(result.status);
+  if (ok) log.ok("Visual C++ Redistributable installed");
+  else log.warn(`Visual C++ Redistributable exited ${result.status}`);
+  return { success: ok, status: result.status };
+}
+
 function buildPhpSpawnEnv(phpDir) {
   const env = { ...process.env };
   const libDir = path.join(phpDir, "lib");
@@ -365,7 +401,13 @@ async function startPhpCgiUnlocked(version) {
   }
 
   const phpIni = await ensurePhpIni(phpDir);
-  const binaryProbe = probePhpCgi(phpCgiExe, phpDir, ["-v", "-n"]);
+  ensureWindowsCppRuntime();
+  let binaryProbe = probePhpCgi(phpCgiExe, phpDir, ["-v", "-n"]);
+  if (!binaryProbe.ok && phpDllNotFound(binaryProbe.status)) {
+    log.warn(`PHP ${version} needs the Visual C++ runtime — installing it now`);
+    const redist = ensureWindowsCppRuntime(true);
+    if (redist.success) binaryProbe = probePhpCgi(phpCgiExe, phpDir, ["-v", "-n"]);
+  }
   if (!binaryProbe.ok) {
     log.err(`PHP ${version} binary probe failed: ${binaryProbe.message}`);
     return { success: false, message: `PHP ${version} cannot start: ${binaryProbe.message}` };
@@ -1047,6 +1089,7 @@ module.exports = {
   getPhpPort,
   quotePhpIniValue,
   phpDllNotFound,
+  vcRedistSucceeded,
   getMariaDBPort,
   getAvailablePhpVersions,
   startNginx,

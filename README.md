@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.24)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.25)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.24.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.24_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.25.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.25_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -144,15 +144,15 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 
 ### Windows
 
-1. Download `ShieldPress.Local.Setup.2.5.24.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.5.25.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.24_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.24_amd64.deb`
+1. Download `shieldpresslocal_2.5.25_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.25_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 
