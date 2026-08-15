@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.21)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.23)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.21.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.21_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.23.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.23_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -102,9 +102,11 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **Inline Editor** | Edit remote files directly in the app |
 | **External Editor** | Open remote files in VS Code — auto-uploads on save |
 | **Open With** | Choose any installed local editor for a remote file while retaining automatic upload on save |
-| **Drag & Drop** | Drag files from Explorer to upload |
+| **Drag & Drop** | Drag files or folders to upload, with overwrite/merge prompts |
+| **Upload Progress** | File count, progress bar, per-file success/failure, Stop, Retry, and a collapsible panel |
 | **ZIP Upload & Extract** | Upload ZIP and extract on server |
 | **Interactive SSH Terminal** | Persistent SSH PTY powered by Xterm.js with ANSI colors, native Tab completion, interactive programs, a resizable layout, selection, paste, and quick commands |
+| **Remote Resource Meters** | Live CPU, RAM, Disk, and network rates in SSH Terminal, including core count and RAM/disk capacity |
 | **Terminal File Manager** | Full right-click file management beside the SSH terminal: create, refresh, download, edit, duplicate, move, delete, upload, and copy paths |
 | **Terminal Autocomplete** | Complete live remote paths with Tab and choose context-aware Linux, npm, Git, Composer, Artisan, and WP-CLI commands with the keyboard |
 | **Linux-Aware Commands** | Detect Ubuntu/Debian, RHEL/Fedora, Alpine, Arch, or SUSE and suggest matching package and service commands |
@@ -142,15 +144,15 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 
 ### Windows
 
-1. Download `ShieldPress.Local.Setup.2.5.21.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.5.23.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.21_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.21_amd64.deb`
+1. Download `shieldpresslocal_2.5.23_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.23_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 
