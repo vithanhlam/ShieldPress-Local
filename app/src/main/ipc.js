@@ -561,6 +561,7 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-create-file", (_e, { id, remotePath }) => sftp.createRemoteFile(id, remotePath));
   ipcMain.handle("sftp-copy", (_e, { id, sourcePath, destinationPath, isDirectory }) => sftp.copyRemote(id, sourcePath, destinationPath, isDirectory));
   ipcMain.handle("sftp-move", (_e, { id, sourcePath, destinationPath }) => sftp.moveRemote(id, sourcePath, destinationPath));
+  ipcMain.handle("sftp-toggle-star", (_e, id) => sftp.toggleStar(id));
   ipcMain.handle("sftp-save-last-path", (_e, { id, path: p }) => sftp.updateLastBrowsedPath(id, p));
   ipcMain.handle("sftp-check-exists", (_e, { id, remotePath }) => sftp.checkRemoteExists(id, remotePath));
   ipcMain.handle("sftp-open-external", (_e, { id, remotePath, editorPath }) =>

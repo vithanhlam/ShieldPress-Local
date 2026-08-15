@@ -1105,10 +1105,86 @@ code,
   margin-top: 14px;
 }
 
+.modal.modal-resizable {
+  resize: both;
+  max-width: none;
+  max-height: none;
+  min-width: 560px;
+  min-height: 420px;
+  overflow: auto;
+}
+
+#m-sftp-browser .modal-resizable {
+  display: flex;
+  flex-direction: column;
+  width: min(860px, 92vw);
+  height: min(720px, 88vh);
+}
+
+#m-sftp-browser .modal-resizable .modal-title,
+#m-sftp-browser .modal-resizable .modal-footer {
+  flex-shrink: 0;
+}
+
+#m-sftp-browser .modal-resizable > div:not(#sftp-file-list) {
+  flex-shrink: 0;
+}
+
+#sftp-file-list {
+  flex: 1;
+  min-height: 240px;
+}
+
+#m-sftp-terminal .modal-resizable {
+  display: flex;
+  flex-direction: column;
+  width: min(1250px, 96vw);
+  height: min(860px, 94vh);
+}
+
 .sftp-terminal-layout {
   display: grid;
-  grid-template-columns: minmax(270px, 330px) minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: minmax(240px, var(--sftp-files-col, 330px)) 8px minmax(0, 1fr);
+  gap: 0 6px;
+  flex: 1;
+  min-height: 420px;
+}
+
+.sftp-terminal-layout > section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#sftp-xterm {
+  flex: 1;
+  min-height: 280px;
+  height: auto !important;
+}
+
+.sftp-terminal-layout > aside {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#sftp-term-files {
+  flex: 1;
+  height: auto !important;
+  min-height: 180px;
+}
+
+.sftp-terminal-splitter {
+  cursor: col-resize;
+  align-self: stretch;
+  border-radius: 6px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+
+.sftp-terminal-splitter:hover,
+.sftp-terminal-splitter.is-dragging {
+  background: var(--accent);
 }
 
 .sftp-terminal-toolbar {
@@ -1126,6 +1202,7 @@ code,
 
 @media (max-width: 900px) {
   .sftp-terminal-layout { grid-template-columns: 1fr; }
+  .sftp-terminal-splitter { display: none; }
   #sftp-term-files { height: 260px !important; }
 }
 

@@ -34,6 +34,7 @@ window.SFTP = {
       this._listening = true;
     }
     await this.refreshVaultStatus();
+    this._bindTerminalSplitter();
     await this.load();
   },
 
@@ -107,6 +108,12 @@ window.SFTP = {
       const matchType = !type || c.type === type;
       return matchQ && matchType;
     });
+    filtered.sort((a, b) => {
+      const sa = a.starred ? 1 : 0;
+      const sb = b.starred ? 1 : 0;
+      if (sa !== sb) return sb - sa;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
     this._render(filtered);
   },
 
@@ -151,9 +158,14 @@ window.SFTP = {
         ${c.credentialState === "legacy-migratable" ? `<span class="tag" style="background:rgba(245,158,11,0.12);color:var(--yellow);border-color:transparent"><i class="fas fa-shield-alt" style="font-size:10px"></i> Create vault to migrate</span>` : ""}
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-      <i class="fas ${statusIcon}" style="font-size:8px;color:${statusColor}"></i>
-      <span style="font-size:13px;font-weight:600;color:${statusColor}">${statusText}</span>
+    <div class="proj-right">
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <i class="fas ${statusIcon}" style="font-size:8px;color:${statusColor}"></i>
+        <span style="font-size:13px;font-weight:600;color:${statusColor}">${statusText}</span>
+      </div>
+      <button class="proj-star ${c.starred ? "starred" : ""}" onclick="SFTP.toggleStar('${c.id}')" title="${c.starred ? "Unpin from top" : "Pin to top"}">
+        <i class="fas fa-star"></i>
+      </button>
     </div>
   </div>
   <div class="proj-card-actions">
@@ -170,6 +182,36 @@ window.SFTP = {
   </div>
 </div>`;
     }).join("");
+  },
+
+  async toggleStar(id) {
+    const r = await api.sftpToggleStar(id);
+    if (!r.success) return toast(r.message || "Could not update favorite", "error");
+    await this.load();
+  },
+
+  _bindTerminalSplitter() {
+    const splitter = document.getElementById("sftp-term-splitter");
+    const layout = document.querySelector(".sftp-terminal-layout");
+    if (!splitter || !layout || splitter.dataset.bound) return;
+    splitter.dataset.bound = "1";
+    splitter.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      splitter.classList.add("is-dragging");
+      const startX = event.clientX;
+      const startWidth = layout.querySelector("aside")?.getBoundingClientRect().width || 330;
+      const onMove = (moveEvent) => {
+        const next = Math.max(240, Math.min(560, startWidth + (moveEvent.clientX - startX)));
+        layout.style.setProperty("--sftp-files-col", `${next}px`);
+      };
+      const onUp = () => {
+        splitter.classList.remove("is-dragging");
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
   },
 
   _esc(s) {

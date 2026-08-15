@@ -99,25 +99,40 @@ async function ensureLinuxPhpRuntime() {
     const expectedMarker = String(APP_VERSION || "development");
     const currentMarker = await fs.readFile(marker, "utf8").catch(() => "");
     const executableName = process.platform === "win32" ? "php-cgi.exe" : "php-cgi";
-    if (
+    const alreadySynced =
       currentMarker.trim() === expectedMarker &&
-      await fs.pathExists(path.join(targetDir, executableName))
-    ) {
-      continue;
+      await fs.pathExists(path.join(targetDir, executableName));
+    if (!alreadySynced) {
+      await fs.ensureDir(targetDir);
+      const files = await fs.readdir(sourceDir, { withFileTypes: true });
+      for (const file of files) {
+        const source = path.join(sourceDir, file.name);
+        const target = path.join(targetDir, file.name);
+        // Preserve settings edited through ShieldPress across application updates.
+        if (file.name === "php.ini" && await fs.pathExists(target)) continue;
+        await fs.copy(source, target, { overwrite: true });
+      }
+      await fs.writeFile(marker, expectedMarker + "\n", "utf8");
+      log.ok(`PHP ${version.name} runtime synced to writable workspace`);
     }
-
-    await fs.ensureDir(targetDir);
-    const files = await fs.readdir(sourceDir, { withFileTypes: true });
-    for (const file of files) {
-      const source = path.join(sourceDir, file.name);
-      const target = path.join(targetDir, file.name);
-      // Preserve settings edited through ShieldPress across application updates.
-      if (file.name === "php.ini" && await fs.pathExists(target)) continue;
-      await fs.copy(source, target, { overwrite: true });
-    }
-    await fs.writeFile(marker, expectedMarker + "\n", "utf8");
-    log.ok(`PHP ${version.name} runtime synced to writable workspace`);
+    await syncLinuxPhpExtensionDir(targetDir);
   }
+}
+
+async function syncLinuxPhpExtensionDir(phpDir) {
+  const phpIni = path.join(phpDir, "php.ini");
+  const extDir = path.join(phpDir, "ext");
+  if (!(await fs.pathExists(phpIni)) || !(await fs.pathExists(extDir))) return;
+  let ini = await fs.readFile(phpIni, "utf8");
+  const extDirFwd = extDir.replace(/\\/g, "/");
+  if (/^\s*extension_dir\s*=/m.test(ini)) {
+    ini = ini.replace(/^\s*extension_dir\s*=.*/m, `extension_dir="${extDirFwd}"`);
+  } else if (/\[PHP\]/.test(ini)) {
+    ini = ini.replace(/\[PHP\]/, `[PHP]\nextension_dir="${extDirFwd}"`);
+  } else {
+    ini = `extension_dir="${extDirFwd}"\n` + ini;
+  }
+  await fs.writeFile(phpIni, ini, "utf8");
 }
 
 async function init() {

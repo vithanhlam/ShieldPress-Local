@@ -149,6 +149,7 @@ async function getConnections() {
           : decryptLegacy(c.password) ? "legacy-migratable" : "legacy-unavailable",
       hasKey: !!c.privateKey,
       lastBrowsedPath: c.lastBrowsedPath || "",
+      starred: !!c.starred,
     }));
     return { success: true, connections: safe };
   } catch {
@@ -181,6 +182,7 @@ async function saveConnection(data) {
     privateKey: data.privateKey || "",
     remotePath: data.remotePath || "/",
     lastBrowsedPath: data.lastBrowsedPath || (existing >= 0 ? conns[existing].lastBrowsedPath : "") || "",
+    starred: existing >= 0 ? !!conns[existing].starred : !!data.starred,
     projectId: data.projectId || "",
     localPath: data.localPath || "",
     excludePaths: data.excludePaths || ["node_modules", ".git", "vendor", ".DS_Store"],
@@ -1227,6 +1229,21 @@ function detectEditor(customPath) {
 }
 
 // ─── Save last browsed path ──────────────────────────────────────────────────
+async function toggleStar(id) {
+  const file = getConnectionsFile();
+  if (!fs.existsSync(file)) return { success: false, message: "Connection not found" };
+  try {
+    const conns = JSON.parse(await fs.readFile(file, "utf8"));
+    const conn = conns.find((c) => c.id === id);
+    if (!conn) return { success: false, message: "Connection not found" };
+    conn.starred = !conn.starred;
+    await writeConnections(conns);
+    return { success: true, starred: !!conn.starred };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
 async function updateLastBrowsedPath(id, browsedPath) {
   const file = getConnectionsFile();
   if (!fs.existsSync(file)) return;
@@ -1313,6 +1330,7 @@ module.exports = {
   moveRemote,
   openInExternalEditor,
   stopFileWatcher,
+  toggleStar,
   updateLastBrowsedPath,
   checkRemoteExists,
   validateLocalPath,

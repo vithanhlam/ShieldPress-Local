@@ -117,7 +117,7 @@
 
 <!-- Modal: File Browser -->
 <div class="overlay" id="m-sftp-browser" onclick="closeIfOverlay(event,'m-sftp-browser')">
-  <div class="modal" style="max-width:750px;max-height:85vh">
+  <div class="modal modal-resizable">
     <div class="modal-title"><i class="fas fa-folder-open"></i> <span id="sftp-browser-title">Remote Files</span></div>
     <input type="hidden" id="sftp-browser-conn-id"/>
 
@@ -129,7 +129,7 @@
     </div>
 
     <!-- File list (drop zone) -->
-    <div id="sftp-file-list" data-remote-browser="true" style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;transition:outline 0.2s,background 0.2s">
+    <div id="sftp-file-list" data-remote-browser="true" style="overflow-y:auto;border:1px solid var(--border);border-radius:6px;transition:outline 0.2s,background 0.2s">
       <div class="loading"><i class="fas fa-spinner fa-spin"></i></div>
     </div>
 
@@ -167,7 +167,7 @@
 
 <!-- Modal: Terminal -->
 <div class="overlay" id="m-sftp-terminal">
-  <div class="modal" style="max-width:1250px;width:96%;max-height:94vh;overflow-y:auto">
+  <div class="modal modal-resizable">
     <div class="modal-title" style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
       <i class="fas fa-terminal" style="color:var(--green)"></i>
       SSH Terminal — <span id="sftp-term-name" style="color:var(--accent)"></span>
@@ -197,6 +197,8 @@
         </div>
       </aside>
 
+      <div class="sftp-terminal-splitter" id="sftp-term-splitter" title="Drag to resize"></div>
+
       <section style="min-width:0">
 
     <div class="sftp-terminal-toolbar">
@@ -216,7 +218,7 @@
       <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Quick Commands</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">
         <!-- Navigation -->
-        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('shieldpress')" title="Open ShieldPress VPS menu" style="color:var(--accent)"><i class="fas fa-shield-alt"></i> shieldpress</button>
+        <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('shieldpress')" title="Open ShieldPress VPS menu" style="color:var(--accent)">shieldpress</button>
         <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('ls -la')" title="List files with details">ls -la</button>
         <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('ls -lah')" title="List with human-readable sizes">ls -lah</button>
         <button class="btn btn-ghost btn-xs" onclick="SFTP.quickCmd('pwd')" title="Current directory">pwd</button>
@@ -264,13 +266,8 @@
       </div>
     </div>
 
-    <!-- Command history hint -->
-    <div style="font-size:10px;color:var(--text3);margin-top:8px">
-      <i class="fas fa-lightbulb" style="color:var(--yellow);margin-right:4px"></i>
-      <kbd style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">Enter</kbd> run ·
-      <kbd style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">Shift+Enter</kbd> new line ·
-      <kbd style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">Ctrl+Enter</kbd> run multiline ·
-      <kbd style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:10px">↑/↓</kbd> history or suggestions
+    <div style="font-size:11px;color:var(--text3);margin-top:8px">
+      Highlight text to copy in the terminal. Right-click to paste.
     </div>
       </section>
     </div>

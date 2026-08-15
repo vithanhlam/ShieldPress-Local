@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.5.21
+
+**SFTP & FTP**
+- Adds a star control on each connection so favorites stay pinned at the top of the list
+- Makes the Browse Files and SSH Terminal windows resizable, including a drag handle between remote files and the console
+- Removes the unused shield icon from the `shieldpress` quick command
+- Replaces the unused terminal shortcut note with copy-on-highlight and right-click paste guidance
+
+**Ubuntu PHP 8.3**
+- Bundles PHP 8.3 alongside PHP 8.4 on Ubuntu, while still detecting the distribution PHP 8.5 runtime
+- Detects Linux `.so` modules in the extension manager instead of looking only for Windows `.dll` files
+- Ships matching Ubuntu modules for MySQL, curl, mbstring, XML, GD, ZIP, Intl, SOAP, SQLite, PostgreSQL, LDAP, GMP, Tidy, BCMath, Bzip2, and OPcache
+- Vendors the extra libraries PHP 8.3 still needs on Ubuntu 26.04 so the bundled binary can start
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.21
+
+---
+
 ## v2.5.20
 
 **Release Packaging**

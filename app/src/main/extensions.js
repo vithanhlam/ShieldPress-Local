@@ -3,7 +3,9 @@ const fs = require("fs-extra");
 const path = require("path");
 const https = require("https");
 const http = require("http");
+const { spawnSync } = require("child_process");
 const log = require("./logger");
+const platform = require("./platform");
 const svc = require("./services");
 
 // Strip UTF-8 BOM — PHP parser treats it as syntax error when it appears mid-file
@@ -107,20 +109,26 @@ async function getExtensions(phpVersion) {
     phpVersion,
   });
 
+  const loadedModules = listLoadedPhpModules(phpDir, phpIni);
+  const knownIds = new Set(ALL_EXTENSIONS.map((ext) => ext.id));
+
   // Check all known extensions
   for (const ext of ALL_EXTENSIONS) {
-    const dllExists = fs.existsSync(path.join(extDir, ext.dll));
-    const enabled = await isExtensionEnabled(phpIni, ext.id, ext.zend);
+    const modulePath = findExtensionFile(extDir, ext);
+    const installed = !!modulePath || loadedModules.has(ext.id);
+    const enabled = await isExtensionEnabled(phpIni, ext.id, ext.zend)
+      || (!modulePath && loadedModules.has(ext.id));
     knownDlls.add(ext.dll.toLowerCase());
+    knownIds.add(ext.id);
     extensions.push({
       id: ext.id,
       name: ext.name,
       description: ext.desc,
       cat: ext.cat,
-      installed: dllExists,
+      installed,
       enabled,
       zend: !!ext.zend,
-      dllPath: dllExists ? path.join(extDir, ext.dll) : null,
+      dllPath: modulePath,
       phpVersion,
     });
   }
@@ -129,11 +137,10 @@ async function getExtensions(phpVersion) {
   if (fs.existsSync(extDir)) {
     const files = await fs.readdir(extDir);
     for (const file of files) {
-      if (!file.startsWith("php_") || !file.endsWith(".dll")) continue;
-      if (knownDlls.has(file.toLowerCase())) continue;
-      // Extract extension id from php_xxx.dll
-      const extId = file.replace(/^php_/, "").replace(/\.dll$/, "");
+      const extId = parseExtensionFileName(file);
+      if (!extId || knownIds.has(extId) || knownDlls.has(file.toLowerCase())) continue;
       const enabled = await isExtensionEnabled(phpIni, extId, false);
+      knownIds.add(extId);
       extensions.push({
         id: extId,
         name: extId,
@@ -152,11 +159,49 @@ async function getExtensions(phpVersion) {
   return { success: true, extensions };
 }
 
+function findExtensionFile(extDir, ext) {
+  const candidates = [
+    path.join(extDir, ext.dll),
+    path.join(extDir, `${ext.id}.so`),
+    path.join(extDir, `php_${ext.id}.dll`),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
+function parseExtensionFileName(file) {
+  if (file.startsWith("php_") && file.endsWith(".dll")) {
+    return file.replace(/^php_/, "").replace(/\.dll$/, "");
+  }
+  if (file.endsWith(".so") && !file.includes(".debug")) {
+    return file.replace(/\.so$/, "");
+  }
+  return null;
+}
+
+function listLoadedPhpModules(phpDir, phpIni) {
+  const phpBin = path.join(phpDir, platform.isWindows ? "php.exe" : "php");
+  if (!fs.existsSync(phpBin)) return new Set();
+  const args = ["-m"];
+  if (phpIni && fs.existsSync(phpIni)) args.unshift("-c", phpIni);
+  const result = spawnSync(phpBin, args, { encoding: "utf8", timeout: 8000, windowsHide: true });
+  const output = `${result.stdout || ""}\n${result.stderr || ""}`;
+  const loaded = new Set();
+  for (const raw of output.split(/\r?\n/)) {
+    const line = raw.trim().toLowerCase();
+    if (!line || line.startsWith("[")) continue;
+    if (line === "zend opcache") loaded.add("opcache");
+    else if (!line.includes(" ")) loaded.add(line);
+  }
+  return loaded;
+}
+
 function findIoncubeDll(phpDir, phpVersion) {
   const possiblePaths = [
     path.join(phpDir, "ext", `ioncube_loader_win_${phpVersion}.dll`),
     path.join(phpDir, "ioncube", `ioncube_loader_win_${phpVersion}.dll`),
     path.join(phpDir, `ioncube_loader_win_${phpVersion}.dll`),
+    path.join(phpDir, "ext", `ioncube_loader_lin_${phpVersion}.so`),
+    path.join(phpDir, "ioncube", `ioncube_loader_lin_${phpVersion}.so`),
   ];
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) return p;
@@ -174,8 +219,8 @@ async function isExtensionEnabled(phpIni, extId, isZend) {
   if (isZend || extId === "opcache" || extId === "xdebug") {
     return new RegExp(`^\\s*zend_extension\\s*=.*${extId}`, "m").test(ini);
   }
-  // Regular extension: look for uncommented extension=ext_id or extension=php_ext_id.dll
-  const re = new RegExp(`^\\s*extension\\s*=\\s*(php_)?${extId}(\\.dll)?\\s*$`, "m");
+  // Regular extension: look for uncommented extension=ext_id, .dll, or .so
+  const re = new RegExp(`^\\s*extension\\s*=\\s*(php_)?${extId}(\\.dll|\\.so)?\\s*$`, "m");
   return re.test(ini);
 }
 
@@ -209,11 +254,13 @@ async function toggleExtension({ phpVersion, extId, enable }) {
     const removeRe = new RegExp(`^\\s*;?\\s*zend_extension\\s*=.*${extId}.*\\r?\\n?`, "gm");
     ini = ini.replace(removeRe, "");
     if (enable) {
-      ini += `\nzend_extension = php_${extId}.dll\n`;
+      ini += platform.isWindows
+        ? `\nzend_extension = php_${extId}.dll\n`
+        : `\nzend_extension = ${extId}\n`;
     }
   } else {
     // Remove ALL lines for this extension first (fix duplicates)
-    const removeRe = new RegExp(`^\\s*;?\\s*extension\\s*=\\s*(php_)?${extId}(\\.dll)?\\s*\\r?\\n?`, "gm");
+    const removeRe = new RegExp(`^\\s*;?\\s*extension\\s*=\\s*(php_)?${extId}(\\.dll|\\.so)?\\s*\\r?\\n?`, "gm");
     ini = ini.replace(removeRe, "");
     if (enable) {
       ini += `\nextension=${extId}\n`;
