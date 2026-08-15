@@ -144,6 +144,7 @@ contextBridge.exposeInMainWorld("api", {
   sftpValidatePath: (localPath) => ipcRenderer.invoke("sftp-validate-path", localPath),
   sftpExec: (id, command) => ipcRenderer.invoke("sftp-exec", { id, command }),
   sftpSystemInfo: (id) => ipcRenderer.invoke("sftp-system-info", id),
+  sftpRemoteStats: (id) => ipcRenderer.invoke("sftp-remote-stats", id),
   sftpShellStart: (id, cols, rows) => ipcRenderer.invoke("sftp-shell-start", { id, cols, rows }),
   sftpShellWrite: (id, data) => ipcRenderer.invoke("sftp-shell-write", { id, data }),
   sftpShellResize: (id, cols, rows) => ipcRenderer.invoke("sftp-shell-resize", { id, cols, rows }),

@@ -1187,6 +1187,28 @@ code,
   background: var(--accent);
 }
 
+.sftp-term-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.sftp-term-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+.sftp-term-metric i { font-size: 10px; }
+
 .sftp-terminal-toolbar {
   display: flex;
   align-items: center;

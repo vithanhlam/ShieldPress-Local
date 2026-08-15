@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.5.22
+
+**SFTP & FTP**
+- Shows live CPU, RAM, Disk, and network up/down rates above the OS label in SSH Terminal, with green/yellow/red usage colors
+- Moves a connection to the top of the list after Connect
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.22
+
+---
+
 ## v2.5.21
 
 **SFTP & FTP**

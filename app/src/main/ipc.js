@@ -545,6 +545,7 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-validate-path", (_e, localPath) => sftp.validateLocalPath(localPath));
   ipcMain.handle("sftp-exec", (_e, { id, command }) => sftp.execCommand(id, command));
   ipcMain.handle("sftp-system-info", (_e, id) => sftp.getRemoteSystemInfo(id));
+  ipcMain.handle("sftp-remote-stats", (_e, id) => sftp.getRemoteStats(id));
   ipcMain.handle("sftp-shell-start", (_e, { id, cols, rows }) => sftp.startShell(id, cols, rows));
   ipcMain.handle("sftp-shell-write", (_e, { id, data }) => sftp.writeShell(id, data));
   ipcMain.handle("sftp-shell-resize", (_e, { id, cols, rows }) => sftp.resizeShell(id, cols, rows));

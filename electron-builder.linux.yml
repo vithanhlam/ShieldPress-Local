@@ -22,6 +22,7 @@ linux:
   target:
     - AppImage
     - deb
+    - snap
   icon: assets/icons
   executableName: shieldpresslocal
   category: Development
@@ -30,6 +31,18 @@ linux:
   desktop:
     Name: ShieldPress Local
     StartupWMClass: ShieldPress Local
+snap:
+  confinement: strict
+  grade: stable
+  base: core22
+  summary: Local PHP, WordPress, Laravel and Node development manager
+  plugs:
+    - default
+    - home
+    - network
+    - network-bind
+    - removable-media
+    - process-control
 deb:
   afterInstall: scripts/linux-after-install.sh
   depends:

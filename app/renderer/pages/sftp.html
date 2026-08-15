@@ -168,10 +168,13 @@
 <!-- Modal: Terminal -->
 <div class="overlay" id="m-sftp-terminal">
   <div class="modal modal-resizable">
-    <div class="modal-title" style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <i class="fas fa-terminal" style="color:var(--green)"></i>
-      SSH Terminal — <span id="sftp-term-name" style="color:var(--accent)"></span>
-      <span id="sftp-term-status" style="font-size:11px;margin-left:auto;color:var(--green);font-weight:400"><i class="fas fa-circle" style="font-size:7px"></i> Connected</span>
+    <div class="modal-title" style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px">
+      <i class="fas fa-terminal" style="color:var(--green);margin-top:4px"></i>
+      <span>SSH Terminal — <span id="sftp-term-name" style="color:var(--accent)"></span></span>
+      <div id="sftp-term-status" style="margin-left:auto;text-align:right">
+        <div id="sftp-term-metrics" class="sftp-term-metrics"></div>
+        <div id="sftp-term-os" style="font-size:11px;color:var(--green);font-weight:400"><i class="fas fa-circle" style="font-size:7px"></i> Connected</div>
+      </div>
     </div>
     <input type="hidden" id="sftp-term-conn-id"/>
 

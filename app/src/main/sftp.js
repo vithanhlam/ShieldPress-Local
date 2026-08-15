@@ -149,6 +149,7 @@ async function getConnections() {
           : decryptLegacy(c.password) ? "legacy-migratable" : "legacy-unavailable",
       hasKey: !!c.privateKey,
       lastBrowsedPath: c.lastBrowsedPath || "",
+      lastConnectedAt: c.lastConnectedAt || "",
       starred: !!c.starred,
     }));
     return { success: true, connections: safe };
@@ -182,6 +183,7 @@ async function saveConnection(data) {
     privateKey: data.privateKey || "",
     remotePath: data.remotePath || "/",
     lastBrowsedPath: data.lastBrowsedPath || (existing >= 0 ? conns[existing].lastBrowsedPath : "") || "",
+    lastConnectedAt: existing >= 0 ? (conns[existing].lastConnectedAt || "") : (data.lastConnectedAt || ""),
     starred: existing >= 0 ? !!conns[existing].starred : !!data.starred,
     projectId: data.projectId || "",
     localPath: data.localPath || "",
@@ -261,8 +263,10 @@ async function connect(id, progressCb) {
 
   if (activeConnections[id]) {
     const alive = await pingConnection(id);
-    if (alive) return { success: true, message: "Already connected" };
-    // Connection is dead — clean up and reconnect
+    if (alive) {
+      await touchLastConnected(id);
+      return { success: true, message: "Already connected" };
+    }
     try {
       const ac = activeConnections[id];
       if (ac.type === "sftp") ac.client.end();
@@ -274,10 +278,11 @@ async function connect(id, progressCb) {
     progressCb && progressCb(`Connecting to ${conn.host}:${conn.port}...`);
   }
 
-  if (conn.type === "ftp") {
-    return connectFtp(id, conn, progressCb);
-  }
-  return connectSftp(id, conn, progressCb);
+  const result = conn.type === "ftp"
+    ? await connectFtp(id, conn, progressCb)
+    : await connectSftp(id, conn, progressCb);
+  if (result.success) await touchLastConnected(id);
+  return result;
 }
 
 async function ensureConnected(id) {
@@ -294,6 +299,7 @@ async function ensureConnected(id) {
   } catch {}
   delete activeConnections[id];
   delete remoteSystemCache[id];
+  delete remoteStatsCache[id];
   log.info(`Auto-reconnecting ${id}...`);
   const r = await connect(id);
   return r;
@@ -374,6 +380,8 @@ async function disconnect(id) {
     }
   } catch {}
   delete activeConnections[id];
+  delete remoteSystemCache[id];
+  delete remoteStatsCache[id];
   log.info(`Disconnected: ${id}`);
   return { success: true };
 }
@@ -654,6 +662,7 @@ async function syncDownload(id, progressCb, opts = {}) {
 // Track current working directory per connection for cd support
 const terminalCwd = {};
 const remoteSystemCache = {};
+const remoteStatsCache = {};
 const activeShells = {};
 
 async function startShell(id, cols = 100, rows = 30) {
@@ -735,6 +744,88 @@ async function getRemoteSystemInfo(id) {
       });
     });
   });
+}
+
+function sshExecText(ac, command, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve({ success: false, message: "timeout" }), timeoutMs);
+    ac.client.exec(command, (error, stream) => {
+      if (error) {
+        clearTimeout(timer);
+        return resolve({ success: false, message: error.message });
+      }
+      let output = "";
+      stream.on("data", (chunk) => { output += chunk.toString(); });
+      stream.stderr.on("data", () => {});
+      stream.on("close", () => {
+        clearTimeout(timer);
+        resolve({ success: true, output });
+      });
+    });
+  });
+}
+
+function parseCpuLine(line) {
+  const parts = String(line || "").trim().split(/\s+/).slice(1).map(Number);
+  const idle = (parts[3] || 0) + (parts[4] || 0);
+  const total = parts.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+  return { idle, total };
+}
+
+async function getRemoteStats(id) {
+  const ac = activeConnections[id];
+  if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
+  const command = [
+    "printf '__CPU__\\n'",
+    "grep '^cpu ' /proc/stat",
+    "printf '__MEM__\\n'",
+    "awk '/MemTotal:/{t=$2} /MemAvailable:/{a=$2} END{print t+0,a+0}' /proc/meminfo",
+    "printf '__DISK__\\n'",
+    "df -P / | awk 'NR==2{gsub(/%/,\"\",$5); print $2+0,$3+0,$5+0}'",
+    "printf '__NET__\\n'",
+    "awk 'NR>2 && $1 !~ /lo:/ {rx+=$2; tx+=$10} END{print rx+0, tx+0}' /proc/net/dev",
+  ].join("; ");
+  const result = await sshExecText(ac, command);
+  if (!result.success) return result;
+  const output = result.output || "";
+  const cpuLine = (output.split("__CPU__\n")[1] || "").split("__MEM__\n")[0].trim();
+  const memLine = (output.split("__MEM__\n")[1] || "").split("__DISK__\n")[0].trim();
+  const diskLine = (output.split("__DISK__\n")[1] || "").split("__NET__\n")[0].trim();
+  const netLine = (output.split("__NET__\n")[1] || "").trim();
+  const cpuSample = parseCpuLine(cpuLine);
+  const [memTotal, memAvail] = memLine.split(/\s+/).map(Number);
+  const [diskTotal, diskUsed, diskPctRaw] = diskLine.split(/\s+/).map(Number);
+  const [rx, tx] = netLine.split(/\s+/).map(Number);
+  const now = Date.now();
+  const prev = remoteStatsCache[id];
+  let cpuPct = null;
+  let netDown = null;
+  let netUp = null;
+  if (prev && cpuSample.total > prev.cpu.total) {
+    const idleDelta = cpuSample.idle - prev.cpu.idle;
+    const totalDelta = cpuSample.total - prev.cpu.total;
+    cpuPct = Math.max(0, Math.min(100, Math.round((1 - idleDelta / totalDelta) * 100)));
+  }
+  if (prev && now > prev.at) {
+    const elapsed = (now - prev.at) / 1000;
+    netDown = Math.max(0, Math.round((rx - prev.net.rx) / elapsed));
+    netUp = Math.max(0, Math.round((tx - prev.net.tx) / elapsed));
+  }
+  remoteStatsCache[id] = { cpu: cpuSample, net: { rx, tx }, at: now };
+  const ramPct = memTotal > 0 ? Math.round(((memTotal - memAvail) / memTotal) * 100) : null;
+  const diskPct = Number.isFinite(diskPctRaw) ? diskPctRaw : (diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : null);
+  return {
+    success: true,
+    cpuPct,
+    ramPct,
+    diskPct,
+    ramUsedKb: memTotal > 0 ? memTotal - memAvail : null,
+    ramTotalKb: memTotal || null,
+    diskUsedKb: diskUsed || null,
+    diskTotalKb: diskTotal || null,
+    netDown,
+    netUp,
+  };
 }
 
 async function execCommand(id, command) {
@@ -1229,6 +1320,18 @@ function detectEditor(customPath) {
 }
 
 // ─── Save last browsed path ──────────────────────────────────────────────────
+async function touchLastConnected(id) {
+  const file = getConnectionsFile();
+  if (!fs.existsSync(file)) return;
+  try {
+    const conns = JSON.parse(await fs.readFile(file, "utf8"));
+    const conn = conns.find((c) => c.id === id);
+    if (!conn) return;
+    conn.lastConnectedAt = new Date().toISOString();
+    await writeConnections(conns);
+  } catch {}
+}
+
 async function toggleStar(id) {
   const file = getConnectionsFile();
   if (!fs.existsSync(file)) return { success: false, message: "Connection not found" };
@@ -1315,6 +1418,7 @@ module.exports = {
   syncDownload,
   execCommand,
   getRemoteSystemInfo,
+  getRemoteStats,
   startShell,
   writeShell,
   resizeShell,

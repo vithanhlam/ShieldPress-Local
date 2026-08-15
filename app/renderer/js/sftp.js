@@ -109,6 +109,9 @@ window.SFTP = {
       return matchQ && matchType;
     });
     filtered.sort((a, b) => {
+      const ta = Date.parse(a.lastConnectedAt || "") || 0;
+      const tb = Date.parse(b.lastConnectedAt || "") || 0;
+      if (ta !== tb) return tb - ta;
       const sa = a.starred ? 1 : 0;
       const sb = b.starred ? 1 : 0;
       if (sa !== sb) return sb - sa;
@@ -353,6 +356,8 @@ window.SFTP = {
     if (r.success) {
       this._connStatus[id] = "connected";
       toast("Connected!", "success");
+      await this.load();
+      return;
     } else {
       this._connStatus[id] = "disconnected";
       if (r.code === "VAULT_LOCKED") await this.openVault();
@@ -381,7 +386,7 @@ window.SFTP = {
       return;
     }
     this._connStatus[id] = "connected";
-    this._render();
+    await this.load();
 
     document.getElementById("sftp-browser-conn-id").value = id;
     document.getElementById("sftp-browser-title").textContent = `${conn.name} — Remote Files`;
@@ -823,10 +828,12 @@ window.SFTP = {
     const cr = await api.sftpConnect(id);
     if (!cr.success) { toast("Connect failed: " + cr.message, "error"); return; }
     this._connStatus[id] = "connected";
-    this._render();
+    await this.load();
 
     document.getElementById("sftp-term-conn-id").value = id;
     document.getElementById("sftp-term-name").textContent = conn.name;
+    const osEl = document.getElementById("sftp-term-os");
+    if (osEl) osEl.innerHTML = '<i class="fas fa-circle" style="font-size:7px"></i> Connected';
     this._cmdHistory = [];
     this._historyIdx = -1;
     this.hideTermSuggestions();
@@ -835,6 +842,7 @@ window.SFTP = {
     this._setupTermDragDrop();
     this._setupTerminalClipboard();
     this._loadRemoteSystemSuggestions(id);
+    this._startRemoteMetrics(id);
     await this.loadTermFiles();
     await this._startInteractiveTerminal(id);
   },
@@ -897,6 +905,7 @@ window.SFTP = {
   async cleanupTerminal() {
     const id = this._activeShellId || document.getElementById("sftp-term-conn-id")?.value;
     this._activeShellId = null;
+    this._stopRemoteMetrics();
     if (id) {
       try { await api.sftpShellStop(id); } catch (_) {}
     }
@@ -1111,8 +1120,69 @@ window.SFTP = {
     if (families.has("arch") || info.tools.includes("pacman")) extra.push("sudo pacman -Syu", "sudo pacman -S ", "sudo pacman -R ", "pacman -Qs ");
     if ([...families].some((value) => ["suse", "opensuse"].includes(value)) || info.tools.includes("zypper")) extra.push("sudo zypper refresh", "sudo zypper update", "sudo zypper install ", "sudo zypper remove ");
     this._linuxSuggestions = [...new Set([...this._linuxSuggestions, ...extra])];
-    const status = document.getElementById("sftp-term-status");
-    if (status) status.innerHTML = `<i class="fas fa-circle" style="font-size:7px"></i> ${this._esc(info.name)}`;
+    const osEl = document.getElementById("sftp-term-os");
+    if (osEl) osEl.innerHTML = `<i class="fas fa-circle" style="font-size:7px"></i> ${this._esc(info.name)}`;
+  },
+
+  _metricColor(pct) {
+    if (pct == null || Number.isNaN(pct)) return "var(--text3)";
+    if (pct >= 90) return "var(--red)";
+    if (pct >= 70) return "var(--yellow)";
+    return "var(--green)";
+  },
+
+  _formatRate(bytesPerSec) {
+    if (bytesPerSec == null || Number.isNaN(bytesPerSec)) return "--";
+    if (bytesPerSec >= 1048576) return `${(bytesPerSec / 1048576).toFixed(1)} MB/s`;
+    if (bytesPerSec >= 1024) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
+    return `${bytesPerSec} B/s`;
+  },
+
+  _formatPct(pct) {
+    return pct == null || Number.isNaN(pct) ? "--" : `${pct}%`;
+  },
+
+  _renderRemoteMetrics(stats) {
+    const el = document.getElementById("sftp-term-metrics");
+    if (!el) return;
+    const cpu = stats?.cpuPct;
+    const ram = stats?.ramPct;
+    const disk = stats?.diskPct;
+    const cpuColor = this._metricColor(cpu);
+    const ramColor = this._metricColor(ram);
+    const diskColor = this._metricColor(disk);
+    el.innerHTML = `
+      <span class="sftp-term-metric" style="color:${cpuColor}" title="CPU usage"><i class="fas fa-microchip"></i> CPU ${this._formatPct(cpu)}</span>
+      <span class="sftp-term-metric" style="color:${ramColor}" title="RAM usage"><i class="fas fa-memory"></i> RAM ${this._formatPct(ram)}</span>
+      <span class="sftp-term-metric" style="color:${diskColor}" title="Disk usage (/)"><i class="fas fa-hdd"></i> Disk ${this._formatPct(disk)}</span>
+      <span class="sftp-term-metric" style="color:var(--accent)" title="Network upload / download">
+        <i class="fas fa-arrow-up"></i> ${this._formatRate(stats?.netUp)}
+        <i class="fas fa-arrow-down" style="margin-left:6px"></i> ${this._formatRate(stats?.netDown)}
+      </span>`;
+  },
+
+  _stopRemoteMetrics() {
+    if (this._metricsTimer) {
+      clearInterval(this._metricsTimer);
+      this._metricsTimer = null;
+    }
+    this._metricsConnId = null;
+  },
+
+  async _refreshRemoteMetrics(id) {
+    if (id !== this._metricsConnId) return;
+    const stats = await api.sftpRemoteStats(id);
+    if (id !== this._metricsConnId) return;
+    if (stats?.success) this._renderRemoteMetrics(stats);
+  },
+
+  _startRemoteMetrics(id) {
+    this._stopRemoteMetrics();
+    this._metricsConnId = id;
+    this._renderRemoteMetrics(null);
+    this._refreshRemoteMetrics(id);
+    setTimeout(() => this._refreshRemoteMetrics(id), 800);
+    this._metricsTimer = setInterval(() => this._refreshRemoteMetrics(id), 2000);
   },
 
   adjustTerminalFont(delta) {
