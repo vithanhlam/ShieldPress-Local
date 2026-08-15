@@ -71,6 +71,16 @@ async function sanitizeProjectSsl(proj, cfgPath) {
   return proj;
 }
 
+function hostsContainsDomain(content, domain) {
+  const needle = String(domain || "").trim().toLowerCase();
+  if (!needle) return true;
+  return String(content || "").split(/\r?\n/).some((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) return false;
+    return trimmed.split(/\s+/).slice(1).some((host) => host.toLowerCase() === needle);
+  });
+}
+
 function isAdmin() {
   try {
     fs.accessSync(HOSTS_FILE, fs.constants.W_OK);
@@ -80,37 +90,75 @@ function isAdmin() {
   }
 }
 
+function runWithTimeout(start, timeoutMs, onTimeout) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      try { onTimeout(); } catch {}
+      log.warn("Hosts update timed out");
+      finish();
+    }, timeoutMs);
+    start((error) => {
+      clearTimeout(timer);
+      if (error) log.warn("Hosts update failed: " + (error.message || error));
+      finish();
+    });
+  });
+}
+
 async function addHost(domain) {
   try {
     const content = await fs.readFile(HOSTS_FILE, "utf8");
-    if (content.includes(domain)) return; // đã có rồi
+    if (hostsContainsDomain(content, domain)) return;
 
-    // Thử ghi thẳng
     try {
       await fs.appendFile(HOSTS_FILE, `\r\n127.0.0.1\t${domain}\r\n`);
       log.ok(`Added ${domain} to hosts`);
       return;
     } catch (e) {
-      // Không có quyền → hỏi UAC
-      log.warn("No write permission, requesting elevation...");
+      log.warn("No write permission for hosts file: " + e.message);
     }
 
-    await new Promise((resolve) => {
-      if (platform.isWindows) {
-        const cmd = `Add-Content -Path '${HOSTS_FILE}' -Value '\r\n127.0.0.1\t${domain}'`;
-        require("child_process").exec(
-          `powershell -Command "Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -Command ${cmd.replace(/'/g, '"')}' -Wait"`,
-          (err) => { if (err) log.warn("Elevated hosts update failed: " + err.message); resolve(); },
-        );
-      } else {
-        const child = require("child_process").spawn("pkexec", ["tee", "-a", HOSTS_FILE], { stdio: ["pipe", "ignore", "pipe"] });
-        let stderr = "";
-        child.stderr.on("data", (data) => { stderr += data; });
-        child.on("error", (error) => { log.warn("Hosts update failed: " + error.message); resolve(); });
-        child.on("close", (code) => { if (code) log.warn("Hosts update failed: " + stderr.trim()); else log.ok(`Added ${domain} to hosts`); resolve(); });
-        child.stdin.end(`\n127.0.0.1\t${domain}\n`);
-      }
-    });
+    // Do not block project start on UAC/pkexec. Elevation can hang forever
+    // if the prompt is dismissed or PowerShell quoting waits for input.
+    if (platform.isWindows) {
+      const os = require("os");
+      const script = path.join(os.tmpdir(), `shieldpress-hosts-${process.pid}-${Date.now()}.ps1`);
+      const escapedHosts = HOSTS_FILE.replace(/'/g, "''");
+      const escapedDomain = String(domain).replace(/'/g, "''");
+      await fs.writeFile(
+        script,
+        `$hostsPath = '${escapedHosts}'\n` +
+          `$line = "127.0.0.1` + "\t" + `'${escapedDomain}'\n` +
+          `$text = Get-Content -LiteralPath $hostsPath -Raw\n` +
+          `if ($text -notmatch [regex]::Escape('${escapedDomain}')) { Add-Content -LiteralPath $hostsPath -Value $line }\n`,
+      );
+      const { spawn } = require("child_process");
+      const child = spawn("powershell.exe", [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        `Start-Process -FilePath powershell.exe -Verb RunAs -WindowStyle Hidden -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File "${script}"'`,
+      ], { windowsHide: true, stdio: "ignore", detached: true });
+      child.unref();
+      log.warn("Hosts update requested in background; project start will continue");
+      return;
+    }
+
+    await runWithTimeout((done) => {
+      const child = require("child_process").spawn("pkexec", ["tee", "-a", HOSTS_FILE], { stdio: ["pipe", "ignore", "pipe"] });
+      let stderr = "";
+      child.stderr.on("data", (data) => { stderr += data; });
+      child.on("error", done);
+      child.on("close", (code) => done(code ? new Error(stderr.trim() || `pkexec exited ${code}`) : null));
+      child.stdin.end(`\n127.0.0.1\t${domain}\n`);
+    }, 8000, () => {});
   } catch (e) {
     log.warn("Cannot update hosts: " + e.message);
   }
@@ -471,10 +519,15 @@ async function backupProjectDb(id, onProgress = () => {}) {
 }
 
 // ─── Start/Stop ───────────────────────────────────────────────────────────────
+async function getProjectById(id) {
+  const cfgPath = path.join(global.CONST.PROJECTS_DIR, id, "project.json");
+  if (!(await fs.pathExists(cfgPath))) return null;
+  return sanitizeProjectSsl(await fs.readJson(cfgPath), cfgPath);
+}
+
 async function startProjectUnlocked(id) {
   const { NGINX_DIR } = global.CONST;
-  const projs = await getProjects();
-  const proj = projs.find((p) => p.id === id);
+  const proj = await getProjectById(id);
   if (!proj) return { success: false, message: "Project not found" };
   await sanitizeProjectSsl(proj, path.join(global.CONST.PROJECTS_DIR, id, "project.json"));
 
@@ -852,6 +905,7 @@ module.exports = {
   saveNginxConfig,
   getProjectDebugInfo,
   buildNginxConf,
+  hostsContainsDomain,
   sanitizeProjectSsl,
   runNodeTool,
   openProjectInEditor,

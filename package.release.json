@@ -1,7 +1,7 @@
 {
   "name": "shieldpresslocal",
   "productName": "ShieldPress Local",
-  "version": "2.5.23",
+  "version": "2.5.24",
   "description": "ShieldPress Local Development Environment Manager",
   "main": "app/main.js",
   "author": "vithanhlam",

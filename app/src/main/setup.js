@@ -338,7 +338,7 @@ async function migratePhpDir() {
   // Move all files/folders from bin/php/ into bin/php/8.3/
   const entries = await fs.readdir(PHP_BASE_DIR, { withFileTypes: true });
   for (const entry of entries) {
-    if (entry.name === "8.3" || entry.name === "8.4") continue; // skip version dirs
+    if (entry.name === "8.3" || entry.name === "8.4" || entry.name === "8.5") continue; // skip version dirs
     const src = path.join(PHP_BASE_DIR, entry.name);
     const dst = path.join(targetDir, entry.name);
     try {
@@ -381,11 +381,15 @@ async function applyPhpIni() {
 
     const extDir = path.join(getPhpDir(ver), "ext").replace(/\\/g, "/");
     if (fs.existsSync(path.join(getPhpDir(ver), "ext"))) {
-      // Remove ALL extension_dir lines then add one correct one
-      const cleaned = ini.replace(/^\s*;?\s*extension_dir\s*=.*/gm, "");
-      ini = `extension_dir = "${extDir}"\n` + cleaned;
-      changed = true;
-      log.ok(`php.ini extension_dir fixed for PHP ${ver}`);
+      const quoted = `"${extDir}"`;
+      const current = ini.match(/^\s*extension_dir\s*=\s*(.*)$/m);
+      const currentVal = current ? current[1].trim().replace(/^"|"$/g, "") : "";
+      if (currentVal.replace(/\\/g, "/") !== extDir) {
+        const cleaned = ini.replace(/^\s*;?\s*extension_dir\s*=.*/gm, "");
+        ini = `extension_dir = ${quoted}\n` + cleaned;
+        changed = true;
+        log.ok(`php.ini extension_dir fixed for PHP ${ver}`);
+      }
     }
 
     // Deduplicate: find extensions that appear more than once and keep only one

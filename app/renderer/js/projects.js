@@ -130,14 +130,17 @@ window.Projects = {
       btn.disabled = true;
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
     }
-    const r = await api.startProject(id);
-    if (r.success) {
-      toast(`Started: ${r.url}`, "success");
-      await this.load();
-    } else {
-      toast("Start failed: " + r.message, "error");
-      await this.load();
+    try {
+      const r = await api.startProject(id);
+      if (r.success) {
+        toast(`Started: ${r.url}`, "success");
+      } else {
+        toast("Start failed: " + r.message, "error");
+      }
+    } catch (error) {
+      toast("Start failed: " + (error.message || error), "error");
     }
+    await this.load();
   },
 
   async stop(id) {

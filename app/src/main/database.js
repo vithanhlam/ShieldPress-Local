@@ -33,12 +33,19 @@ function mysqlExec(sql) {
   return new Promise((resolve, reject) => {
     const binary = mysqlBin();
     if (!binary) return reject(new Error("MariaDB client not found"));
-    const proc = require("child_process").spawn(binary, [...connectionArgs(), "-e", sql]);
+    const proc = require("child_process").spawn(binary, [...connectionArgs(), "-e", sql], { windowsHide: true });
     let stdout = "", stderr = "";
+    const timer = setTimeout(() => {
+      try { proc.kill(); } catch {}
+      reject(new Error("MariaDB client timed out"));
+    }, 20000);
     proc.stdout.on("data", (data) => { stdout += data; });
     proc.stderr.on("data", (data) => { stderr += data; });
-    proc.on("error", reject);
-    proc.on("close", (code) => code === 0 ? resolve(stdout) : reject(stderr || `MariaDB client exited ${code}`));
+    proc.on("error", (error) => { clearTimeout(timer); reject(error); });
+    proc.on("close", (code) => {
+      clearTimeout(timer);
+      code === 0 ? resolve(stdout) : reject(stderr || `MariaDB client exited ${code}`);
+    });
   });
 }
 
@@ -46,7 +53,7 @@ function mysqlExecFile(file, db = "") {
   return new Promise((resolve, reject) => {
     exec(
       `"${mysqlBin()}" ${connectionArgs().join(" ")}${db ? " " + db : ""} < "${file}"`,
-      { shell: true },
+      { shell: true, timeout: 20000 },
       (err, stdout, stderr) => {
         if (err) reject(stderr || err.message);
         else resolve(stdout);

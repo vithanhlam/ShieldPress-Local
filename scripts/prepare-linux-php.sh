@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Extract Ubuntu PHP debs into a versioned runtime tree:
 #   <out>/8.3/{php,php-cgi,php.ini,ext/*.so}
-#   <out>/8.4/{php,php-cgi,php.ini,ext/*.so}
+#   <out>/8.5/{php,php-cgi,php.ini,ext/*.so}
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${1:-${PROJECT_DIR}/.build-runtime/linux/php}"
@@ -106,4 +106,5 @@ install_php_series "8.3" "8.3.6-0ubuntu0.24.04.10" "20230831" "${PROJECT_DIR}/as
 vendor_compat_libs "${OUT_DIR}/8.3"
 wrap_php_binaries "${OUT_DIR}/8.3"
 install_php_series "8.4" "8.4.11-1ubuntu1.2" "20240924" "${PROJECT_DIR}/assets/php84.ini"
+install_php_series "8.5" "8.5.9-0ubuntu1" "20250925" "${PROJECT_DIR}/assets/php85.ini"
 echo "Prepared PHP runtimes in ${OUT_DIR}"

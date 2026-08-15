@@ -1,9 +1,11 @@
 // src/main/extensions.js
 const fs = require("fs-extra");
 const path = require("path");
+const os = require("os");
 const https = require("https");
 const http = require("http");
 const { spawnSync } = require("child_process");
+const extractZip = require("extract-zip");
 const log = require("./logger");
 const platform = require("./platform");
 const svc = require("./services");
@@ -13,9 +15,30 @@ function stripBom(str) {
   return str.replace(/\uFEFF/g, "");
 }
 
-// ionCube loader download URLs by PHP version
 const IONCUBE_BASE = "https://downloads.ioncube.com/loader_downloads";
-const IONCUBE_ZIP = "ioncube_loaders_win_nonts_vc16_x86-64.zip";
+
+function ioncubeWindowsCompiler(phpVersion) {
+  const minor = parseInt(String(phpVersion || "8.3").split(".")[1] || "3", 10);
+  // Official Windows PHP 8.3 is VS16; 8.4 and 8.5 are VS17.
+  return minor >= 4 ? "vc17" : "vc16";
+}
+
+function ioncubeArchiveName(phpVersion, platformName = process.platform) {
+  if (platformName === "win32") {
+    return `ioncube_loaders_win_nonts_${ioncubeWindowsCompiler(phpVersion)}_x86-64.zip`;
+  }
+  return "ioncube_loaders_lin_x86-64.zip";
+}
+
+function ioncubeLoaderFileName(phpVersion, platformName = process.platform) {
+  return platformName === "win32"
+    ? `ioncube_loader_win_${phpVersion}.dll`
+    : `ioncube_loader_lin_${phpVersion}.so`;
+}
+
+function ioncubeDownloadUrl(phpVersion, platformName = process.platform) {
+  return `${IONCUBE_BASE}/${ioncubeArchiveName(phpVersion, platformName)}`;
+}
 
 // All known PHP extensions with descriptions and categories
 const ALL_EXTENSIONS = [
@@ -101,7 +124,7 @@ async function getExtensions(phpVersion) {
   extensions.push({
     id: "ioncube",
     name: "ionCube Loader",
-    description: "Decode and run ionCube-encoded PHP files",
+    description: "Decode ionCube-encoded PHP files (PHP 8.3 VC16, PHP 8.4/8.5 VC17 on Windows; Linux loaders included)",
     cat: "Security",
     installed: !!ioncubeDll,
     enabled: ioncubeEnabled,
@@ -316,74 +339,70 @@ async function fixExtensionDir(phpVersion) {
   return { success: true };
 }
 
+async function walkFiles(root) {
+  const files = [];
+  const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const item = path.join(root, entry.name);
+    if (entry.isDirectory()) files.push(...await walkFiles(item));
+    else files.push(item);
+  }
+  return files;
+}
+
 async function installIoncube({ phpVersion }, progressCb) {
-  const { getPhpDir, BIN_DIR } = global.CONST;
   phpVersion = phpVersion || "8.3";
+  const { getPhpDir } = global.CONST;
   const phpDir = getPhpDir(phpVersion);
   const extDir = path.join(phpDir, "ext");
   await fs.ensureDir(extDir);
 
-  const targetDll = path.join(extDir, `ioncube_loader_win_${phpVersion}.dll`);
-  if (fs.existsSync(targetDll)) {
+  const loaderName = ioncubeLoaderFileName(phpVersion);
+  const targetLoader = path.join(extDir, loaderName);
+  if (fs.existsSync(targetLoader)) {
     return { success: true, message: "ionCube already installed" };
   }
 
-  progressCb && progressCb("Downloading ionCube loader...");
-
-  const tempDir = path.join(BIN_DIR, "temp_ioncube");
+  const url = ioncubeDownloadUrl(phpVersion);
+  const tempDir = path.join(os.tmpdir(), `shieldpress-ioncube-${process.pid}`);
   await fs.ensureDir(tempDir);
   const zipPath = path.join(tempDir, "ioncube.zip");
 
   try {
-    const url = `${IONCUBE_BASE}/${IONCUBE_ZIP}`;
-    progressCb && progressCb(`Downloading from ${url}`);
+    progressCb && progressCb(`Downloading ionCube Loader 15.5 for PHP ${phpVersion}...`);
+    progressCb && progressCb(url);
     await dlFile(url, zipPath);
     progressCb && progressCb("Download complete. Extracting...");
+    await extractZip(zipPath, { dir: tempDir });
 
-    const { exec } = require("child_process");
-    await new Promise((resolve, reject) => {
-      exec(
-        `powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${tempDir}' -Force"`,
-        (err, stdout, stderr) => {
-          if (err) reject(new Error(stderr || err.message));
-          else resolve();
-        },
+    const files = await walkFiles(tempDir);
+    const available = files.filter((file) => /\.(dll|so)$/i.test(file)).map((file) => path.basename(file));
+    let sourceLoader = files.find((file) => path.basename(file) === loaderName);
+    if (!sourceLoader) {
+      const needle = platform.isWindows ? `win_${phpVersion}` : `lin_${phpVersion}`;
+      sourceLoader = files.find((file) => path.basename(file).includes(needle) && /\.(dll|so)$/i.test(file));
+    }
+    if (!sourceLoader) {
+      throw new Error(
+        `ionCube Loader for PHP ${phpVersion} was not in ${path.basename(url)}. Available: ${available.join(", ") || "none"}`,
       );
-    });
-
-    progressCb && progressCb("Looking for the correct loader DLL...");
-
-    const ioncubeDir = path.join(tempDir, "ioncube");
-    const dllName = `ioncube_loader_win_${phpVersion}.dll`;
-    let sourceDll = path.join(ioncubeDir, dllName);
-
-    if (!fs.existsSync(sourceDll)) {
-      sourceDll = path.join(ioncubeDir, `ioncube_loader_win_${phpVersion}_nonts.dll`);
-    }
-    if (!fs.existsSync(sourceDll)) {
-      const files = await fs.readdir(ioncubeDir).catch(() => []);
-      const match = files.find((f) => f.includes(`win_${phpVersion}`) && f.endsWith(".dll"));
-      if (match) sourceDll = path.join(ioncubeDir, match);
-      else throw new Error(`ionCube DLL for PHP ${phpVersion} not found. Available: ${files.filter((f) => f.endsWith(".dll")).join(", ")}`);
     }
 
-    await fs.copy(sourceDll, targetDll);
-    progressCb && progressCb(`Installed: ${targetDll}`);
+    await fs.copy(sourceLoader, targetLoader);
+    progressCb && progressCb(`Installed: ${targetLoader}`);
 
     const phpIni = path.join(phpDir, "php.ini");
     if (fs.existsSync(phpIni)) {
       let ini = stripBom(await fs.readFile(phpIni, "utf8"));
-      const dllFwd = targetDll.replace(/\\/g, "/");
-      if (!/zend_extension\s*=.*ioncube/m.test(ini)) {
-        ini = `zend_extension = "${dllFwd}"\n` + ini;
-        await fs.writeFile(phpIni, ini, "utf8");
-        progressCb && progressCb("ionCube enabled in php.ini");
-      }
+      const loaderFwd = targetLoader.replace(/\\/g, "/");
+      ini = ini.replace(/^\s*;?\s*zend_extension\s*=.*ioncube.*\r?\n?/gm, "");
+      ini = `zend_extension = "${loaderFwd}"\n` + ini;
+      await fs.writeFile(phpIni, ini, "utf8");
+      progressCb && progressCb("ionCube enabled in php.ini");
     }
 
     await svc.restartPhpCgi(phpVersion);
     progressCb && progressCb("PHP restarted. ionCube is ready!");
-
     log.ok(`ionCube loader installed for PHP ${phpVersion}`);
     return { success: true };
   } catch (err) {
@@ -594,4 +613,8 @@ module.exports = {
   getDuplicateInfo,
   addPhpVersion,
   removePhpVersion,
+  ioncubeWindowsCompiler,
+  ioncubeArchiveName,
+  ioncubeLoaderFileName,
+  ioncubeDownloadUrl,
 };
