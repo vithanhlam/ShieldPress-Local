@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.20)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.21)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.20.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.20_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.21.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.21_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -61,7 +61,7 @@
 
 ShieldPress Local is a desktop application that lets you run WordPress, Laravel, and PHP-based websites locally on Windows or Ubuntu — no technical expertise required.
 
-It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and multi-version PHP — **PHP 8.3/8.4 on Windows** and **PHP 8.4/8.5 on Ubuntu** — all managed through a clean, modern interface.
+It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and multi-version PHP — **PHP 8.3/8.4 on Windows** and **PHP 8.3/8.4/8.5 on Ubuntu** — all managed through a clean, modern interface.
 
 ---
 
@@ -95,15 +95,16 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | Feature | Description |
 | ------- | ----------- |
 | **SFTP / FTP / FTPS Client** | Connect to remote servers via SFTP (SSH), FTP, or FTP secured with explicit TLS |
+| **Favorites** | Star a connection to pin it to the top of the SFTP/FTP list |
 | **Search & Filter** | Search connections by name, host, or username; filter by protocol type |
-| **File Browser** | Browse, upload, download, delete, create folders |
+| **File Browser** | Browse, upload, download, delete, create folders in a resizable window |
 | **File Context Menu** | Right-click to create, refresh, download, edit, delete, duplicate, move, or copy a remote path |
 | **Inline Editor** | Edit remote files directly in the app |
 | **External Editor** | Open remote files in VS Code — auto-uploads on save |
 | **Open With** | Choose any installed local editor for a remote file while retaining automatic upload on save |
 | **Drag & Drop** | Drag files from Explorer to upload |
 | **ZIP Upload & Extract** | Upload ZIP and extract on server |
-| **Interactive SSH Terminal** | Persistent SSH PTY powered by Xterm.js with ANSI colors, native Tab completion, interactive programs, selection, paste, and quick commands |
+| **Interactive SSH Terminal** | Persistent SSH PTY powered by Xterm.js with ANSI colors, native Tab completion, interactive programs, a resizable layout, selection, paste, and quick commands |
 | **Terminal File Manager** | Full right-click file management beside the SSH terminal: create, refresh, download, edit, duplicate, move, delete, upload, and copy paths |
 | **Terminal Autocomplete** | Complete live remote paths with Tab and choose context-aware Linux, npm, Git, Composer, Artisan, and WP-CLI commands with the keyboard |
 | **Linux-Aware Commands** | Detect Ubuntu/Debian, RHEL/Fedora, Alpine, Arch, or SUSE and suggest matching package and service commands |
@@ -141,19 +142,19 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 
 ### Windows
 
-1. Download `ShieldPress.Local.Setup.2.5.20.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.5.21.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.20_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.20_amd64.deb`
+1. Download `shieldpresslocal_2.5.21_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.21_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 
-The Ubuntu package includes an isolated PHP 8.4 runtime and uses the distribution's PHP 8.5 runtime alongside it. Projects always start with the exact PHP version selected in their configuration.
+The Ubuntu package includes isolated PHP 8.3 and PHP 8.4 runtimes and uses the distribution's PHP 8.5 runtime alongside them. Projects always start with the exact PHP version selected in their configuration. The extension manager detects Linux `.so` modules for the bundled versions.
 
 When using SFTP or FTP for the first time, create a Master Password from the **Credential Vault** button. Workspaces copied from another computer may require you to edit legacy connections and enter their passwords once so they can be re-encrypted in the portable vault. Prefer SFTP or FTPS over unencrypted FTP.
 
