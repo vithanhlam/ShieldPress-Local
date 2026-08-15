@@ -24,7 +24,11 @@ download_and_extract() {
   local cache_dir="${CACHE_ROOT}/php${series}"
   mkdir -p "${cache_dir}"
   if [[ ! -s "${cache_dir}/${filename}" ]]; then
-    curl -fL "${repository}/php${series}/${filename}" -o "${cache_dir}/${filename}"
+    if ! curl -fL "${repository}/php${series}/${filename}" -o "${cache_dir}/${filename}"; then
+      rm -f "${cache_dir}/${filename}"
+      echo "Skipping missing package ${filename}"
+      return 0
+    fi
   fi
   dpkg-deb -x "${cache_dir}/${filename}" "${extract_dir}"
 }
