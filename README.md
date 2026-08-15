@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.23)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.24)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.23.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.23_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.24.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.24_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -61,7 +61,7 @@
 
 ShieldPress Local is a desktop application that lets you run WordPress, Laravel, and PHP-based websites locally on Windows or Ubuntu — no technical expertise required.
 
-It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and multi-version PHP — **PHP 8.3/8.4 on Windows** and **PHP 8.3/8.4/8.5 on Ubuntu** — all managed through a clean, modern interface.
+It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and multi-version PHP — **PHP 8.3/8.4/8.5 on Windows and Ubuntu** — all managed through a clean, modern interface.
 
 ---
 
@@ -144,19 +144,19 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 
 ### Windows
 
-1. Download `ShieldPress.Local.Setup.2.5.23.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.5.24.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.23_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.23_amd64.deb`
+1. Download `shieldpresslocal_2.5.24_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.24_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 
-The Ubuntu package includes isolated PHP 8.3 and PHP 8.4 runtimes and uses the distribution's PHP 8.5 runtime alongside them. Projects always start with the exact PHP version selected in their configuration. The extension manager detects Linux `.so` modules for the bundled versions.
+The Ubuntu package includes isolated PHP 8.3, PHP 8.4, and PHP 8.5 runtimes. Projects always start with the exact PHP version selected in their configuration. The extension manager detects Linux `.so` modules for the bundled versions and can install ionCube Loader 15.5 for PHP 8.3–8.5.
 
 When using SFTP or FTP for the first time, create a Master Password from the **Credential Vault** button. Workspaces copied from another computer may require you to edit legacy connections and enter their passwords once so they can be re-encrypted in the portable vault. Prefer SFTP or FTPS over unencrypted FTP.
 

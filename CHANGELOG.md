@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.5.24
+
+**PHP 8.3 / 8.4 / 8.5**
+- Installs ionCube Loader 15.5 with the matching Windows package: VC16 NTS for PHP 8.3, VC17 NTS for PHP 8.4 and 8.5
+- Installs Linux ionCube `.so` loaders for PHP 8.3, 8.4, and 8.5
+- Bundles PHP 8.5 alongside 8.3 and 8.4 on Windows and Ubuntu
+- Probes php-cgi before waiting on ports 9083/9084/9085 so a crashed binary cannot spin CPU and RAM
+
+**Project startup**
+- Stops hanging on Windows hosts-file UAC while starting a new project
+- Adds timeouts around Nginx, MariaDB, and PHP process helpers
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.24
+
+---
+
 ## v2.5.23
 
 **SFTP & FTP**
