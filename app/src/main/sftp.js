@@ -432,6 +432,91 @@ async function disconnect(id) {
   return { success: true };
 }
 
+const S_IFMT = 0o170000;
+const S_IFDIR = 0o040000;
+const S_IFLNK = 0o120000;
+
+function fileKindLabel(name, isDirectory, isLink) {
+  if (isLink && isDirectory) return "link-dir";
+  if (isLink) return "link";
+  if (isDirectory) return "folder";
+  const base = String(name || "");
+  const idx = base.lastIndexOf(".");
+  if (idx < 0) return "file";
+  return base.slice(idx + 1).toLowerCase() || "file";
+}
+
+function mapSftpListItem(item) {
+  const mode = item.attrs?.mode || 0;
+  const longname = item.longname || "";
+  const isLink = (mode & S_IFMT) === S_IFLNK || longname.startsWith("l");
+  const isDir = (mode & S_IFMT) === S_IFDIR || longname.startsWith("d");
+  const name = item.filename;
+  return {
+    name,
+    type: isDir ? "directory" : isLink ? "link" : "file",
+    isDirectory: isDir,
+    isLink,
+    size: item.attrs?.size || 0,
+    modified: item.attrs?.mtime ? new Date(item.attrs.mtime * 1000).toISOString() : "",
+    permissions: longname.substring(0, 10),
+    kind: fileKindLabel(name, isDir, isLink),
+  };
+}
+
+function mapFtpListItem(item) {
+  const isLink = item.type === 3;
+  const isDir = item.type === 2;
+  const name = item.name;
+  return {
+    name,
+    type: isDir ? "directory" : isLink ? "link" : "file",
+    isDirectory: isDir,
+    isLink,
+    size: item.size || 0,
+    modified: item.modifiedAt ? item.modifiedAt.toISOString() : "",
+    permissions: item.rawModifiedAt || "",
+    kind: fileKindLabel(name, isDir, isLink),
+  };
+}
+
+function sortRemoteItems(items, sortKey = "name", sortDir = 1) {
+  const dir = sortDir < 0 ? -1 : 1;
+  return [...items].sort((a, b) => {
+    if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+    let cmp = 0;
+    if (sortKey === "modified") {
+      cmp = String(a.modified || "").localeCompare(String(b.modified || ""));
+    } else if (sortKey === "size") {
+      cmp = (a.size || 0) - (b.size || 0);
+    } else if (sortKey === "kind") {
+      cmp = String(a.kind || "").localeCompare(String(b.kind || ""), undefined, { sensitivity: "base" });
+    } else {
+      cmp = String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
+    }
+    return cmp * dir;
+  });
+}
+
+function sftpStatFollow(sftp, remotePath) {
+  return new Promise((resolve) => {
+    sftp.stat(remotePath, (err, stats) => resolve(err ? null : stats));
+  });
+}
+
+async function resolveLinkTargets(sftp, remotePath, items) {
+  for (const item of items) {
+    if (!item.isLink) continue;
+    const stats = await sftpStatFollow(sftp, joinRemotePath(remotePath, item.name));
+    if (!stats) continue;
+    item.isDirectory = !!stats.isDirectory();
+    item.type = item.isDirectory ? "directory" : "file";
+    item.kind = fileKindLabel(item.name, item.isDirectory, true);
+    if (stats.size) item.size = stats.size;
+  }
+  return items;
+}
+
 async function listRemote(id, remotePath) {
   const ok = await ensureConnected(id);
   if (!ok.success) return { success: false, message: ok.message || "Not connected" };
@@ -440,46 +525,36 @@ async function listRemote(id, remotePath) {
 
   try {
     if (ac.type === "sftp") {
-      return new Promise((resolve) => {
-        ac.sftp.readdir(remotePath, (err, list) => {
-          if (err) return resolve({ success: false, message: err.message });
-          const items = list.map((item) => ({
-            name: item.filename,
-            type: item.longname.startsWith("d") ? "directory" : "file",
-            size: item.attrs.size,
-            modified: new Date(item.attrs.mtime * 1000).toISOString(),
-            permissions: item.longname.substring(0, 10),
-          }));
-          items.sort((a, b) => {
-            if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
-            return a.name.localeCompare(b.name);
-          });
-          resolve({ success: true, items, path: remotePath });
-        });
+      const list = await new Promise((resolve, reject) => {
+        ac.sftp.readdir(remotePath, (err, entries) => err ? reject(err) : resolve(entries || []));
       });
-    } else if (ac.type === "ftp") {
-      // Use "-a" to show hidden files (dotfiles)
+      let items = list
+        .filter((item) => item.filename !== "." && item.filename !== "..")
+        .map(mapSftpListItem);
+      items = await resolveLinkTargets(ac.sftp, remotePath, items);
+      return { success: true, items: sortRemoteItems(items), path: remotePath };
+    }
+    if (ac.type === "ftp") {
+      await ac.client.cd(remotePath);
       let list;
       try {
-        await ac.client.cd(remotePath);
         list = await ac.client.list("-a");
       } catch {
-        list = await ac.client.list(remotePath);
+        list = await ac.client.list();
       }
-      const items = list
+      const items = (list || [])
         .filter((item) => item.name !== "." && item.name !== "..")
-        .map((item) => ({
-          name: item.name,
-          type: item.type === 2 ? "directory" : "file",
-          size: item.size,
-          modified: item.modifiedAt ? item.modifiedAt.toISOString() : "",
-          permissions: item.rawModifiedAt || "",
-        }));
-      items.sort((a, b) => {
-        if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
-      return { success: true, items, path: remotePath };
+        .map(mapFtpListItem);
+      for (const item of items) {
+        if (!item.isLink) continue;
+        try {
+          await ac.client.list(joinRemotePath(remotePath, item.name));
+          item.isDirectory = true;
+          item.type = "directory";
+          item.kind = fileKindLabel(item.name, true, true);
+        } catch {}
+      }
+      return { success: true, items: sortRemoteItems(items), path: remotePath };
     }
   } catch (err) {
     return { success: false, message: err.message };
@@ -1254,8 +1329,11 @@ async function deleteDirRecursiveSftp(sftp, dirPath) {
     sftp.readdir(dirPath, (err, items) => err ? reject(err) : resolve(items || []));
   });
   for (const item of list) {
-    const fullPath = dirPath + "/" + item.filename;
-    if (item.longname.startsWith("d")) {
+    if (item.filename === "." || item.filename === "..") continue;
+    const fullPath = joinRemotePath(dirPath, item.filename);
+    const followed = await sftpStatFollow(sftp, fullPath);
+    const isDir = followed ? followed.isDirectory() : (item.longname || "").startsWith("d");
+    if (isDir) {
       await deleteDirRecursiveSftp(sftp, fullPath);
     } else {
       await new Promise((resolve, reject) => {
@@ -1264,7 +1342,10 @@ async function deleteDirRecursiveSftp(sftp, dirPath) {
     }
   }
   await new Promise((resolve, reject) => {
-    sftp.rmdir(dirPath, (err) => err ? reject(err) : resolve());
+    sftp.rmdir(dirPath, (err) => {
+      if (!err) return resolve();
+      sftp.unlink(dirPath, (unlinkErr) => unlinkErr ? reject(err) : resolve());
+    });
   });
 }
 
@@ -1753,5 +1834,5 @@ module.exports = {
   checkRemoteExists,
   validateLocalPath,
   statLocalPath,
-  __test: { normalizeRemoteMutationPath, createRemoteDirOnConnection, createRemoteFileOnConnection, joinRemotePath, collectLocalFiles },
+  __test: { normalizeRemoteMutationPath, createRemoteDirOnConnection, createRemoteFileOnConnection, joinRemotePath, collectLocalFiles, mapSftpListItem, mapFtpListItem, sortRemoteItems, fileKindLabel },
 };

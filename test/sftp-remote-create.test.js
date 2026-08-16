@@ -60,6 +60,52 @@ test("creates an SFTP directory and empty file with explicit modes", async () =>
   ]);
 });
 
+test("maps SFTP symlink directories and hidden files", () => {
+  const dir = __test.mapSftpListItem({
+    filename: ".env",
+    longname: "-rw-r--r-- 1 root root 12",
+    attrs: { size: 12, mtime: 1700000000, mode: 0o100644 },
+  });
+  assert.equal(dir.name, ".env");
+  assert.equal(dir.isDirectory, false);
+  assert.equal(dir.kind, "env");
+
+  const link = __test.mapSftpListItem({
+    filename: "html",
+    longname: "lrwxrwxrwx 1 root root 10",
+    attrs: { size: 10, mtime: 1700000000, mode: 0o120777 },
+  });
+  assert.equal(link.isLink, true);
+  assert.equal(link.type, "link");
+
+  const folder = __test.mapSftpListItem({
+    filename: "data",
+    longname: "drwxr-xr-x 2 root root 4096",
+    attrs: { size: 4096, mtime: 1700000001, mode: 0o040755 },
+  });
+  assert.equal(folder.isDirectory, true);
+  assert.equal(folder.type, "directory");
+});
+
+test("sorts remote items by name or modified time with folders first", () => {
+  const items = [
+    { name: "b.txt", isDirectory: false, size: 2, modified: "2024-02-01T00:00:00.000Z", kind: "txt" },
+    { name: "a-dir", isDirectory: true, size: 0, modified: "2024-01-01T00:00:00.000Z", kind: "folder" },
+    { name: "a.txt", isDirectory: false, size: 1, modified: "2024-03-01T00:00:00.000Z", kind: "txt" },
+  ];
+  const byName = __test.sortRemoteItems(items, "name", 1);
+  assert.deepEqual(byName.map((item) => item.name), ["a-dir", "a.txt", "b.txt"]);
+  const byTime = __test.sortRemoteItems(items, "modified", -1);
+  assert.equal(byTime[0].name, "a-dir");
+  assert.equal(byTime[1].name, "a.txt");
+});
+
+test("maps FTP directory, file, and symlink types", () => {
+  assert.equal(__test.mapFtpListItem({ name: "public", type: 2, size: 0 }).type, "directory");
+  assert.equal(__test.mapFtpListItem({ name: "index.php", type: 1, size: 10 }).kind, "php");
+  assert.equal(__test.mapFtpListItem({ name: "www", type: 3, size: 4 }).isLink, true);
+});
+
 test("creates an FTP directory without changing the working directory", async () => {
   const calls = [];
   const connection = {

@@ -1,9 +1,10 @@
+<div class="page-sticky">
 <div class="page-header">
   <div>
     <div class="page-title">SFTP & FTP</div>
     <div class="page-sub">Manage remote server connections, file transfer & sync</div>
   </div>
-  <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+  <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap">
     <div class="search-wrap" style="max-width:220px">
       <i class="fas fa-search"></i>
       <input id="sftp-search-box" class="fi" placeholder="Search connections..." oninput="SFTP.filter()" style="padding-left:32px"/>
@@ -20,6 +21,7 @@
       <i class="fas fa-plus"></i> New Connection
     </button>
   </div>
+</div>
 </div>
 
 <!-- Modal: Create remote file or folder -->
@@ -125,6 +127,10 @@
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="SFTP.browseUp()" title="Parent directory"><i class="fas fa-arrow-up"></i></button>
       <input class="fi" id="sftp-current-path" style="flex:1;font-family:var(--mono);font-size:13px" readonly/>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);white-space:nowrap">
+        <input type="checkbox" id="sftp-show-hidden" checked onchange="SFTP.toggleHiddenFiles()"/>
+        Hidden files
+      </label>
       <button class="btn btn-ghost btn-sm" onclick="SFTP.refreshBrowser()" title="Refresh"><i class="fas fa-sync"></i></button>
     </div>
 

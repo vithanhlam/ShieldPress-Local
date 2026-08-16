@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.5.26
+
+**SFTP & FTP**
+- Shows hidden files in Browse Files, with a toggle to hide them
+- Adds a Type column and click-to-sort by name, type, size, or modified time
+- Treats symlink folders as directories so they can be opened
+- Deletes a remote folder recursively, including nested `data` directories and directory links
+
+**Projects & SFTP lists**
+- Keeps search, filters, and New Project / New Connection on a sticky bar while scrolling
+- Aligns the sticky bar flush with the title bar
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.26
+
+---
+
 ## v2.5.25
 
 **Windows Visual C++ runtime**

@@ -6,6 +6,10 @@ window.SFTP = {
   _currentPath: "/",
   _listening: false,
   _vault: { configured: false, unlocked: false },
+  _showHidden: true,
+  _sortKey: "name",
+  _sortDir: 1,
+  _browserItems: [],
 
   async init() {
     // Page HTML is cached by the router. Ensure a previous terminal overlay can
@@ -419,6 +423,13 @@ window.SFTP = {
       zone.style.background = "";
     });
 
+    zone.addEventListener("click", (e) => {
+      const nameCell = e.target.closest("[data-enter-dir]");
+      if (!nameCell || !zone.contains(nameCell)) return;
+      e.preventDefault();
+      this.enterEncodedDir(nameCell.getAttribute("data-enter-dir"));
+    });
+
     zone.addEventListener("drop", async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -446,40 +457,106 @@ window.SFTP = {
       return;
     }
 
-    if (!r.items.length) {
+    this._browserItems = r.items || [];
+    this._renderBrowserList();
+  },
+
+  toggleHiddenFiles() {
+    this._showHidden = !!document.getElementById("sftp-show-hidden")?.checked;
+    this._renderBrowserList();
+  },
+
+  sortBrowser(key) {
+    if (this._sortKey === key) this._sortDir *= -1;
+    else {
+      this._sortKey = key;
+      this._sortDir = 1;
+    }
+    this._renderBrowserList();
+  },
+
+  _sortMarker(key) {
+    if (this._sortKey !== key) return "";
+    return this._sortDir > 0 ? " ▲" : " ▼";
+  },
+
+  _itemKind(item) {
+    if (item.kind === "folder") return "Folder";
+    if (item.kind === "link-dir") return "Link (folder)";
+    if (item.kind === "link") return "Link";
+    if (item.kind && item.kind !== "file") return item.kind.toUpperCase();
+    const ext = (item.name || "").split(".").pop();
+    if (ext && ext !== item.name) return ext.toUpperCase();
+    return "File";
+  },
+
+  _isDir(item) {
+    return item.isDirectory || item.type === "directory";
+  },
+
+  _renderBrowserList() {
+    const listEl = document.getElementById("sftp-file-list");
+    if (!listEl) return;
+    let items = [...(this._browserItems || [])];
+    if (!this._showHidden) items = items.filter((item) => !String(item.name || "").startsWith("."));
+    items.sort((a, b) => {
+      const aDir = this._isDir(a);
+      const bDir = this._isDir(b);
+      if (aDir !== bDir) return aDir ? -1 : 1;
+      let cmp = 0;
+      if (this._sortKey === "modified") cmp = String(a.modified || "").localeCompare(String(b.modified || ""));
+      else if (this._sortKey === "size") cmp = (a.size || 0) - (b.size || 0);
+      else if (this._sortKey === "kind") cmp = this._itemKind(a).localeCompare(this._itemKind(b));
+      else cmp = String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
+      return cmp * this._sortDir;
+    });
+
+    if (!items.length) {
       listEl.innerHTML = '<div style="padding:16px;color:var(--text3);text-align:center"><i class="fas fa-folder-open"></i> Empty directory</div>';
       return;
     }
 
     const curPath = this._currentPath;
+    const th = (key, label, width) =>
+      `<th style="padding:8px 10px;${width ? `width:${width};` : ""}cursor:pointer;user-select:none" onclick="SFTP.sortBrowser('${key}')">${label}${this._sortMarker(key)}</th>`;
     listEl.innerHTML = `<table style="width:100%;font-size:13px;border-collapse:collapse">
 <thead><tr style="background:var(--bg3);text-align:left">
-  <th style="padding:8px 10px">Name</th>
-  <th style="padding:8px 10px;width:80px">Size</th>
-  <th style="padding:8px 10px;width:140px">Modified</th>
+  ${th("name", "Name")}
+  ${th("kind", "Type", "110px")}
+  ${th("size", "Size", "80px")}
+  ${th("modified", "Modified", "150px")}
   <th style="padding:8px 10px;width:120px;text-align:right">Actions</th>
 </tr></thead>
-<tbody>${r.items.map((item) => {
+<tbody>${items.map((item) => {
   const fullPath = curPath.replace(/\/+$/, "") + "/" + item.name;
   const encodedPath = encodeURIComponent(fullPath);
-  const isEditable = item.type === "file" && /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|env|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(item.name);
+  const encodedName = encodeURIComponent(item.name);
+  const isDir = this._isDir(item);
+  const isEditable = !isDir && /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|env|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(item.name);
+  const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
+  const color = isDir ? "var(--yellow)" : "var(--text3)";
   return `
-<tr style="border-top:1px solid var(--border)" data-remote-path="${encodedPath}" data-remote-name="${encodeURIComponent(item.name)}" data-remote-type="${item.type}" data-remote-editable="${isEditable}">
-  <td style="padding:8px 10px;cursor:${item.type === "directory" ? "pointer" : "default"}"
-      ${item.type === "directory" ? `onclick="SFTP.enterDir('${this._esc(item.name)}')"` : ""}>
-    <i class="fas ${item.type === "directory" ? "fa-folder" : "fa-file"}" style="color:${item.type === "directory" ? "var(--yellow)" : "var(--text3)"};margin-right:8px"></i>
-    ${this._esc(item.name)}
+<tr style="border-top:1px solid var(--border)" data-remote-path="${encodedPath}" data-remote-name="${encodedName}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${isEditable}">
+  <td style="padding:8px 10px;cursor:${isDir ? "pointer" : "default"};color:${isDir ? "var(--accent)" : "inherit"};text-decoration:${isDir ? "underline" : "none"}"
+      ${isDir ? `data-enter-dir="${encodedName}"` : ""}>
+    <i class="fas ${icon}" style="color:${color};margin-right:8px"></i>
+    ${this._esc(item.name)}${item.isLink ? ' <span style="font-size:10px;color:var(--text3)">link</span>' : ""}
   </td>
-  <td style="padding:8px 10px;color:var(--text3)">${item.type === "file" ? this._fmtSize(item.size) : ""}</td>
+  <td style="padding:8px 10px;color:var(--text3)">${this._esc(this._itemKind(item))}</td>
+  <td style="padding:8px 10px;color:var(--text3)">${isDir ? "" : this._fmtSize(item.size)}</td>
   <td style="padding:8px 10px;color:var(--text3);font-size:12px">${item.modified ? new Date(item.modified).toLocaleString("vi-VN") : ""}</td>
   <td style="padding:8px 10px;text-align:right;white-space:nowrap">
-    ${item.type === "file" ? `<button class="btn btn-ghost btn-xs" title="Download" onclick="SFTP.downloadItem('${this._esc(fullPath)}')"><i class="fas fa-download"></i></button>` : ""}
-    ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Edit inline" onclick="SFTP.editFile('${this._esc(fullPath)}')"><i class="fas fa-edit"></i></button>` : ""}
-    ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Open in Editor (VS Code, Notepad++...)" onclick="SFTP.openExternal('${this._esc(fullPath)}')"><i class="fas fa-external-link-alt"></i></button>` : ""}
-    <button class="btn btn-ghost btn-xs" title="Delete" style="color:var(--red)" onclick="SFTP.deleteItem('${this._esc(fullPath)}', ${item.type === 'directory'})"><i class="fas fa-trash"></i></button>
+    ${!isDir ? `<button class="btn btn-ghost btn-xs" title="Download" onclick="SFTP.downloadItem(decodeURIComponent('${encodedPath}'))"><i class="fas fa-download"></i></button>` : ""}
+    ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Edit inline" onclick="SFTP.editFile(decodeURIComponent('${encodedPath}'))"><i class="fas fa-edit"></i></button>` : ""}
+    ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Open in Editor (VS Code, Notepad++...)" onclick="SFTP.openExternal(decodeURIComponent('${encodedPath}'))"><i class="fas fa-external-link-alt"></i></button>` : ""}
+    <button class="btn btn-ghost btn-xs" title="Delete" style="color:var(--red)" onclick="SFTP.deleteItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-trash"></i></button>
   </td>
 </tr>`;
 }).join("")}</tbody></table>`;
+  },
+
+  enterEncodedDir(encodedName) {
+    this.enterDir(decodeURIComponent(encodedName || ""));
   },
 
   enterDir(name) {
@@ -1120,16 +1197,18 @@ window.SFTP = {
     listEl.innerHTML = r.items.map((item) => {
       const fullPath = base.replace(/\/+$/, "") + "/" + item.name;
       const encoded = encodeURIComponent(fullPath);
-      const editable = item.type === "file" && /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|env|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(item.name);
-      return `<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-bottom:1px solid var(--border);font-size:12px" title="${this._esc(fullPath)}" data-remote-path="${encoded}" data-remote-name="${encodeURIComponent(item.name)}" data-remote-type="${item.type}" data-remote-editable="${editable}">
-        <button class="btn btn-ghost btn-xs" style="min-width:0;flex:1;justify-content:flex-start;overflow:hidden" onclick="${item.type === "directory" ? `SFTP.termEnterPath('${encoded}')` : editable ? `SFTP.termEditFile('${encoded}')` : `SFTP.copyRemotePath(decodeURIComponent('${encoded}'))`}">
-          <i class="fas ${item.type === "directory" ? "fa-folder" : "fa-file"}" style="color:${item.type === "directory" ? "var(--yellow)" : "var(--text3)"};flex-shrink:0"></i>
+      const isDir = item.isDirectory || item.type === "directory";
+      const editable = !isDir && /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|env|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(item.name);
+      const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
+      return `<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-bottom:1px solid var(--border);font-size:12px" title="${this._esc(fullPath)}" data-remote-path="${encoded}" data-remote-name="${encodeURIComponent(item.name)}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${editable}">
+        <button class="btn btn-ghost btn-xs" style="min-width:0;flex:1;justify-content:flex-start;overflow:hidden" onclick="${isDir ? `SFTP.termEnterPath('${encoded}')` : editable ? `SFTP.termEditFile('${encoded}')` : `SFTP.copyRemotePath(decodeURIComponent('${encoded}'))`}">
+          <i class="fas ${icon}" style="color:${isDir ? "var(--yellow)" : "var(--text3)"};flex-shrink:0"></i>
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(item.name)}</span>
         </button>
-        ${item.type === "file" ? `<span style="color:var(--text3);font-size:10px;flex-shrink:0">${this._fmtSize(item.size)}</span>` : ""}
+        ${!isDir ? `<span style="color:var(--text3);font-size:10px;flex-shrink:0">${this._fmtSize(item.size)}</span>` : ""}
         <button class="btn btn-ghost btn-xs" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'))" title="Copy path"><i class="fas fa-copy"></i></button>
         ${editable ? `<button class="btn btn-ghost btn-xs" onclick="SFTP.termEditFile('${encoded}')" title="Edit"><i class="fas fa-edit"></i></button>` : ""}
-        <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="SFTP.termDeleteItem('${encoded}',${item.type === "directory"})" title="Delete"><i class="fas fa-trash"></i></button>
+        <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="SFTP.termDeleteItem('${encoded}',${isDir})" title="Delete"><i class="fas fa-trash"></i></button>
       </div>`;
     }).join("");
   },
@@ -1550,11 +1629,12 @@ window.SFTP = {
       .filter((item) => item.name.toLowerCase().startsWith(partial.toLowerCase()))
       .slice(0, 10)
       .map((item) => {
-        const completedToken = typedDir + item.name + (item.type === "directory" ? "/" : "");
+        const isDir = item.isDirectory || item.type === "directory";
+        const completedToken = typedDir + item.name + (isDir ? "/" : "");
         return {
           value: before + completedToken,
           label: completedToken,
-          kind: item.type === "directory" ? "folder" : "file",
+          kind: isDir ? "folder" : "file",
         };
       });
   },
