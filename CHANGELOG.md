@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.5.27
+
+**SFTP & FTP file management**
+- Adds a Permissions column with symbolic and chmod values for both SFTP and FTP listings
+- Shows Name, Type, Size, Chmod, User, Group, and Actions as separate columns in the SSH Terminal file manager
+- Downloads individual files or complete folders with overwrite/merge confirmation and per-file byte progress
+- Shows upload and download progress in a shared collapsible panel at the bottom of the remote file browser
+- Adds remote create, duplicate, move, download, edit, open-with, copy-path, refresh, and delete actions to the file context menu
+
+**Credential Vault**
+- Submits the Master Password with Enter
+- Automatically opens the Vault when a locked connection is used from Connect, Browse Files, or Terminal
+- Continues the requested action automatically after a successful unlock
+
+**Interface**
+- Opens the remote file browser at a wider default size while retaining drag-to-resize controls
+- Removes underlines from remote folder names and increases left navigation labels by one pixel
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.27
+
+---
+
 ## v2.5.26
 
 **SFTP & FTP**

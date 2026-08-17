@@ -436,6 +436,31 @@ const S_IFMT = 0o170000;
 const S_IFDIR = 0o040000;
 const S_IFLNK = 0o120000;
 
+function formatRemotePermissions(mode, permissions, longname = "") {
+  let digits = null;
+  if (permissions && ["user", "group", "world"].every((key) => Number.isInteger(permissions[key]))) {
+    digits = [permissions.user, permissions.group, permissions.world].map((value) => value & 7);
+  } else if (Number.isInteger(mode)) {
+    digits = [(mode >> 6) & 7, (mode >> 3) & 7, mode & 7];
+  }
+  if (digits) {
+    const symbolic = digits.map((value) =>
+      `${value & 4 ? "r" : "-"}${value & 2 ? "w" : "-"}${value & 1 ? "x" : "-"}`,
+    ).join("");
+    return `${symbolic} (${digits.join("")})`;
+  }
+  const symbolic = String(longname || "").substring(1, 10);
+  return symbolic.length === 9 ? symbolic : "";
+}
+
+function parseOwnerGroupFromLongname(longname = "") {
+  const match = String(longname || "").match(
+    /^[bcdelfmpSs-](?:[r-][w-][xsStTL-]){3}\+?\s+\d+\s+(\S+)\s+(\S+)\s+/,
+  );
+  if (!match) return { owner: "", group: "" };
+  return { owner: match[1] || "", group: match[2] || "" };
+}
+
 function fileKindLabel(name, isDirectory, isLink) {
   if (isLink && isDirectory) return "link-dir";
   if (isLink) return "link";
@@ -447,11 +472,12 @@ function fileKindLabel(name, isDirectory, isLink) {
 }
 
 function mapSftpListItem(item) {
-  const mode = item.attrs?.mode || 0;
+  const mode = Number.isInteger(item.attrs?.mode) ? item.attrs.mode : null;
   const longname = item.longname || "";
   const isLink = (mode & S_IFMT) === S_IFLNK || longname.startsWith("l");
   const isDir = (mode & S_IFMT) === S_IFDIR || longname.startsWith("d");
   const name = item.filename;
+  const ownership = parseOwnerGroupFromLongname(longname);
   return {
     name,
     type: isDir ? "directory" : isLink ? "link" : "file",
@@ -459,7 +485,9 @@ function mapSftpListItem(item) {
     isLink,
     size: item.attrs?.size || 0,
     modified: item.attrs?.mtime ? new Date(item.attrs.mtime * 1000).toISOString() : "",
-    permissions: longname.substring(0, 10),
+    permissions: formatRemotePermissions(mode, null, longname),
+    owner: ownership.owner,
+    group: ownership.group,
     kind: fileKindLabel(name, isDir, isLink),
   };
 }
@@ -475,7 +503,9 @@ function mapFtpListItem(item) {
     isLink,
     size: item.size || 0,
     modified: item.modifiedAt ? item.modifiedAt.toISOString() : "",
-    permissions: item.rawModifiedAt || "",
+    permissions: formatRemotePermissions(null, item.permissions),
+    owner: item.user || "",
+    group: item.group || "",
     kind: fileKindLabel(name, isDir, isLink),
   };
 }
@@ -561,25 +591,69 @@ async function listRemote(id, remotePath) {
   }
 }
 
-async function downloadFile(id, remotePath, localPath, progressCb) {
+function joinLocalDownloadPath(localRoot, relativePath) {
+  const parts = String(relativePath || "").split(/[\\/]+/).filter(Boolean);
+  return parts.length ? path.join(localRoot, ...parts) : localRoot;
+}
+
+function isRemoteDirectory(item) {
+  return !!(item && (item.isDirectory || item.type === "directory"));
+}
+
+async function collectRemoteFiles(id, remotePath) {
+  const files = [];
+  const dirs = [];
+  async function walk(dir, relativePath) {
+    const listed = await listRemote(id, dir);
+    if (!listed.success) throw new Error(listed.message || "Could not list remote directory");
+    dirs.push({ remotePath: dir, relativePath });
+    for (const item of listed.items || []) {
+      const childRemote = joinRemotePath(dir, item.name);
+      const childRel = relativePath ? `${relativePath}/${item.name}` : item.name;
+      if (isRemoteDirectory(item)) await walk(childRemote, childRel);
+      else files.push({ remotePath: childRemote, relativePath: childRel, size: item.size || 0, name: childRel });
+    }
+  }
+  await walk(remotePath, "");
+  return { files, dirs };
+}
+
+async function downloadFile(id, remotePath, localPath, progressCb, opts = {}) {
   const ac = activeConnections[id];
   if (!ac) return { success: false, message: "Not connected" };
 
   await fs.ensureDir(path.dirname(localPath));
-  progressCb && progressCb(`Downloading ${path.basename(remotePath)}...`);
+  const name = path.basename(remotePath);
+  progressCb && progressCb(`Downloading ${name}...`);
+  let lastStep = 0;
+  const emitBytes = (transferred, total) => {
+    if (typeof opts.onStep !== "function") return;
+    const now = Date.now();
+    if (transferred < total && now - lastStep < 120) return;
+    lastStep = now;
+    opts.onStep(transferred, total);
+  };
 
   try {
     if (ac.type === "sftp") {
       return new Promise((resolve) => {
-        ac.sftp.fastGet(remotePath, localPath, {}, (err) => {
+        ac.sftp.fastGet(remotePath, localPath, {
+          step: (transferred, _chunk, total) => emitBytes(transferred, total),
+        }, (err) => {
           if (err) return resolve({ success: false, message: err.message });
-          progressCb && progressCb(`Downloaded: ${path.basename(remotePath)}`);
+          progressCb && progressCb(`Downloaded: ${name}`);
           resolve({ success: true });
         });
       });
-    } else if (ac.type === "ftp") {
-      await ac.client.downloadTo(localPath, remotePath);
-      progressCb && progressCb(`Downloaded: ${path.basename(remotePath)}`);
+    }
+    if (ac.type === "ftp") {
+      try {
+        ac.client.trackProgress((info) => emitBytes(info.bytes || info.bytesOverall || 0, opts.size || 0));
+        await ac.client.downloadTo(localPath, remotePath);
+      } finally {
+        try { ac.client.trackProgress(); } catch {}
+      }
+      progressCb && progressCb(`Downloaded: ${name}`);
       return { success: true };
     }
   } catch (err) {
@@ -637,20 +711,35 @@ async function collectLocalFiles(localPath) {
   return items;
 }
 
-async function putLocalFile(id, localPath, remotePath) {
+async function putLocalFile(id, localPath, remotePath, opts = {}) {
   const ac = activeConnections[id];
   if (!ac) return { success: false, message: "Not connected" };
+  let lastStep = 0;
+  const emitBytes = (transferred, total) => {
+    if (typeof opts.onStep !== "function") return;
+    const now = Date.now();
+    if (transferred < total && now - lastStep < 120) return;
+    lastStep = now;
+    opts.onStep(transferred, total);
+  };
   try {
     if (ac.type === "sftp") {
       return await new Promise((resolve) => {
-        ac.sftp.fastPut(localPath, remotePath, {}, (err) => {
+        ac.sftp.fastPut(localPath, remotePath, {
+          step: (transferred, _chunk, total) => emitBytes(transferred, total),
+        }, (err) => {
           if (err) return resolve({ success: false, message: err.message });
           resolve({ success: true, uploaded: 1 });
         });
       });
     }
     if (ac.type === "ftp") {
-      await ac.client.uploadFrom(localPath, remotePath);
+      try {
+        ac.client.trackProgress((info) => emitBytes(info.bytes || 0, opts.size || 0));
+        await ac.client.uploadFrom(localPath, remotePath);
+      } finally {
+        try { ac.client.trackProgress(); } catch {}
+      }
       return { success: true, uploaded: 1 };
     }
   } catch (err) {
@@ -729,6 +818,7 @@ async function uploadBatch(id, items, progressCb, opts = {}) {
           localPath: file.localPath,
           remotePath: joinRemotePath(item.remotePath, file.relativePath),
           name: `${path.basename(item.localPath)}/${file.relativePath}`.replace(/\\/g, "/"),
+          size: file.size,
           index: item.index,
         });
       }
@@ -737,6 +827,7 @@ async function uploadBatch(id, items, progressCb, opts = {}) {
         localPath: item.localPath,
         remotePath: item.remotePath,
         name: item.name || path.basename(item.localPath),
+        size: stat.size,
         index: item.index,
       });
     }
@@ -764,6 +855,7 @@ async function uploadBatch(id, items, progressCb, opts = {}) {
       localPath: file.localPath,
       remotePath: file.remotePath,
       retry,
+      direction: "upload",
     });
     const parent = path.posix.dirname(file.remotePath);
     if (parent && parent !== "." && parent !== file.remotePath) {
@@ -791,10 +883,38 @@ async function uploadBatch(id, items, progressCb, opts = {}) {
         continue;
       }
     }
-    let result = await putLocalFile(id, file.localPath, file.remotePath);
+    let result = await putLocalFile(id, file.localPath, file.remotePath, {
+      size: file.size,
+      onStep: (transferred, total) => {
+        emitUploadProgress(progressCb, {
+          type: "file-progress",
+          index,
+          total: files.length,
+          name: file.name,
+          transferred,
+          bytesTotal: total || file.size || 0,
+          direction: "upload",
+        });
+      },
+    });
     if (!result.success && isDisconnectError(result.message) && !uploadCancelled) {
       const recon = await ensureConnected(id);
-      if (recon.success) result = await putLocalFile(id, file.localPath, file.remotePath);
+      if (recon.success) {
+        result = await putLocalFile(id, file.localPath, file.remotePath, {
+          size: file.size,
+          onStep: (transferred, total) => {
+            emitUploadProgress(progressCb, {
+              type: "file-progress",
+              index,
+              total: files.length,
+              name: file.name,
+              transferred,
+              bytesTotal: total || file.size || 0,
+              direction: "upload",
+            });
+          },
+        });
+      }
       else {
         disconnect = true;
         result = { success: false, message: "Connection lost" };
@@ -812,6 +932,7 @@ async function uploadBatch(id, items, progressCb, opts = {}) {
       success: !!result.success,
       message: result.message,
       retry,
+      direction: "upload",
     });
     if (disconnect && !result.success) {
       failed += emitRemainingFailed(progressCb, files, i + 1, files.length, retry, "Connection lost");
@@ -826,6 +947,7 @@ async function uploadBatch(id, items, progressCb, opts = {}) {
       total: files.length,
       cancelled: stopped,
       disconnect,
+      direction: "upload",
     });
   }
   return {
@@ -836,6 +958,147 @@ async function uploadBatch(id, items, progressCb, opts = {}) {
     cancelled: stopped,
     disconnect,
     message: disconnect ? "Connection lost" : (stopped ? "Upload stopped" : (failed ? `${failed} file(s) failed` : undefined)),
+  };
+}
+
+async function downloadBatch(id, items, progressCb, opts = {}) {
+  uploadCancelled = false;
+  const retry = !!opts.retry;
+  const connected = await ensureConnected(id);
+  if (!connected.success) return connected;
+  const files = [];
+  try {
+    for (const item of items || []) {
+      if (!item?.remotePath || !item?.localPath) {
+        emitUploadProgress(progressCb, {
+          type: "file-done",
+          name: path.basename(item?.remotePath || "unknown"),
+          localPath: item?.localPath,
+          remotePath: item?.remotePath,
+          success: false,
+          message: "Missing download path",
+          index: item?.index || 0,
+          total: 0,
+          retry,
+          direction: "download",
+        });
+        continue;
+      }
+      if (item.isDirectory) {
+        const collected = await collectRemoteFiles(id, item.remotePath);
+        for (const dir of collected.dirs) {
+          await fs.ensureDir(joinLocalDownloadPath(item.localPath, dir.relativePath));
+        }
+        for (const file of collected.files) {
+          files.push({
+            remotePath: file.remotePath,
+            localPath: joinLocalDownloadPath(item.localPath, file.relativePath),
+            name: `${path.basename(item.localPath)}/${file.relativePath}`.replace(/\\/g, "/"),
+            size: file.size,
+            index: item.index,
+          });
+        }
+      } else {
+        files.push({
+          remotePath: item.remotePath,
+          localPath: item.localPath,
+          name: item.name || path.basename(item.remotePath),
+          size: item.size || 0,
+          index: item.index,
+        });
+      }
+    }
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+
+  if (!retry) emitUploadProgress(progressCb, { type: "batch-start", total: files.length, direction: "download" });
+  let downloaded = 0;
+  let failed = 0;
+  let stopped = false;
+  let disconnect = false;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const index = retry && file.index ? file.index : i + 1;
+    if (uploadCancelled) {
+      stopped = true;
+      failed += emitRemainingFailed(progressCb, files, i, files.length, retry, "Stopped");
+      break;
+    }
+    emitUploadProgress(progressCb, {
+      type: "file-start",
+      index,
+      total: files.length,
+      name: file.name,
+      localPath: file.localPath,
+      remotePath: file.remotePath,
+      size: file.size,
+      retry,
+      direction: "download",
+    });
+    await fs.ensureDir(path.dirname(file.localPath));
+    let result = await downloadFile(id, file.remotePath, file.localPath, null, {
+      size: file.size,
+      onStep: (transferred, total) => {
+        emitUploadProgress(progressCb, {
+          type: "file-progress",
+          index,
+          total: files.length,
+          name: file.name,
+          transferred,
+          bytesTotal: total || file.size || 0,
+          direction: "download",
+        });
+      },
+    });
+    if (!result.success && isDisconnectError(result.message) && !uploadCancelled) {
+      const recon = await ensureConnected(id);
+      if (recon.success) {
+        result = await downloadFile(id, file.remotePath, file.localPath, null, { size: file.size });
+      } else {
+        disconnect = true;
+        result = { success: false, message: "Connection lost" };
+      }
+    }
+    if (result.success) downloaded++;
+    else failed++;
+    emitUploadProgress(progressCb, {
+      type: "file-done",
+      index,
+      total: files.length,
+      name: file.name,
+      localPath: file.localPath,
+      remotePath: file.remotePath,
+      success: !!result.success,
+      message: result.message,
+      retry,
+      direction: "download",
+    });
+    if (disconnect && !result.success) {
+      failed += emitRemainingFailed(progressCb, files, i + 1, files.length, retry, "Connection lost");
+      break;
+    }
+  }
+  if (!retry) {
+    emitUploadProgress(progressCb, {
+      type: "batch-end",
+      downloaded,
+      uploaded: downloaded,
+      failed,
+      total: files.length,
+      cancelled: stopped,
+      disconnect,
+      direction: "download",
+    });
+  }
+  return {
+    success: failed === 0 && !stopped,
+    downloaded,
+    failed,
+    total: files.length,
+    cancelled: stopped,
+    disconnect,
+    message: disconnect ? "Connection lost" : (stopped ? "Download stopped" : (failed ? `${failed} file(s) failed` : undefined)),
   };
 }
 
@@ -1806,6 +2069,7 @@ module.exports = {
   disconnect,
   listRemote,
   downloadFile,
+  downloadBatch,
   uploadFile,
   uploadBatch,
   cancelUpload,
@@ -1834,5 +2098,5 @@ module.exports = {
   checkRemoteExists,
   validateLocalPath,
   statLocalPath,
-  __test: { normalizeRemoteMutationPath, createRemoteDirOnConnection, createRemoteFileOnConnection, joinRemotePath, collectLocalFiles, mapSftpListItem, mapFtpListItem, sortRemoteItems, fileKindLabel },
+  __test: { normalizeRemoteMutationPath, createRemoteDirOnConnection, createRemoteFileOnConnection, joinRemotePath, joinLocalDownloadPath, collectLocalFiles, mapSftpListItem, mapFtpListItem, sortRemoteItems, fileKindLabel },
 };

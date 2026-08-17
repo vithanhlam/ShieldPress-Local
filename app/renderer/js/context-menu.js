@@ -104,7 +104,7 @@ window.ContextMenu = {
     const action = target.scope === "terminal" ? "termContext" : "context";
     this.el.innerHTML = `
       <div class="ctx-section">${SFTP._esc(heading || "Remote Files")}</div>
-      ${item && !directory ? `<div class="ctx-item" onclick="SFTP.${action}Download('${encoded}');ContextMenu.hide()"><i class="fas fa-download"></i> Download</div>` : ""}
+      ${item ? `<div class="ctx-item" onclick="SFTP.${action}Download('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-download"></i> Download${directory ? " Folder" : ""}</div>` : ""}
       ${item && !directory && editable ? `<div class="ctx-item" onclick="SFTP.${action}Edit('${encoded}');ContextMenu.hide()"><i class="fas fa-edit"></i> Edit in ShieldPress</div>
         <div class="ctx-item" onclick="SFTP.${action}OpenExternal('${encoded}');ContextMenu.hide()"><i class="fas fa-external-link-alt"></i> Open in Default Editor</div>
         <div class="ctx-item" onclick="SFTP.${action}OpenWith('${encoded}');ContextMenu.hide()"><i class="fas fa-code"></i> Open With...</div>` : ""}

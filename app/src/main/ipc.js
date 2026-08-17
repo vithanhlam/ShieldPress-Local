@@ -533,6 +533,9 @@ function register(ipcMain, shell, dialog) {
     if (msg && typeof msg === "object") win.send("sftp-upload-progress", msg);
     else win.send("sftp-progress", msg);
   };
+  ipcMain.handle("sftp-download-batch", (_e, { id, items, retry }) =>
+    sftp.downloadBatch(id, items, sendSftpProgress, { retry: !!retry }),
+  );
   ipcMain.handle("sftp-upload", (_e, { id, localPath, remotePath }) =>
     sftp.uploadFile(id, localPath, remotePath, sendSftpProgress),
   );

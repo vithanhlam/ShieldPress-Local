@@ -53,9 +53,15 @@ window.SFTP = {
     btn.style.color = this._vault.unlocked ? "var(--green)" : "var(--yellow)";
   },
 
-  async openVault() {
+  async openVault(onUnlocked = null) {
     await this.refreshVaultStatus();
+    if (typeof onUnlocked === "function") this._pendingVaultAction = onUnlocked;
     if (this._vault.unlocked) {
+      if (typeof onUnlocked === "function") {
+        this._pendingVaultAction = null;
+        await onUnlocked();
+        return;
+      }
       if (confirm("Lock the credential vault and disconnect all remote sessions?")) {
         await api.sftpVaultLock();
         await this.refreshVaultStatus();
@@ -77,6 +83,21 @@ window.SFTP = {
     setTimeout(() => document.getElementById("sftp-master-pass")?.focus(), 50);
   },
 
+  vaultKeyDown(event, isConfirmation) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (!this._vault.configured && !isConfirmation) {
+      document.getElementById("sftp-master-confirm")?.focus();
+      return;
+    }
+    this.submitVault();
+  },
+
+  cancelVault() {
+    this._pendingVaultAction = null;
+    closeModal("m-sftp-vault");
+  },
+
   async submitVault() {
     const password = document.getElementById("sftp-master-pass").value;
     if (!this._vault.configured) {
@@ -94,6 +115,15 @@ window.SFTP = {
     await this.refreshVaultStatus();
     await this.load();
     toast("Credential vault unlocked", "success");
+    const pendingAction = this._pendingVaultAction;
+    this._pendingVaultAction = null;
+    if (typeof pendingAction === "function") await pendingAction();
+  },
+
+  async _handleVaultLocked(result, retryAction) {
+    if (result?.code !== "VAULT_LOCKED") return false;
+    await this.openVault(retryAction);
+    return true;
   },
 
   async load() {
@@ -365,8 +395,9 @@ window.SFTP = {
       return;
     } else {
       this._connStatus[id] = "disconnected";
-      if (r.code === "VAULT_LOCKED") await this.openVault();
-      toast("Connection failed: " + r.message, "error");
+      if (!(await this._handleVaultLocked(r, () => this.connect(id)))) {
+        toast("Connection failed: " + r.message, "error");
+      }
     }
     this._render();
   },
@@ -387,7 +418,9 @@ window.SFTP = {
 
     const cr = await api.sftpConnect(id);
     if (!cr.success) {
-      toast("Connect failed: " + cr.message, "error");
+      if (!(await this._handleVaultLocked(cr, () => this.openBrowser(id)))) {
+        toast("Connect failed: " + cr.message, "error");
+      }
       return;
     }
     this._connStatus[id] = "connected";
@@ -507,6 +540,7 @@ window.SFTP = {
       if (this._sortKey === "modified") cmp = String(a.modified || "").localeCompare(String(b.modified || ""));
       else if (this._sortKey === "size") cmp = (a.size || 0) - (b.size || 0);
       else if (this._sortKey === "kind") cmp = this._itemKind(a).localeCompare(this._itemKind(b));
+      else if (this._sortKey === "permissions") cmp = String(a.permissions || "").localeCompare(String(b.permissions || ""));
       else cmp = String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
       return cmp * this._sortDir;
     });
@@ -524,6 +558,7 @@ window.SFTP = {
   ${th("name", "Name")}
   ${th("kind", "Type", "110px")}
   ${th("size", "Size", "80px")}
+  ${th("permissions", "Permissions", "145px")}
   ${th("modified", "Modified", "150px")}
   <th style="padding:8px 10px;width:120px;text-align:right">Actions</th>
 </tr></thead>
@@ -537,16 +572,17 @@ window.SFTP = {
   const color = isDir ? "var(--yellow)" : "var(--text3)";
   return `
 <tr style="border-top:1px solid var(--border)" data-remote-path="${encodedPath}" data-remote-name="${encodedName}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${isEditable}">
-  <td style="padding:8px 10px;cursor:${isDir ? "pointer" : "default"};color:${isDir ? "var(--accent)" : "inherit"};text-decoration:${isDir ? "underline" : "none"}"
+  <td style="padding:8px 10px;cursor:${isDir ? "pointer" : "default"};color:${isDir ? "var(--accent)" : "inherit"}"
       ${isDir ? `data-enter-dir="${encodedName}"` : ""}>
     <i class="fas ${icon}" style="color:${color};margin-right:8px"></i>
     ${this._esc(item.name)}${item.isLink ? ' <span style="font-size:10px;color:var(--text3)">link</span>' : ""}
   </td>
   <td style="padding:8px 10px;color:var(--text3)">${this._esc(this._itemKind(item))}</td>
   <td style="padding:8px 10px;color:var(--text3)">${isDir ? "" : this._fmtSize(item.size)}</td>
+  <td style="padding:8px 10px;color:var(--text3);font-family:var(--mono);font-size:11px;white-space:nowrap">${this._esc(item.permissions || "—")}</td>
   <td style="padding:8px 10px;color:var(--text3);font-size:12px">${item.modified ? new Date(item.modified).toLocaleString("vi-VN") : ""}</td>
   <td style="padding:8px 10px;text-align:right;white-space:nowrap">
-    ${!isDir ? `<button class="btn btn-ghost btn-xs" title="Download" onclick="SFTP.downloadItem(decodeURIComponent('${encodedPath}'))"><i class="fas fa-download"></i></button>` : ""}
+    ${`<button class="btn btn-ghost btn-xs" title="Download" onclick="SFTP.downloadItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-download"></i></button>`}
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Edit inline" onclick="SFTP.editFile(decodeURIComponent('${encodedPath}'))"><i class="fas fa-edit"></i></button>` : ""}
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Open in Editor (VS Code, Notepad++...)" onclick="SFTP.openExternal(decodeURIComponent('${encodedPath}'))"><i class="fas fa-external-link-alt"></i></button>` : ""}
     <button class="btn btn-ghost btn-xs" title="Delete" style="color:var(--red)" onclick="SFTP.deleteItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-trash"></i></button>
@@ -588,16 +624,45 @@ window.SFTP = {
     return bytes + " B";
   },
 
-  async downloadItem(remotePath) {
-    const localPath = await api.openFileDialog({ properties: ["openDirectory"] });
-    if (!localPath) return;
-    const fileName = remotePath.split("/").pop();
-    const dest = localPath.replace(/[\\/]+$/, "") + "/" + fileName;
-    const id = document.getElementById("sftp-browser-conn-id").value;
-    toast("Downloading " + fileName + "...", "info");
-    const r = await api.sftpDownload(id, remotePath, dest);
-    if (r.success) toast("Downloaded: " + fileName, "success");
-    else toast("Download failed: " + r.message, "error");
+  async downloadItem(remotePath, isDirectory) {
+    const id = document.getElementById("sftp-browser-conn-id")?.value;
+    return this.downloadRemote(id, remotePath, !!isDirectory);
+  },
+
+  async downloadRemote(id, remotePath, isDirectory) {
+    if (!id) return;
+    if (this._xferBusy) return toast("A transfer is already in progress", "warn");
+    const localDir = await api.openFileDialog({ properties: ["openDirectory"] });
+    if (!localDir) return;
+    const name = remotePath.split("/").pop();
+    const dest = localDir.replace(/[\\/]+$/, "") + "/" + name;
+    const localInfo = await api.sftpStatLocal(dest);
+    if (localInfo.exists) {
+      const message = isDirectory
+        ? `"${name}" folder already exists locally.\n\nMerge contents? Existing files inside will be overwritten.`
+        : `"${name}" already exists locally (${this._fmtSize(localInfo.size)}).\n\nOverwrite?`;
+      if (!confirm(message)) return;
+    }
+    this._xferDirection = "download";
+    this._xferReset();
+    this._xferShow(true);
+    this._xferBusy = true;
+    this._xferConnId = id;
+    this._xferSetBusy(true);
+    this._xferSetMeta(isDirectory ? "Scanning folder..." : "Preparing download...", "0 / 0", 0);
+    try {
+      const result = await api.sftpDownloadBatch(id, [{ remotePath, localPath: dest, isDirectory: !!isDirectory, name }]);
+      const downloaded = result.downloaded || 0;
+      const failed = result.failed || 0;
+      if (result.cancelled) toast("Download stopped", "warn");
+      else if (result.disconnect) toast("Connection lost during download", "error");
+      else if (downloaded && !failed) toast(`Downloaded ${downloaded} file(s)`, "success");
+      else if (downloaded) toast(`Downloaded ${downloaded} file(s), ${failed} failed`, "warn");
+      else toast(result.message || "Download failed", "error");
+    } finally {
+      this._xferBusy = false;
+      this._xferSetBusy(false);
+    }
   },
 
   async uploadFromDialog() {
@@ -616,7 +681,8 @@ window.SFTP = {
   },
 
   async _uploadLocalPaths(id, localPaths, remoteDir, onDone) {
-    if (this._xferBusy) return toast("An upload is already in progress", "warn");
+    if (this._xferBusy) return toast("A transfer is already in progress", "warn");
+    this._xferDirection = "upload";
     const jobs = [];
     this._xferReset();
     this._xferShow(true);
@@ -697,7 +763,10 @@ window.SFTP = {
     this._xferSetBusy(true);
     this._xferUpdateRow(index, job.name, "pending");
     try {
-      const result = await api.sftpUploadBatch(id, [{ ...job, index }], { retry: true });
+      const download = this._xferDirection === "download" || job.direction === "download";
+      const result = download
+        ? await api.sftpDownloadBatch(id, [{ ...job, index, isDirectory: false }], { retry: true })
+        : await api.sftpUploadBatch(id, [{ ...job, index }], { retry: true });
       if (result.success && this._xfer) {
         this._xfer.ok++;
         this._xfer.fail = Math.max(0, (this._xfer.fail || 0) - 1);
@@ -750,8 +819,9 @@ window.SFTP = {
   },
 
   _xferRowHtml(id, name, status, detail) {
+    const downloading = this._xferDirection === "download";
     const map = {
-      pending: { cls: "sftp-xfer-pending", icon: "fa-spinner fa-spin", text: "Uploading" },
+      pending: { cls: "sftp-xfer-pending", icon: "fa-spinner fa-spin", text: downloading ? "Downloading" : "Uploading" },
       ok: { cls: "sftp-xfer-ok", icon: "fa-check", text: "Done" },
       fail: { cls: "sftp-xfer-fail", icon: "fa-times", text: detail || "Failed" },
       skip: { cls: "sftp-xfer-skip", icon: "fa-minus", text: detail || "Skipped" },
@@ -778,20 +848,40 @@ window.SFTP = {
 
   _onUploadProgress(msg) {
     if (!msg || typeof msg !== "object") return;
+    if (msg.direction === "download") this._xferDirection = "download";
+    else if (msg.direction === "upload") this._xferDirection = "upload";
+    const downloading = this._xferDirection === "download";
+    const verb = downloading ? "Downloading" : "Uploading";
+    const doneVerb = downloading ? "Downloaded" : "Uploaded";
     this._xferShow(true);
     if (msg.localPath && msg.remotePath && msg.index) {
       this._xferFiles ||= {};
-      this._xferFiles[msg.index] = { localPath: msg.localPath, remotePath: msg.remotePath, name: msg.name };
+      this._xferFiles[msg.index] = {
+        localPath: msg.localPath,
+        remotePath: msg.remotePath,
+        name: msg.name,
+        direction: this._xferDirection,
+      };
     }
     if (msg.type === "batch-start") {
       this._xfer = { total: msg.total || 0, done: 0, ok: 0, fail: 0 };
       this._xferSetBusy(true);
-      this._xferSetMeta(msg.total ? `Uploading 0 / ${msg.total} files` : "No files to upload", `0 / ${msg.total || 0}`, 0);
+      this._xferSetMeta(msg.total ? `${verb} 0 / ${msg.total} files` : `No files to ${downloading ? "download" : "upload"}`, `0 / ${msg.total || 0}`, 0);
     }
     if (msg.type === "file-start") {
       this._xferUpdateRow(msg.index, msg.name, "pending");
       this._xferEls("current").forEach((el) => { el.textContent = msg.name || ""; });
-      this._xferSetMeta(`Uploading ${msg.index} / ${msg.total} files`, `${this._xfer?.ok || 0} done · ${this._xfer?.fail || 0} failed`, msg.total ? ((msg.index - 1) / msg.total) * 100 : 0);
+      this._xferSetMeta(`${verb} ${msg.index} / ${msg.total} files`, `${this._xfer?.ok || 0} done · ${this._xfer?.fail || 0} failed`, msg.total ? ((msg.index - 1) / msg.total) * 100 : 0);
+    }
+    if (msg.type === "file-progress") {
+      const total = msg.total || this._xfer?.total || 0;
+      const bytesTotal = msg.bytesTotal || 0;
+      const transferred = msg.transferred || 0;
+      const fileFrac = bytesTotal ? Math.min(1, transferred / bytesTotal) : 0;
+      const pct = total ? ((Math.max(0, (msg.index || 1) - 1) + fileFrac) / total) * 100 : fileFrac * 100;
+      const sizeText = bytesTotal ? ` · ${this._fmtSize(transferred)} / ${this._fmtSize(bytesTotal)}` : "";
+      this._xferEls("current").forEach((el) => { el.textContent = `${msg.name || ""}${sizeText}`; });
+      this._xferSetMeta(`${verb} ${msg.index} / ${total} files`, `${this._xfer?.ok || 0} done · ${this._xfer?.fail || 0} failed`, pct);
     }
     if (msg.type === "file-done") {
       if (this._xfer && !msg.retry) {
@@ -803,18 +893,18 @@ window.SFTP = {
       const total = this._xfer?.total || msg.total || 0;
       const ok = this._xfer?.ok || 0;
       const fail = this._xfer?.fail || 0;
-      this._xferSetMeta(`Uploading ${msg.index} / ${total} files`, `${ok} done · ${fail} failed`, total ? (Math.max(ok + fail, msg.index) / total) * 100 : 0);
+      this._xferSetMeta(`${verb} ${msg.index} / ${total} files`, `${ok} done · ${fail} failed`, total ? (Math.max(ok + fail, msg.index) / total) * 100 : 0);
     }
     if (msg.type === "batch-end") {
-      const uploaded = msg.uploaded || 0;
+      const uploaded = msg.downloaded || msg.uploaded || 0;
       const failed = msg.failed || 0;
       const total = msg.total || 0;
       this._xferSetBusy(false);
-      let label = `Uploaded ${uploaded} file(s)`;
-      let current = "All files uploaded";
+      let label = `${doneVerb} ${uploaded} file(s)`;
+      let current = downloading ? "All files downloaded" : "All files uploaded";
       if (msg.cancelled) {
-        label = "Upload stopped";
-        current = "Remaining files were not uploaded";
+        label = downloading ? "Download stopped" : "Upload stopped";
+        current = downloading ? "Remaining files were not downloaded" : "Remaining files were not uploaded";
       } else if (msg.disconnect) {
         label = "Connection lost";
         current = "Reconnect, then retry failed files";
@@ -915,7 +1005,7 @@ window.SFTP = {
     this._loadDir();
   },
 
-  contextDownload(encodedPath) { return this.downloadItem(decodeURIComponent(encodedPath)); },
+  contextDownload(encodedPath, isDirectory) { return this.downloadItem(decodeURIComponent(encodedPath), !!isDirectory); },
   contextEdit(encodedPath) { return this.editFile(decodeURIComponent(encodedPath)); },
   contextOpenExternal(encodedPath) { return this.openExternal(decodeURIComponent(encodedPath)); },
 
@@ -1080,7 +1170,12 @@ window.SFTP = {
     await this.cleanupTerminal();
 
     const cr = await api.sftpConnect(id);
-    if (!cr.success) { toast("Connect failed: " + cr.message, "error"); return; }
+    if (!cr.success) {
+      if (!(await this._handleVaultLocked(cr, () => this.openTerminal(id)))) {
+        toast("Connect failed: " + cr.message, "error");
+      }
+      return;
+    }
     this._connStatus[id] = "connected";
     await this.load();
 
@@ -1194,23 +1289,54 @@ window.SFTP = {
       return;
     }
     const base = this._termPath;
-    listEl.innerHTML = r.items.map((item) => {
+    const rows = r.items.map((item) => {
       const fullPath = base.replace(/\/+$/, "") + "/" + item.name;
       const encoded = encodeURIComponent(fullPath);
       const isDir = item.isDirectory || item.type === "directory";
       const editable = !isDir && /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|env|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(item.name);
       const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
-      return `<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-bottom:1px solid var(--border);font-size:12px" title="${this._esc(fullPath)}" data-remote-path="${encoded}" data-remote-name="${encodeURIComponent(item.name)}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${editable}">
-        <button class="btn btn-ghost btn-xs" style="min-width:0;flex:1;justify-content:flex-start;overflow:hidden" onclick="${isDir ? `SFTP.termEnterPath('${encoded}')` : editable ? `SFTP.termEditFile('${encoded}')` : `SFTP.copyRemotePath(decodeURIComponent('${encoded}'))`}">
-          <i class="fas ${icon}" style="color:${isDir ? "var(--yellow)" : "var(--text3)"};flex-shrink:0"></i>
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(item.name)}</span>
-        </button>
-        ${!isDir ? `<span style="color:var(--text3);font-size:10px;flex-shrink:0">${this._fmtSize(item.size)}</span>` : ""}
-        <button class="btn btn-ghost btn-xs" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'))" title="Copy path"><i class="fas fa-copy"></i></button>
-        ${editable ? `<button class="btn btn-ghost btn-xs" onclick="SFTP.termEditFile('${encoded}')" title="Edit"><i class="fas fa-edit"></i></button>` : ""}
-        <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="SFTP.termDeleteItem('${encoded}',${isDir})" title="Delete"><i class="fas fa-trash"></i></button>
-      </div>`;
+      const chmod = String(item.permissions || "").match(/\((\d{3,4})\)/)?.[1] || "—";
+      const action = isDir
+        ? `SFTP.termEnterPath('${encoded}')`
+        : editable ? `SFTP.termEditFile('${encoded}')` : `SFTP.copyRemotePath(decodeURIComponent('${encoded}'))`;
+      return `<tr style="border-bottom:1px solid var(--border)" title="${this._esc(fullPath)}" data-remote-path="${encoded}" data-remote-name="${encodeURIComponent(item.name)}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${editable}">
+        <td style="padding:6px 8px;overflow:hidden">
+          <button class="btn btn-ghost btn-xs" style="width:100%;min-width:0;justify-content:flex-start;overflow:hidden" onclick="${action}">
+            <i class="fas ${icon}" style="color:${isDir ? "var(--yellow)" : "var(--text3)"};flex-shrink:0"></i>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(item.name)}</span>
+          </button>
+        </td>
+        <td style="padding:6px;color:var(--text3);white-space:nowrap">${this._esc(this._itemKind(item))}</td>
+        <td style="padding:6px;color:var(--text3);text-align:right;white-space:nowrap">${isDir ? "—" : this._fmtSize(item.size)}</td>
+        <td style="padding:6px;color:var(--accent);font-family:var(--mono);text-align:center" title="${this._esc(item.permissions || "")}">${chmod}</td>
+        <td style="padding:6px;color:var(--text2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this._esc(item.owner || "")}">${this._esc(item.owner || "—")}</td>
+        <td style="padding:6px;color:var(--text2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this._esc(item.group || "")}">${this._esc(item.group || "—")}</td>
+        <td style="padding:5px;text-align:right;white-space:nowrap">
+          <button class="btn btn-ghost btn-xs" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'))" title="Copy path"><i class="fas fa-copy"></i></button>
+          <button class="btn btn-ghost btn-xs" onclick="SFTP.termContextDownload('${encoded}',${isDir})" title="Download"><i class="fas fa-download"></i></button>
+          ${editable ? `<button class="btn btn-ghost btn-xs" onclick="SFTP.termEditFile('${encoded}')" title="Edit"><i class="fas fa-edit"></i></button>` : ""}
+          <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="SFTP.termDeleteItem('${encoded}',${isDir})" title="Delete"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
     }).join("");
+    listEl.innerHTML = `<table style="width:100%;min-width:820px;border-collapse:collapse;table-layout:fixed;font-size:11px">
+      <colgroup>
+        <col style="width:210px"><col style="width:75px"><col style="width:75px">
+        <col style="width:65px"><col style="width:100px"><col style="width:100px"><col style="width:150px">
+      </colgroup>
+      <thead style="position:sticky;top:0;z-index:1;background:var(--bg2)">
+        <tr style="color:var(--text3);text-align:left;border-bottom:1px solid var(--border)">
+          <th style="padding:7px 8px">Name</th>
+          <th style="padding:7px 6px">Type</th>
+          <th style="padding:7px 6px;text-align:right">Size</th>
+          <th style="padding:7px 6px;text-align:center">Chmod</th>
+          <th style="padding:7px 6px">User</th>
+          <th style="padding:7px 6px">Group</th>
+          <th style="padding:7px 6px;text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
   },
 
   termEnterPath(encodedPath) {
@@ -1262,15 +1388,9 @@ window.SFTP = {
   termContextDelete(encodedPath, isDirectory) { return this.termDeleteItem(encodedPath, isDirectory); },
   termContextRefresh() { return this.loadTermFiles(); },
 
-  async termContextDownload(encodedPath) {
-    const remotePath = decodeURIComponent(encodedPath);
-    const localDir = await api.openFileDialog({ properties: ["openDirectory"] });
-    if (!localDir) return;
-    const destination = localDir.replace(/[\\/]+$/, "") + "/" + remotePath.split("/").pop();
+  async termContextDownload(encodedPath, isDirectory) {
     const id = document.getElementById("sftp-term-conn-id").value;
-    const result = await api.sftpDownload(id, remotePath, destination);
-    if (result.success) toast("Downloaded successfully", "success");
-    else toast("Download failed: " + result.message, "error");
+    return this.downloadRemote(id, decodeURIComponent(encodedPath), !!isDirectory);
   },
 
   async termContextOpenExternal(encodedPath) {

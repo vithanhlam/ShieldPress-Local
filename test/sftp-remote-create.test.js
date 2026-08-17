@@ -69,6 +69,9 @@ test("maps SFTP symlink directories and hidden files", () => {
   assert.equal(dir.name, ".env");
   assert.equal(dir.isDirectory, false);
   assert.equal(dir.kind, "env");
+  assert.equal(dir.permissions, "rw-r--r-- (644)");
+  assert.equal(dir.owner, "root");
+  assert.equal(dir.group, "root");
 
   const link = __test.mapSftpListItem({
     filename: "html",
@@ -80,11 +83,14 @@ test("maps SFTP symlink directories and hidden files", () => {
 
   const folder = __test.mapSftpListItem({
     filename: "data",
-    longname: "drwxr-xr-x 2 root root 4096",
+    longname: "drwxr-xr-x 2 www-data www-data 4096",
     attrs: { size: 4096, mtime: 1700000001, mode: 0o040755 },
   });
   assert.equal(folder.isDirectory, true);
   assert.equal(folder.type, "directory");
+  assert.equal(folder.permissions, "rwxr-xr-x (755)");
+  assert.equal(folder.owner, "www-data");
+  assert.equal(folder.group, "www-data");
 });
 
 test("sorts remote items by name or modified time with folders first", () => {
@@ -102,7 +108,18 @@ test("sorts remote items by name or modified time with folders first", () => {
 
 test("maps FTP directory, file, and symlink types", () => {
   assert.equal(__test.mapFtpListItem({ name: "public", type: 2, size: 0 }).type, "directory");
-  assert.equal(__test.mapFtpListItem({ name: "index.php", type: 1, size: 10 }).kind, "php");
+  const file = __test.mapFtpListItem({
+    name: "index.php",
+    type: 1,
+    size: 10,
+    permissions: { user: 6, group: 4, world: 4 },
+    user: "www-data",
+    group: "www-data",
+  });
+  assert.equal(file.kind, "php");
+  assert.equal(file.permissions, "rw-r--r-- (644)");
+  assert.equal(file.owner, "www-data");
+  assert.equal(file.group, "www-data");
   assert.equal(__test.mapFtpListItem({ name: "www", type: 3, size: 4 }).isLink, true);
 });
 
@@ -121,4 +138,13 @@ test("creates an FTP directory without changing the working directory", async ()
     ["ensureDir", "/public_html/new-folder"],
     ["cd", "/home/account"],
   ]);
+});
+
+test("joins nested download paths under the chosen local folder", () => {
+  const path = require("path");
+  assert.equal(
+    __test.joinLocalDownloadPath("/tmp/out/theme", "css/app.css"),
+    path.join("/tmp/out/theme", "css", "app.css"),
+  );
+  assert.equal(__test.joinLocalDownloadPath("/tmp/out/theme", ""), "/tmp/out/theme");
 });

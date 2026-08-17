@@ -138,6 +138,7 @@ contextBridge.exposeInMainWorld("api", {
   sftpDisconnect: (id) => ipcRenderer.invoke("sftp-disconnect", id),
   sftpList: (id, remotePath) => ipcRenderer.invoke("sftp-list", { id, remotePath }),
   sftpDownload: (id, remotePath, localPath) => ipcRenderer.invoke("sftp-download", { id, remotePath, localPath }),
+  sftpDownloadBatch: (id, items, opts) => ipcRenderer.invoke("sftp-download-batch", { id, items, ...(opts || {}) }),
   sftpUpload: (id, localPath, remotePath) => ipcRenderer.invoke("sftp-upload", { id, localPath, remotePath }),
   sftpUploadBatch: (id, items, opts) => ipcRenderer.invoke("sftp-upload-batch", { id, items, ...(opts || {}) }),
   sftpUploadCancel: () => ipcRenderer.invoke("sftp-upload-cancel"),

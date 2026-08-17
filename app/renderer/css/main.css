@@ -200,7 +200,7 @@ code,
   border-radius: var(--rs);
   cursor: pointer;
   color: var(--text2);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   transition: all 0.15s;
   margin-bottom: 2px;
@@ -219,7 +219,7 @@ code,
 .nav-item i {
   width: 16px;
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .sidebar-bottom {
@@ -1137,8 +1137,11 @@ code,
 #m-sftp-browser .modal-resizable {
   display: flex;
   flex-direction: column;
-  width: min(860px, 92vw);
-  height: min(720px, 88vh);
+  width: min(1100px, 94vw);
+  height: min(760px, 90vh);
+  min-width: 720px;
+  min-height: 480px;
+  resize: both;
 }
 
 #m-sftp-browser .modal-resizable .modal-title,

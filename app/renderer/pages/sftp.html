@@ -100,18 +100,18 @@
 </div>
 
 <!-- Modal: encrypted credential vault -->
-<div class="overlay" id="m-sftp-vault" onclick="closeIfOverlay(event,'m-sftp-vault')">
+<div class="overlay" id="m-sftp-vault" onclick="if(event.target===this)SFTP.cancelVault()">
   <div class="modal" style="max-width:430px">
     <div class="modal-title"><i class="fas fa-shield-alt"></i> Credential Vault</div>
     <p id="sftp-vault-help" style="font-size:13px;color:var(--text2);line-height:1.6;margin-top:0"></p>
     <div class="fg">
       <div><div class="fl">Master Password</div>
-        <input class="fi" id="sftp-master-pass" type="password" autocomplete="current-password"/></div>
+        <input class="fi" id="sftp-master-pass" type="password" autocomplete="current-password" onkeydown="SFTP.vaultKeyDown(event, false)"/></div>
       <div id="sftp-master-confirm-wrap"><div class="fl">Confirm Master Password</div>
-        <input class="fi" id="sftp-master-confirm" type="password" autocomplete="new-password"/></div>
+        <input class="fi" id="sftp-master-confirm" type="password" autocomplete="new-password" onkeydown="SFTP.vaultKeyDown(event, true)"/></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('m-sftp-vault')">Cancel</button>
+      <button class="btn btn-ghost" onclick="SFTP.cancelVault()">Cancel</button>
       <button class="btn btn-primary" id="sftp-vault-submit" onclick="SFTP.submitVault()"><i class="fas fa-unlock"></i> Unlock</button>
     </div>
   </div>
@@ -144,12 +144,21 @@
       <i class="fas fa-cloud-upload-alt"></i> Drag & drop files or folders to upload. Existing items will ask before overwriting.
     </div>
 
+    <!-- Action bar -->
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFromDialog()"><i class="fas fa-upload"></i> Upload File</button>
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFolderDialog()"><i class="fas fa-folder-open"></i> Upload Folder</button>
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadZipDialog()"><i class="fas fa-file-archive"></i> Upload ZIP & Extract</button>
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.createDirPrompt()"><i class="fas fa-folder-plus"></i> New Folder</button>
+    </div>
+
+    <!-- Transfer progress stays at the bottom of the file browser -->
     <div id="sftp-xfer" class="sftp-xfer" style="display:none">
       <div class="sftp-xfer-head">
         <span id="sftp-xfer-label">Preparing upload...</span>
         <span class="sftp-xfer-head-right">
           <span id="sftp-xfer-count">0 / 0</span>
-          <button class="btn btn-ghost btn-xs sftp-xfer-stop" onclick="SFTP.stopUpload()" title="Stop upload"><i class="fas fa-stop"></i> Stop</button>
+          <button class="btn btn-ghost btn-xs sftp-xfer-stop" onclick="SFTP.stopUpload()" title="Stop transfer"><i class="fas fa-stop"></i> Stop</button>
           <button class="btn btn-ghost btn-xs sftp-xfer-hide" onclick="SFTP.toggleTransfer(true)" title="Hide"><i class="fas fa-chevron-down"></i></button>
           <button class="btn btn-ghost btn-xs sftp-xfer-expand" onclick="SFTP.toggleTransfer(false)" title="Show details"><i class="fas fa-chevron-up"></i></button>
         </span>
@@ -157,14 +166,6 @@
       <div class="sftp-xfer-track"><div id="sftp-xfer-bar" class="sftp-xfer-bar"></div></div>
       <div id="sftp-xfer-current" class="sftp-xfer-current"></div>
       <div id="sftp-xfer-list" class="sftp-xfer-list"></div>
-    </div>
-
-    <!-- Action bar -->
-    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFromDialog()"><i class="fas fa-upload"></i> Upload File</button>
-      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFolderDialog()"><i class="fas fa-folder-open"></i> Upload Folder</button>
-      <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadZipDialog()"><i class="fas fa-file-archive"></i> Upload ZIP & Extract</button>
-      <button class="btn btn-ghost btn-sm" onclick="SFTP.createDirPrompt()"><i class="fas fa-folder-plus"></i> New Folder</button>
     </div>
 
     <div class="modal-footer">
