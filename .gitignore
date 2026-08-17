@@ -9,6 +9,7 @@ nul
 # Local agent/editor state
 .agents/
 .codex/
+.cursor/
 .vscode/
 .idea/
 
