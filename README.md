@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/github/v/release/vithanhlam/shieldpress-local?style=flat-square&color=e07b1a" alt="Release"/>
   <img src="https://img.shields.io/github/downloads/vithanhlam/shieldpress-local/total?style=flat-square&color=22c55e" alt="Downloads"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Ubuntu-blue?style=flat-square" alt="Platform"/>
-  <img src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square" alt="License"/>
+  <img src="https://img.shields.io/badge/license-Proprietary-red?style=flat-square" alt="License"/>
 </p>
 
 ---
@@ -143,9 +143,11 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 
 ## Installation
 
-### Run from source
+### Run from source (personal use only)
 
 Requirements: **Node.js 18+** and **npm**.
+
+Cloning for local development or contribution is allowed. **Redistributing, republishing, or selling** this source (or builds from it) is **not** allowed. See [`LICENSE`](LICENSE).
 
 ```bash
 git clone https://github.com/vithanhlam/ShieldPress-Local.git
@@ -236,20 +238,14 @@ Contributions are welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for how to
 
 ## License
 
-ShieldPress Local is free software licensed under the **[GNU General Public License v3.0](LICENSE)** (GPL-3.0).
+ShieldPress Local is **proprietary software**. Copyright (C) 2026 **vithanhlam**. **All Rights Reserved.**
 
-- You may use, study, share, and modify the software.
-- If you distribute this software or a modified version, you must provide the corresponding source code under GPLv3.
-- You may not turn it into proprietary/closed-source software.
-- Copyleft is intentional so redistributed forks remain free software under GPLv3.
+- You may download and use **official** installers for personal or internal business use.
+- You may **not** copy, clone for republication, modify-and-distribute, sell, or commercially exploit the source or binaries without written permission.
+- Full terms: **[LICENSE](LICENSE)**
+- Brand / trademark rules: **[TRADEMARK.md](TRADEMARK.md)**
 
-## Trademark & brand rights
-
-**Copyright (C) 2026 vithanhlam. All Rights Reserved** for the ShieldPress name, logos, icons, screenshots branding, and product identity.
-
-GPLv3 covers the *source code* only. It does **not** grant permission to re-release, rebrand, or sell clones under the ShieldPress name.
-
-See **[TRADEMARK.md](TRADEMARK.md)** for the full brand policy. Official releases come only from [vithanhlam/ShieldPress-Local](https://github.com/vithanhlam/ShieldPress-Local).
+Official releases come only from [vithanhlam/ShieldPress-Local](https://github.com/vithanhlam/ShieldPress-Local).
 
 ---
 
@@ -262,6 +258,5 @@ See **[TRADEMARK.md](TRADEMARK.md)** for the full brand policy. Official release
 
 ---
 
-Copyright (C) 2026 vithanhlam.  
-Source code: GNU General Public License v3.0 — see [`LICENSE`](LICENSE).  
-ShieldPress trademarks & brand assets: **All Rights Reserved** — see [`TRADEMARK.md`](TRADEMARK.md).
+Copyright (C) 2026 vithanhlam. **All Rights Reserved.**  
+See [`LICENSE`](LICENSE) and [`TRADEMARK.md`](TRADEMARK.md).

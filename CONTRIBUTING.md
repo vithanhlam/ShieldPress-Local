@@ -1,6 +1,6 @@
 # Contributing to ShieldPress Local
 
-Thank you for helping improve ShieldPress Local. Contributions are welcome from everyone through GitHub pull requests.
+Thank you for helping improve ShieldPress Local. Contributions are welcome through GitHub pull requests, under the proprietary license below.
 
 ## How to contribute
 
@@ -20,24 +20,21 @@ Thank you for helping improve ShieldPress Local. Contributions are welcome from 
 - Do not commit secrets, credentials, local data, `node_modules/`, `dist/`, `bin/`, or editor/agent folders such as `.cursor/`.
 - Do not add AI co-author trailers (`Co-authored-by: Claude`, ChatGPT, Cursor, etc.) or extra bot names in commits, PRs, or release notes. Author commits as yourself.
 - Prefer English for commit messages, pull request titles, and pull request descriptions.
-- Do not use ShieldPress logos or claim official status for forks. See [TRADEMARK.md](TRADEMARK.md).
+- Do not redistribute clones or claim official status for forks. See [LICENSE](LICENSE) and [TRADEMARK.md](TRADEMARK.md).
 
 ## License of contributions
 
-By submitting a pull request or other contribution, you agree that your contribution is licensed under the [GNU General Public License v3.0](LICENSE) (GPL-3.0), the same license as this project.
+ShieldPress Local is **proprietary software**. By submitting a pull request or other contribution, you agree that:
 
-## What GPLv3 means here
+- Your contribution is assigned to **vithanhlam**, or you grant vithanhlam a perpetual, irrevocable, worldwide, royalty-free license to use, modify, and distribute it under the proprietary [LICENSE](LICENSE); and
+- You will not use the contribution process as a way to obtain or redistribute the full project under any open-source license.
 
-ShieldPress Local is free software under GPLv3:
+## Proprietary license (summary)
 
-- You may use, study, share, and modify the software.
-- If you distribute the software or a modified version, you must also provide the corresponding source code under GPLv3.
-- You may not relicense the project as proprietary/closed-source software.
-- Copyleft is intentional: forks that are redistributed must remain free software under GPLv3.
-
-GPLv3 does allow commercial use of free software. What it prevents is turning this project into a proprietary commercial product without sharing source under GPLv3.
-
-Trademark is separate: you may not re-release or sell a clone under the ShieldPress name or branding. See [TRADEMARK.md](TRADEMARK.md).
+- Official installers may be used for personal or internal business use.
+- You may **not** copy, clone for republication, modify-and-distribute, sell, or commercially exploit the source or binaries without written permission.
+- Full terms: [LICENSE](LICENSE)
+- Brand rules: [TRADEMARK.md](TRADEMARK.md)
 
 ## Questions
 

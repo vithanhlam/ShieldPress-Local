@@ -9,7 +9,7 @@
     "email": "vithanhlam@users.noreply.github.com"
   },
   "homepage": "https://shieldpress.net",
-  "license": "GPL-3.0-only",
+  "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",

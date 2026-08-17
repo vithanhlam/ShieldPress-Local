@@ -60,23 +60,22 @@ ShieldPress Local does not integrate with any third-party services for data proc
 
 ### 1. License
 
-ShieldPress Local is free software licensed under the **GNU General Public License v3.0** (GPL-3.0). The full license text is in [`LICENSE`](LICENSE).
+ShieldPress Local is **proprietary software**. Copyright (C) 2026 **vithanhlam**. **All Rights Reserved.** The full license text is in [`LICENSE`](LICENSE).
 
-Under GPLv3 you may:
+You may:
 
-- Use the software for any purpose
-- Study and modify the source code
-- Share original or modified copies, including commercially, **if** you also provide the corresponding source code under GPLv3
+- Download and use official installers for personal or internal business use
+- Open issues and submit contributions under [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
-You may not:
+You may **not**, without prior written permission:
 
-- Redistribute the software or a modified version as proprietary/closed-source software
-- Remove or alter copyright notices or license notices required by GPLv3
-- Impose additional restrictions that conflict with GPLv3
+- Copy, clone, mirror, or republish the source code for public distribution
+- Modify and distribute the Software or builds derived from it
+- Sell, rent, sublicense, or commercially exploit the Software
+- Remove copyright or proprietary notices
+- Use ShieldPress names or logos except as allowed in [`TRADEMARK.md`](TRADEMARK.md)
 
-Community contributions are welcome through GitHub pull requests. By contributing, you agree that your contribution is licensed under GPLv3.
-
-Trademark rights are separate from the GPL. You may not clone, rebrand, or resell this software under the ShieldPress name or logos. Official identity and brand rules are in [`TRADEMARK.md`](TRADEMARK.md).
+By contributing, you agree that your contribution is assigned to (or exclusively licensed to) vithanhlam under the proprietary license.
 
 ### 2. Your Data, Your Responsibility
 
@@ -147,6 +146,5 @@ We may update this Privacy Policy and Terms of Use from time to time. Changes wi
 
 ---
 
-Copyright (C) 2026 vithanhlam.  
-Source code licensed under the GNU General Public License v3.0.  
-ShieldPress trademarks & brand assets: **All Rights Reserved** — see [`TRADEMARK.md`](TRADEMARK.md).
+Copyright (C) 2026 vithanhlam. **All Rights Reserved.**  
+See [`LICENSE`](LICENSE) and [`TRADEMARK.md`](TRADEMARK.md).

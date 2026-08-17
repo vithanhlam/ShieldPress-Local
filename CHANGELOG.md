@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+**License**
+- Relicenses ShieldPress Local from GPLv3 to a proprietary All Rights Reserved license (see `LICENSE`)
+
 ## v2.5.27
 
 **SFTP & FTP file management**
