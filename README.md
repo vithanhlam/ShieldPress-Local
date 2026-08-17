@@ -243,6 +243,12 @@ ShieldPress Local is free software licensed under the **[GNU General Public Lice
 - You may not turn it into proprietary/closed-source software.
 - Copyleft is intentional so redistributed forks remain free software under GPLv3.
 
+## Trademark
+
+The **ShieldPress** name, logos, and brand identity are owned by **vithanhlam**. GPLv3 does **not** grant permission to re-release or sell clones under the ShieldPress name.
+
+See **[TRADEMARK.md](TRADEMARK.md)** for the full brand policy. Official releases come only from [vithanhlam/ShieldPress-Local](https://github.com/vithanhlam/ShieldPress-Local).
+
 ---
 
 ## Support
@@ -254,4 +260,4 @@ ShieldPress Local is free software licensed under the **[GNU General Public Lice
 
 ---
 
-Copyright (C) 2026 vithanhlam. ShieldPress Local is licensed under the GNU General Public License v3.0.
+Copyright (C) 2026 vithanhlam. ShieldPress Local is licensed under the GNU General Public License v3.0. ShieldPress trademarks are reserved; see TRADEMARK.md.

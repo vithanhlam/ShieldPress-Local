@@ -18,8 +18,9 @@ Thank you for helping improve ShieldPress Local. Contributions are welcome from 
 - Keep pull requests small and focused on one issue or feature.
 - Match the existing code style and structure.
 - Do not commit secrets, credentials, local data, `node_modules/`, `dist/`, `bin/`, or editor/agent folders such as `.cursor/`.
-- Do not add AI co-author trailers or extra contributor names in commits. Author commits as yourself.
+- Do not add AI co-author trailers (`Co-authored-by: Claude`, ChatGPT, Cursor, etc.) or extra bot names in commits, PRs, or release notes. Author commits as yourself.
 - Prefer English for commit messages, pull request titles, and pull request descriptions.
+- Do not use ShieldPress logos or claim official status for forks. See [TRADEMARK.md](TRADEMARK.md).
 
 ## License of contributions
 
@@ -35,6 +36,8 @@ ShieldPress Local is free software under GPLv3:
 - Copyleft is intentional: forks that are redistributed must remain free software under GPLv3.
 
 GPLv3 does allow commercial use of free software. What it prevents is turning this project into a proprietary commercial product without sharing source under GPLv3.
+
+Trademark is separate: you may not re-release or sell a clone under the ShieldPress name or branding. See [TRADEMARK.md](TRADEMARK.md).
 
 ## Questions
 

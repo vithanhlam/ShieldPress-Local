@@ -76,6 +76,8 @@ You may not:
 
 Community contributions are welcome through GitHub pull requests. By contributing, you agree that your contribution is licensed under GPLv3.
 
+Trademark rights are separate from the GPL. You may not clone, rebrand, or resell this software under the ShieldPress name or logos. Official identity and brand rules are in [`TRADEMARK.md`](TRADEMARK.md).
+
 ### 2. Your Data, Your Responsibility
 
 You have **full ownership and control** over all data managed by ShieldPress Local. We do not access, monitor, or interfere with your projects, databases, or files in any way.
@@ -145,4 +147,4 @@ We may update this Privacy Policy and Terms of Use from time to time. Changes wi
 
 ---
 
-Copyright (C) 2026 vithanhlam. Licensed under the GNU General Public License v3.0.
+Copyright (C) 2026 vithanhlam. Licensed under the GNU General Public License v3.0. ShieldPress trademarks are reserved; see TRADEMARK.md.
