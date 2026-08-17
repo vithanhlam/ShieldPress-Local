@@ -12,6 +12,7 @@
   "license": "GPL-3.0-only",
   "scripts": {
     "start": "electron .",
+    "dev": "electron .",
     "pack": "electron-builder --dir",
     "dist:win": "bash scripts/prepare-vc-redist.sh && electron-builder --win nsis --x64",
     "dist:linux": "bash scripts/build-linux.sh",

@@ -143,6 +143,25 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 
 ## Installation
 
+### Run from source
+
+Requirements: **Node.js 18+** and **npm**.
+
+```bash
+git clone https://github.com/vithanhlam/ShieldPress-Local.git
+cd ShieldPress-Local
+npm install
+npm start
+```
+
+You can also launch with:
+
+```bash
+npm run dev
+```
+
+Both `npm start` and `npm run dev` start the Electron app from the local source tree.
+
 ### Windows
 
 1. Download `ShieldPress.Local.Setup.2.5.27.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
