@@ -147,4 +147,6 @@ We may update this Privacy Policy and Terms of Use from time to time. Changes wi
 
 ---
 
-Copyright (C) 2026 vithanhlam. Licensed under the GNU General Public License v3.0. ShieldPress trademarks are reserved; see TRADEMARK.md.
+Copyright (C) 2026 vithanhlam.  
+Source code licensed under the GNU General Public License v3.0.  
+ShieldPress trademarks & brand assets: **All Rights Reserved** — see [`TRADEMARK.md`](TRADEMARK.md).

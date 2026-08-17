@@ -112,4 +112,5 @@ If anything in marketing or a fork conflicts with this trademark policy, **this 
 
 ---
 
-Copyright (C) 2026 vithanhlam. All ShieldPress trademarks and brand assets reserved.
+Copyright (C) 2026 vithanhlam.  
+ShieldPress trademarks and brand assets: **All Rights Reserved**.
