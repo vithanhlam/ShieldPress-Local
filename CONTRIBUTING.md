@@ -38,5 +38,7 @@ GPLv3 does allow commercial use of free software. What it prevents is turning th
 
 ## Questions
 
+- Website: https://shieldpress.net
+- Facebook: https://fb.com/vithanhlam
 - Open a GitHub Issue for bugs and feature requests.
 - Email: support@shieldpress.net

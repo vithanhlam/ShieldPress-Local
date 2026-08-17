@@ -137,6 +137,8 @@ We may update this Privacy Policy and Terms of Use from time to time. Changes wi
 ## Contact
 
 - **Author**: vithanhlam
+- **Website**: [shieldpress.net](https://shieldpress.net)
+- **Facebook**: [fb.com/vithanhlam](https://fb.com/vithanhlam)
 - **Email**: support@shieldpress.net
 - **GitHub**: [github.com/vithanhlam/shieldpress-local](https://github.com/vithanhlam/shieldpress-local)
 - **Issues**: [GitHub Issues](https://github.com/vithanhlam/shieldpress-local/issues)

@@ -228,6 +228,8 @@ ShieldPress Local is free software licensed under the **[GNU General Public Lice
 
 ## Support
 
+- **Website:** [shieldpress.net](https://shieldpress.net)
+- **Facebook:** [fb.com/vithanhlam](https://fb.com/vithanhlam)
 - **Issues:** [GitHub Issues](https://github.com/vithanhlam/shieldpress-local/issues)
 - **Email:** support@shieldpress.net
 
