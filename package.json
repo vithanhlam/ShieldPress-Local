@@ -9,7 +9,7 @@
     "email": "vithanhlam@users.noreply.github.com"
   },
   "homepage": "https://github.com/vithanhlam/shieldpress-local",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",

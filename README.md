@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/github/v/release/vithanhlam/shieldpress-local?style=flat-square&color=e07b1a" alt="Release"/>
   <img src="https://img.shields.io/github/downloads/vithanhlam/shieldpress-local/total?style=flat-square&color=22c55e" alt="Downloads"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Ubuntu-blue?style=flat-square" alt="Platform"/>
-  <img src="https://img.shields.io/badge/license-Freeware-orange?style=flat-square" alt="License"/>
+  <img src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square" alt="License"/>
 </p>
 
 ---
@@ -211,6 +211,21 @@ ShieldPress Local does not collect, store, or transmit any of your data. All dat
 
 ---
 
+## Contributing
+
+Contributions are welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for how to fork the project, open pull requests, and submit changes.
+
+## License
+
+ShieldPress Local is free software licensed under the **[GNU General Public License v3.0](LICENSE)** (GPL-3.0).
+
+- You may use, study, share, and modify the software.
+- If you distribute this software or a modified version, you must provide the corresponding source code under GPLv3.
+- You may not turn it into proprietary/closed-source software.
+- Copyleft is intentional so redistributed forks remain free software under GPLv3.
+
+---
+
 ## Support
 
 - **Issues:** [GitHub Issues](https://github.com/vithanhlam/shieldpress-local/issues)
@@ -218,4 +233,4 @@ ShieldPress Local does not collect, store, or transmit any of your data. All dat
 
 ---
 
-© 2026 vithanhlam. All rights reserved. Free to use, redistribution not permitted without permission.
+Copyright (C) 2026 vithanhlam. ShieldPress Local is licensed under the GNU General Public License v3.0.

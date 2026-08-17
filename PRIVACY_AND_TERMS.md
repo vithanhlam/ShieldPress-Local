@@ -1,7 +1,7 @@
 # Privacy Policy & Terms of Use
 
 **ShieldPress Local**
-Last updated: July 18, 2026
+Last updated: August 17, 2026
 
 ---
 
@@ -60,12 +60,21 @@ ShieldPress Local does not integrate with any third-party services for data proc
 
 ### 1. License
 
-ShieldPress Local is provided as **freeware** for personal and commercial use. You may install and use the software on any number of machines you own or operate.
+ShieldPress Local is free software licensed under the **GNU General Public License v3.0** (GPL-3.0). The full license text is in [`LICENSE`](LICENSE).
 
-**You may not:**
-- Redistribute, resell, or sublicense the software without written permission
-- Reverse-engineer, decompile, or modify the application binary
-- Remove or alter copyright notices or branding
+Under GPLv3 you may:
+
+- Use the software for any purpose
+- Study and modify the source code
+- Share original or modified copies, including commercially, **if** you also provide the corresponding source code under GPLv3
+
+You may not:
+
+- Redistribute the software or a modified version as proprietary/closed-source software
+- Remove or alter copyright notices or license notices required by GPLv3
+- Impose additional restrictions that conflict with GPLv3
+
+Community contributions are welcome through GitHub pull requests. By contributing, you agree that your contribution is licensed under GPLv3.
 
 ### 2. Your Data, Your Responsibility
 
@@ -134,4 +143,4 @@ We may update this Privacy Policy and Terms of Use from time to time. Changes wi
 
 ---
 
-(c) 2026 vithanhlam. All rights reserved.
+Copyright (C) 2026 vithanhlam. Licensed under the GNU General Public License v3.0.
