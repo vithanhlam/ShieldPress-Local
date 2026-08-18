@@ -10,6 +10,8 @@ window.SFTP = {
   _sortKey: "name",
   _sortDir: 1,
   _browserItems: [],
+  _deleteBusy: false,
+  _remoteSelection: null,
 
   async init() {
     // Page HTML is cached by the router. Ensure a previous terminal overlay can
@@ -38,6 +40,7 @@ window.SFTP = {
       });
       this._listening = true;
     }
+    this._setupRemoteKeyboard();
     await this.refreshVaultStatus();
     this._bindTerminalSplitter();
     await this.load();
@@ -456,13 +459,6 @@ window.SFTP = {
       zone.style.background = "";
     });
 
-    zone.addEventListener("click", (e) => {
-      const nameCell = e.target.closest("[data-enter-dir]");
-      if (!nameCell || !zone.contains(nameCell)) return;
-      e.preventDefault();
-      this.enterEncodedDir(nameCell.getAttribute("data-enter-dir"));
-    });
-
     zone.addEventListener("drop", async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -475,6 +471,8 @@ window.SFTP = {
       const id = document.getElementById("sftp-browser-conn-id").value;
       await this._uploadLocalPaths(id, paths, this._currentPath, () => this._loadDir());
     });
+
+    this._bindRemoteListEvents(zone, "browser");
   },
 
   async _loadDir() {
@@ -560,7 +558,7 @@ window.SFTP = {
   ${th("size", "Size", "80px")}
   ${th("permissions", "Permissions", "145px")}
   ${th("modified", "Modified", "150px")}
-  <th style="padding:8px 10px;width:120px;text-align:right">Actions</th>
+  <th style="padding:8px 10px;width:150px;text-align:right">Actions</th>
 </tr></thead>
 <tbody>${items.map((item) => {
   const fullPath = curPath.replace(/\/+$/, "") + "/" + item.name;
@@ -572,8 +570,7 @@ window.SFTP = {
   const color = isDir ? "var(--yellow)" : "var(--text3)";
   return `
 <tr style="border-top:1px solid var(--border)" data-remote-path="${encodedPath}" data-remote-name="${encodedName}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${isEditable}">
-  <td style="padding:8px 10px;cursor:${isDir ? "pointer" : "default"};color:${isDir ? "var(--accent)" : "inherit"}"
-      ${isDir ? `data-enter-dir="${encodedName}"` : ""}>
+  <td style="padding:8px 10px;cursor:${isDir ? "pointer" : "default"};color:${isDir ? "var(--accent)" : "inherit"}">
     <i class="fas ${icon}" style="color:${color};margin-right:8px"></i>
     ${this._esc(item.name)}${item.isLink ? ' <span style="font-size:10px;color:var(--text3)">link</span>' : ""}
   </td>
@@ -585,10 +582,12 @@ window.SFTP = {
     ${`<button class="btn btn-ghost btn-xs" title="Download" onclick="SFTP.downloadItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-download"></i></button>`}
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Edit inline" onclick="SFTP.editFile(decodeURIComponent('${encodedPath}'))"><i class="fas fa-edit"></i></button>` : ""}
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Open in Editor (VS Code, Notepad++...)" onclick="SFTP.openExternal(decodeURIComponent('${encodedPath}'))"><i class="fas fa-external-link-alt"></i></button>` : ""}
+    <button class="btn btn-ghost btn-xs" title="Rename (F2)" onclick="SFTP.renameItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-i-cursor"></i></button>
     <button class="btn btn-ghost btn-xs" title="Delete" style="color:var(--red)" onclick="SFTP.deleteItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-trash"></i></button>
   </td>
 </tr>`;
 }).join("")}</tbody></table>`;
+    this._applyRemoteSelectionHighlight(listEl);
   },
 
   enterEncodedDir(encodedName) {
@@ -596,12 +595,14 @@ window.SFTP = {
   },
 
   enterDir(name) {
+    this._clearRemoteSelection();
     this._currentPath = this._currentPath.replace(/\/+$/, "") + "/" + name;
     this._saveCurrentPath();
     this._loadDir();
   },
 
   browseUp() {
+    this._clearRemoteSelection();
     const parts = this._currentPath.split("/").filter(Boolean);
     parts.pop();
     this._currentPath = "/" + parts.join("/");
@@ -744,6 +745,7 @@ window.SFTP = {
   },
 
   async stopUpload() {
+    if (this._xferDirection === "delete") return;
     await api.sftpUploadCancel();
     this._xferSetMeta("Stopping...", null, null);
   },
@@ -848,6 +850,7 @@ window.SFTP = {
 
   _onUploadProgress(msg) {
     if (!msg || typeof msg !== "object") return;
+    if (msg.type?.startsWith("delete-")) return this._onDeleteProgress(msg);
     if (msg.direction === "download") this._xferDirection = "download";
     else if (msg.direction === "upload") this._xferDirection = "upload";
     const downloading = this._xferDirection === "download";
@@ -935,15 +938,209 @@ window.SFTP = {
     }
   },
 
+  _onDeleteProgress(msg) {
+    this._xferShow(true);
+    this._xferSetBusy(true);
+    this._xferDirection = "delete";
+    if (msg.type === "delete-start") {
+      this._xferReset();
+      this._xferDirection = "delete";
+      const label = msg.isDirectory
+        ? `Deleting folder "${msg.name}"...`
+        : `Deleting "${msg.name}"...`;
+      this._xferSetMeta(label, "", msg.isDirectory ? 0 : 50);
+      this._xferEls("current").forEach((el) => {
+        el.textContent = msg.isDirectory ? "Removing contents..." : "";
+      });
+    }
+    if (msg.type === "delete-progress") {
+      const count = msg.deleted || 0;
+      const current = msg.current ? msg.current.split("/").pop() : "";
+      this._xferSetMeta(`Deleting... ${count} item(s) removed`, `${count} deleted`, null);
+      this._xferEls("current").forEach((el) => {
+        el.textContent = current ? `Removing: ${current}` : "";
+      });
+    }
+    if (msg.type === "delete-done") {
+      this._xferSetBusy(false);
+      if (msg.success) {
+        this._xferSetMeta(`Deleted "${msg.name}"`, "Done", 100);
+        this._xferEls("current").forEach((el) => { el.textContent = "Removed successfully"; });
+        setTimeout(() => this.toggleTransfer(true), 1200);
+      } else {
+        this._xferSetMeta("Delete failed", msg.message || "Error", 0);
+        this._xferEls("current").forEach((el) => { el.textContent = msg.message || ""; });
+      }
+    }
+  },
+
+  async _deleteRemote(id, remotePath, isDirectory, onDone) {
+    if (this._deleteBusy) {
+      toast("A delete operation is already in progress", "warn");
+      return;
+    }
+    const name = remotePath.split("/").pop();
+    if (!confirm(`Delete ${isDirectory ? "folder" : "file"} "${name}"?`)) return;
+    this._deleteBusy = true;
+    try {
+      const r = await api.sftpDelete(id, remotePath, isDirectory);
+      if (r.success) {
+        toast("Deleted: " + name, "success");
+        if (onDone) await onDone();
+      } else {
+        toast("Delete failed: " + r.message, "error");
+      }
+    } finally {
+      this._deleteBusy = false;
+    }
+  },
+
   createDirPrompt() { this.openRemoteCreate("browser", "folder"); },
 
   async deleteItem(remotePath, isDirectory) {
-    const name = remotePath.split("/").pop();
-    if (!confirm(`Delete ${isDirectory ? "folder" : "file"} "${name}"?`)) return;
     const id = document.getElementById("sftp-browser-conn-id").value;
-    const r = await api.sftpDelete(id, remotePath, isDirectory);
-    if (r.success) { toast("Deleted: " + name, "success"); this._loadDir(); }
-    else toast("Delete failed: " + r.message, "error");
+    return this._deleteRemote(id, remotePath, isDirectory, () => this._loadDir());
+  },
+
+  renameItem(remotePath, isDirectory) {
+    this.openRemoteRename("browser", remotePath, !!isDirectory);
+  },
+
+  _focusRenameInput(input, name, isDirectory) {
+    if (!input) return;
+    input.value = name;
+    input.focus();
+    const dot = isDirectory ? -1 : name.lastIndexOf(".");
+    const end = dot > 0 ? dot : name.length;
+    input.setSelectionRange(0, end);
+  },
+
+  _clearRemoteSelectionVisual() {
+    document.querySelectorAll(".remote-row-selected").forEach((el) => el.classList.remove("remote-row-selected"));
+  },
+
+  _clearRemoteSelection() {
+    this._clearRemoteSelectionVisual();
+    this._remoteSelection = null;
+  },
+
+  _setRemoteSelection(row, scope) {
+    if (!row) return;
+    this._clearRemoteSelectionVisual();
+    row.classList.add("remote-row-selected");
+    this._remoteSelection = {
+      scope,
+      path: decodeURIComponent(row.dataset.remotePath),
+      isDirectory: row.dataset.remoteType === "directory",
+    };
+  },
+
+  _applyRemoteSelectionHighlight(container) {
+    if (!this._remoteSelection || !container) return;
+    const selectedPath = this._remoteSelection.path;
+    const row = [...container.querySelectorAll("[data-remote-path]")].find(
+      (el) => decodeURIComponent(el.dataset.remotePath) === selectedPath,
+    );
+    if (row) row.classList.add("remote-row-selected");
+  },
+
+  _bindRemoteListEvents(zone, scope) {
+    if (zone.dataset.remoteListBound === scope) return;
+    zone.dataset.remoteListBound = scope;
+
+    zone.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      const row = e.target.closest("[data-remote-path]");
+      if (!row || !zone.contains(row)) return;
+      this._setRemoteSelection(row, scope);
+    });
+
+    zone.addEventListener("dblclick", (e) => {
+      if (e.target.closest("button")) return;
+      const row = e.target.closest("[data-remote-path]");
+      if (!row || !zone.contains(row) || row.dataset.remoteType !== "directory") return;
+      e.preventDefault();
+      if (scope === "terminal") this.termEnterPath(row.dataset.remotePath);
+      else this.enterDir(decodeURIComponent(row.dataset.remoteName));
+    });
+  },
+
+  _setupRemoteKeyboard() {
+    if (this._remoteKeyboardSetup) return;
+    this._remoteKeyboardSetup = true;
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "F2") return;
+      if (document.getElementById("m-sftp-rename")?.classList.contains("open")) return;
+      if (e.target.matches("input, textarea, select, [contenteditable=true]")) return;
+
+      const inBrowser = document.getElementById("m-sftp-browser")?.classList.contains("open");
+      const inTerminal = document.getElementById("m-sftp-terminal")?.classList.contains("open");
+      if (!inBrowser && !inTerminal) return;
+
+      e.preventDefault();
+      const scope = inTerminal ? "terminal" : "browser";
+      const sel = this._remoteSelection;
+      if (!sel || sel.scope !== scope) {
+        toast("Select a file or folder first", "warn");
+        return;
+      }
+      this.openRemoteRename(sel.scope, sel.path, sel.isDirectory);
+    });
+  },
+
+  openRemoteRename(scope, remotePath, isDirectory) {
+    const name = remotePath.split("/").pop() || "";
+    const parent = remotePath.slice(0, -(name.length + 1)) || "/";
+    document.getElementById("sftp-rename-scope").value = scope;
+    document.getElementById("sftp-rename-path").value = remotePath;
+    document.getElementById("sftp-rename-title").textContent = `Rename "${name}"`;
+    document.getElementById("sftp-rename-location").textContent = `Location: ${parent}`;
+    document.getElementById("sftp-rename-name").value = name;
+    document.getElementById("sftp-rename-error").style.display = "none";
+    document.getElementById("sftp-rename-submit").disabled = false;
+    openModal("m-sftp-rename");
+    setTimeout(() => {
+      this._focusRenameInput(
+        document.getElementById("sftp-rename-name"),
+        name,
+        !!isDirectory,
+      );
+    }, 50);
+  },
+
+  async submitRemoteRename() {
+    const scope = document.getElementById("sftp-rename-scope").value;
+    const remotePath = document.getElementById("sftp-rename-path").value;
+    const newName = document.getElementById("sftp-rename-name").value.trim();
+    const errorEl = document.getElementById("sftp-rename-error");
+    if (!this._validRemoteName(newName)) return;
+    const oldName = remotePath.split("/").pop();
+    if (newName === oldName) {
+      closeModal("m-sftp-rename");
+      return;
+    }
+    const id = document.getElementById(scope === "terminal" ? "sftp-term-conn-id" : "sftp-browser-conn-id").value;
+    const button = document.getElementById("sftp-rename-submit");
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Renaming...';
+    errorEl.style.display = "none";
+    let result;
+    try {
+      result = await api.sftpRename(id, remotePath, newName);
+    } catch (error) {
+      result = { success: false, message: error.message || "The operation failed" };
+    }
+    button.disabled = false;
+    button.innerHTML = '<i class="fas fa-check"></i> Rename';
+    if (!result.success) {
+      errorEl.textContent = result.message || "The server rejected the operation";
+      errorEl.style.display = "block";
+      return;
+    }
+    closeModal("m-sftp-rename");
+    toast("Renamed to " + newName, "success");
+    if (scope === "terminal") await this.loadTermFiles();
+    else await this._loadDir();
   },
 
   // ── File Editor ───────────────────────────────────────────────────────────
@@ -986,6 +1183,7 @@ window.SFTP = {
     const row = target.closest("[data-remote-path]");
     const scope = inTerminal ? "terminal" : "browser";
     const currentPath = inTerminal ? this._termPath : this._currentPath;
+    if (row) this._setRemoteSelection(row, scope);
     if (!row) return { scope, currentPath, item: null };
     return {
       scope,
@@ -1112,6 +1310,10 @@ window.SFTP = {
     const result = await api.sftpMove(id, sourcePath, destinationPath);
     if (result.success) { toast("Moved successfully", "success"); await this._loadDir(); }
     else toast("Move failed: " + result.message, "error");
+  },
+
+  contextRename(encodedPath, isDirectory) {
+    return this.openRemoteRename("browser", decodeURIComponent(encodedPath), !!isDirectory);
   },
 
   contextDelete(encodedPath, isDirectory) {
@@ -1315,6 +1517,7 @@ window.SFTP = {
           <button class="btn btn-ghost btn-xs" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'))" title="Copy path"><i class="fas fa-copy"></i></button>
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termContextDownload('${encoded}',${isDir})" title="Download"><i class="fas fa-download"></i></button>
           ${editable ? `<button class="btn btn-ghost btn-xs" onclick="SFTP.termEditFile('${encoded}')" title="Edit"><i class="fas fa-edit"></i></button>` : ""}
+          <button class="btn btn-ghost btn-xs" onclick="SFTP.termRenameItem('${encoded}',${isDir})" title="Rename (F2)"><i class="fas fa-i-cursor"></i></button>
           <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="SFTP.termDeleteItem('${encoded}',${isDir})" title="Delete"><i class="fas fa-trash"></i></button>
         </td>
       </tr>`;
@@ -1337,15 +1540,18 @@ window.SFTP = {
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
+    this._applyRemoteSelectionHighlight(listEl);
   },
 
   termEnterPath(encodedPath) {
+    this._clearRemoteSelection();
     this._termPath = decodeURIComponent(encodedPath);
     api.sftpSaveLastPath(document.getElementById("sftp-term-conn-id").value, this._termPath);
     this.loadTermFiles();
   },
 
   termBrowseUp() {
+    this._clearRemoteSelection();
     const parts = this._termPath.split("/").filter(Boolean);
     parts.pop();
     this._termPath = "/" + parts.join("/");
@@ -1375,12 +1581,12 @@ window.SFTP = {
 
   async termDeleteItem(encodedPath, isDirectory) {
     const remotePath = decodeURIComponent(encodedPath);
-    const name = remotePath.split("/").pop();
-    if (!confirm(`Delete ${isDirectory ? "folder" : "file"} "${name}"?`)) return;
     const id = document.getElementById("sftp-term-conn-id").value;
-    const r = await api.sftpDelete(id, remotePath, isDirectory);
-    if (r.success) { toast("Deleted: " + name, "success"); await this.loadTermFiles(); }
-    else toast("Delete failed: " + r.message, "error");
+    return this._deleteRemote(id, remotePath, isDirectory, () => this.loadTermFiles());
+  },
+
+  termRenameItem(encodedPath, isDirectory) {
+    return this.openRemoteRename("terminal", decodeURIComponent(encodedPath), !!isDirectory);
   },
 
   termContextOpenFolder(encodedPath) { return this.termEnterPath(encodedPath); },
@@ -1439,6 +1645,10 @@ window.SFTP = {
     const result = await api.sftpMove(id, sourcePath, destinationPath);
     if (result.success) { toast("Moved successfully", "success"); await this.loadTermFiles(); }
     else toast("Move failed: " + result.message, "error");
+  },
+
+  termContextRename(encodedPath, isDirectory) {
+    return this.openRemoteRename("terminal", decodeURIComponent(encodedPath), !!isDirectory);
   },
 
   isTerminalClipboardTarget(target) {
@@ -1636,6 +1846,7 @@ window.SFTP = {
       const paths = [...(event.dataTransfer?.files || [])].map((file) => file.path).filter(Boolean);
       if (paths.length) await this._termUploadPaths(paths);
     });
+    this._bindRemoteListEvents(zone, "terminal");
   },
 
   async termKeyDown(event) {

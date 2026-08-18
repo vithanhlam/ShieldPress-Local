@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.27)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.28)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.27.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.27_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.28.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.28_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -97,14 +97,14 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **SFTP / FTP / FTPS Client** | Connect to remote servers via SFTP (SSH), FTP, or FTP secured with explicit TLS |
 | **Favorites** | Star a connection to pin it to the top of the SFTP/FTP list |
 | **Search & Filter** | Search connections by name, host, or username; filter by protocol type |
-| **File Browser** | Browse, upload, download, delete, and create remote files or folders in a wide, resizable window |
+| **File Browser** | Browse, upload, download, rename, delete, and create remote files or folders in a wide, resizable window |
 | **Remote File Details** | View file type, size, modified time, symbolic permissions, chmod value, user, and group where supported |
-| **File Context Menu** | Right-click to create, refresh, download, edit, delete, duplicate, move, or copy a remote path |
+| **File Context Menu** | Right-click to create, refresh, download, edit, rename, delete, duplicate, move, or copy a remote path |
 | **Inline Editor** | Edit remote files directly in the app |
 | **External Editor** | Open remote files in VS Code — auto-uploads on save |
 | **Open With** | Choose any installed local editor for a remote file while retaining automatic upload on save |
 | **Drag & Drop** | Drag files or folders to upload, with overwrite/merge prompts |
-| **Transfer Progress** | Upload and download files or folders with byte progress, file count, per-file status, Stop, Retry, and a collapsible bottom panel |
+| **Transfer Progress** | Upload, download, and folder-delete progress with byte or item count, per-file status, Stop, Retry, and a collapsible bottom panel |
 | **ZIP Upload & Extract** | Upload ZIP and extract on server |
 | **Interactive SSH Terminal** | Persistent SSH PTY powered by Xterm.js with ANSI colors, native Tab completion, interactive programs, a resizable layout, selection, paste, and quick commands |
 | **Remote Resource Meters** | Live CPU, RAM, Disk, and network rates in SSH Terminal, including core count and RAM/disk capacity |
@@ -166,15 +166,15 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download `ShieldPress.Local.Setup.2.5.27.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.5.28.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.27_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.27_amd64.deb`
+1. Download `shieldpresslocal_2.5.28_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.28_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 

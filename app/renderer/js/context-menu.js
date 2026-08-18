@@ -112,6 +112,7 @@ window.ContextMenu = {
       ${item ? `<div class="ctx-item" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'));ContextMenu.hide()"><i class="fas fa-copy"></i> Copy Path</div>
         <div class="ctx-divider"></div>
         <div class="ctx-item" onclick="SFTP.${action}Clone('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-clone"></i> Duplicate</div>
+        <div class="ctx-item" onclick="SFTP.${action}Rename('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-i-cursor"></i> Rename</div>
         <div class="ctx-item" onclick="SFTP.${action}Move('${encoded}');ContextMenu.hide()"><i class="fas fa-arrows-alt"></i> Move...</div>` : ""}
       ${item ? '<div class="ctx-divider"></div>' : ""}
       <div class="ctx-item" onclick="SFTP.${action}NewFile();ContextMenu.hide()"><i class="fas fa-file-medical"></i> New File</div>

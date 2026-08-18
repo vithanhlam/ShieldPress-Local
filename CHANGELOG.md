@@ -2,8 +2,20 @@
 
 ## Unreleased
 
-**License**
-- Relicenses ShieldPress Local from GPLv3 to a proprietary All Rights Reserved license (see `LICENSE`)
+## v2.5.28
+
+**SFTP & FTP file management**
+- Adds rename for remote files and folders in File Browser, SSH Terminal file panel, action buttons, and the right-click menu
+- Adds **F2** to rename the selected item; files highlight only the base name (extension stays editable)
+- Click a row to select it; double-click a folder to open it
+- Shows delete progress when removing folders, including a live item count and current path
+- Blocks repeated delete clicks while a folder delete is still running
+- Recursively deletes FTP folders with progress feedback instead of waiting silently
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.28
+
+---
 
 ## v2.5.27
 

@@ -162,6 +162,7 @@ contextBridge.exposeInMainWorld("api", {
   sftpCreateFile: (id, remotePath) => ipcRenderer.invoke("sftp-create-file", { id, remotePath }),
   sftpCopy: (id, sourcePath, destinationPath, isDirectory) => ipcRenderer.invoke("sftp-copy", { id, sourcePath, destinationPath, isDirectory }),
   sftpMove: (id, sourcePath, destinationPath) => ipcRenderer.invoke("sftp-move", { id, sourcePath, destinationPath }),
+  sftpRename: (id, remotePath, newName) => ipcRenderer.invoke("sftp-rename", { id, remotePath, newName }),
   sftpToggleStar: (id) => ipcRenderer.invoke("sftp-toggle-star", id),
   sftpSaveLastPath: (id, path) => ipcRenderer.invoke("sftp-save-last-path", { id, path }),
   sftpCheckExists: (id, remotePath) => ipcRenderer.invoke("sftp-check-exists", { id, remotePath }),

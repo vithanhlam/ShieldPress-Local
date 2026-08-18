@@ -561,7 +561,11 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-shell-write", (_e, { id, data }) => sftp.writeShell(id, data));
   ipcMain.handle("sftp-shell-resize", (_e, { id, cols, rows }) => sftp.resizeShell(id, cols, rows));
   ipcMain.handle("sftp-shell-stop", (_e, id) => sftp.stopShell(id));
-  ipcMain.handle("sftp-delete", (_e, { id, remotePath, isDirectory }) => sftp.deleteRemote(id, remotePath, isDirectory));
+  ipcMain.handle("sftp-delete", (_e, { id, remotePath, isDirectory }) =>
+    sftp.deleteRemote(id, remotePath, isDirectory, (msg) => {
+      global.STATE.mainWindow?.webContents?.send("sftp-upload-progress", msg);
+    }),
+  );
   ipcMain.handle("sftp-read-file", (_e, { id, remotePath }) => sftp.readRemoteFile(id, remotePath));
   ipcMain.handle("sftp-write-file", (_e, { id, remotePath, content }) => sftp.writeRemoteFile(id, remotePath, content));
   ipcMain.handle("sftp-upload-extract", (_e, { id, localZipPath, remotePath }) =>
@@ -573,6 +577,7 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-create-file", (_e, { id, remotePath }) => sftp.createRemoteFile(id, remotePath));
   ipcMain.handle("sftp-copy", (_e, { id, sourcePath, destinationPath, isDirectory }) => sftp.copyRemote(id, sourcePath, destinationPath, isDirectory));
   ipcMain.handle("sftp-move", (_e, { id, sourcePath, destinationPath }) => sftp.moveRemote(id, sourcePath, destinationPath));
+  ipcMain.handle("sftp-rename", (_e, { id, remotePath, newName }) => sftp.renameRemote(id, remotePath, newName));
   ipcMain.handle("sftp-toggle-star", (_e, id) => sftp.toggleStar(id));
   ipcMain.handle("sftp-save-last-path", (_e, { id, path: p }) => sftp.updateLastBrowsedPath(id, p));
   ipcMain.handle("sftp-check-exists", (_e, { id, remotePath }) => sftp.checkRemoteExists(id, remotePath));

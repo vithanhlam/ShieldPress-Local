@@ -43,6 +43,25 @@
   </div>
 </div>
 
+<!-- Modal: Rename remote file or folder -->
+<div class="overlay overlay-nested" id="m-sftp-rename" onclick="closeIfOverlay(event,'m-sftp-rename')">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title"><i class="fas fa-i-cursor"></i> <span id="sftp-rename-title">Rename</span></div>
+    <input type="hidden" id="sftp-rename-scope"/>
+    <input type="hidden" id="sftp-rename-path"/>
+    <div class="fg">
+      <div><div class="fl">New name</div>
+        <input class="fi" id="sftp-rename-name" autocomplete="off" onkeydown="if(event.key==='Enter')SFTP.submitRemoteRename()"/></div>
+      <div id="sftp-rename-location" style="font-family:var(--mono);font-size:11px;color:var(--text3);word-break:break-all"></div>
+      <div id="sftp-rename-error" style="display:none;color:var(--red);font-size:12px;padding:8px;background:rgba(239,68,68,.08);border-radius:6px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-sftp-rename')">Cancel</button>
+      <button class="btn btn-primary" id="sftp-rename-submit" onclick="SFTP.submitRemoteRename()"><i class="fas fa-check"></i> Rename</button>
+    </div>
+  </div>
+</div>
+
 <!-- Connection list -->
 <div id="sftp-conn-list">
   <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
@@ -141,7 +160,7 @@
 
     <!-- Drop hint -->
     <div style="font-size:11px;color:var(--text3);margin-top:6px;display:flex;align-items:center;gap:6px">
-      <i class="fas fa-cloud-upload-alt"></i> Drag & drop files or folders to upload. Existing items will ask before overwriting.
+      <i class="fas fa-cloud-upload-alt"></i> Drag & drop files or folders to upload. Click to select, double-click folders to open, F2 to rename.
     </div>
 
     <!-- Action bar -->

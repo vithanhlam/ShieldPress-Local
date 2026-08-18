@@ -1559,35 +1559,42 @@ async function execFtpCommand(id, command) {
 }
 
 // ─── Delete remote file/directory ────────────────────────────────────────────
-async function deleteRemote(id, remotePath, isDirectory) {
+function emitDeleteProgress(progressCb, payload) {
+  progressCb && progressCb(payload);
+}
+
+async function deleteRemote(id, remotePath, isDirectory, progressCb) {
   const ac = activeConnections[id];
   if (!ac) return { success: false, message: "Not connected" };
+
+  const rootName = path.posix.basename(remotePath) || remotePath;
+  emitDeleteProgress(progressCb, { type: "delete-start", name: rootName, isDirectory: !!isDirectory });
 
   try {
     if (ac.type === "sftp") {
       if (isDirectory) {
-        // Recursively delete directory
-        await deleteDirRecursiveSftp(ac.sftp, remotePath);
+        await deleteDirRecursiveSftp(ac.sftp, remotePath, progressCb);
       } else {
         await new Promise((resolve, reject) => {
           ac.sftp.unlink(remotePath, (err) => err ? reject(err) : resolve());
         });
       }
-      return { success: true };
     } else if (ac.type === "ftp") {
       if (isDirectory) {
-        await ac.client.removeDir(remotePath);
+        await deleteDirRecursiveFtp(id, ac.client, remotePath, progressCb);
       } else {
         await ac.client.remove(remotePath);
       }
-      return { success: true };
     }
+    emitDeleteProgress(progressCb, { type: "delete-done", success: true, name: rootName });
+    return { success: true };
   } catch (err) {
+    emitDeleteProgress(progressCb, { type: "delete-done", success: false, name: rootName, message: err.message });
     return { success: false, message: err.message };
   }
 }
 
-async function deleteDirRecursiveSftp(sftp, dirPath) {
+async function deleteDirRecursiveSftp(sftp, dirPath, progressCb, state = { deleted: 0 }) {
   const list = await new Promise((resolve, reject) => {
     sftp.readdir(dirPath, (err, items) => err ? reject(err) : resolve(items || []));
   });
@@ -1597,11 +1604,13 @@ async function deleteDirRecursiveSftp(sftp, dirPath) {
     const followed = await sftpStatFollow(sftp, fullPath);
     const isDir = followed ? followed.isDirectory() : (item.longname || "").startsWith("d");
     if (isDir) {
-      await deleteDirRecursiveSftp(sftp, fullPath);
+      await deleteDirRecursiveSftp(sftp, fullPath, progressCb, state);
     } else {
       await new Promise((resolve, reject) => {
         sftp.unlink(fullPath, (err) => err ? reject(err) : resolve());
       });
+      state.deleted++;
+      emitDeleteProgress(progressCb, { type: "delete-progress", deleted: state.deleted, current: fullPath });
     }
   }
   await new Promise((resolve, reject) => {
@@ -1610,6 +1619,37 @@ async function deleteDirRecursiveSftp(sftp, dirPath) {
       sftp.unlink(dirPath, (unlinkErr) => unlinkErr ? reject(err) : resolve());
     });
   });
+  emitDeleteProgress(progressCb, { type: "delete-progress", deleted: state.deleted, current: dirPath });
+}
+
+async function deleteDirRecursiveFtp(id, client, dirPath, progressCb, state = { deleted: 0 }) {
+  const listed = await listRemote(id, dirPath);
+  if (!listed.success) throw new Error(listed.message || "Could not list remote directory");
+  for (const item of listed.items) {
+    const fullPath = joinRemotePath(dirPath, item.name);
+    if (item.isDirectory || item.type === "directory") {
+      await deleteDirRecursiveFtp(id, client, fullPath, progressCb, state);
+    } else {
+      await client.remove(fullPath);
+      state.deleted++;
+      emitDeleteProgress(progressCb, { type: "delete-progress", deleted: state.deleted, current: fullPath });
+    }
+  }
+  await client.removeDir(dirPath);
+  emitDeleteProgress(progressCb, { type: "delete-progress", deleted: state.deleted, current: dirPath });
+}
+
+async function renameRemote(id, remotePath, newName) {
+  const name = String(newName || "").trim();
+  if (!name || name === "." || name === ".." || name.includes("/") || name.includes("\\")) {
+    return { success: false, message: "Enter a valid name without path separators" };
+  }
+  const parent = path.posix.dirname(remotePath);
+  const destinationPath = joinRemotePath(parent === "." ? "/" : parent, name);
+  if (destinationPath === remotePath) return { success: true };
+  const exists = await checkRemoteExists(id, destinationPath);
+  if (exists.exists) return { success: false, message: "A file or folder with that name already exists" };
+  return moveRemote(id, remotePath, destinationPath);
 }
 
 // ─── Read remote file content (for editing) ──────────────────────────────────
@@ -2091,6 +2131,7 @@ module.exports = {
   createRemoteFile,
   copyRemote,
   moveRemote,
+  renameRemote,
   openInExternalEditor,
   stopFileWatcher,
   toggleStar,
