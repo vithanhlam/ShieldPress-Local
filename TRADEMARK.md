@@ -4,7 +4,7 @@
 **Product:** ShieldPress Local  
 **Website:** https://shieldpress.net  
 **Official source:** https://github.com/vithanhlam/ShieldPress-Local  
-**Last updated:** August 17, 2026
+**Last updated:** August 19, 2026
 
 ---
 
@@ -12,11 +12,11 @@
 
 The names, marks, logos, icons, screenshots branding, and product identity of **ShieldPress**, **ShieldPress Local**, and related stylized marks (together, the “ShieldPress Marks”) are owned by **vithanhlam**.
 
-This document is a **trademark / brand policy**. It works together with the proprietary copyright license in [`LICENSE`](LICENSE) (**All Rights Reserved**).
+This document is a **trademark / brand policy**. It works together with the **ShieldPress Source-Available License** in [`LICENSE`](LICENSE). The software license does **not** grant trademark rights.
 
 | Right | What it means |
 | ----- | ------------- |
-| **Copyright** | The source code and product are proprietary. You may not copy, clone, republish, or sell the Software without written permission. See [`LICENSE`](LICENSE). |
+| **Copyright** | ShieldPress is source-available, not open source. You may view, clone, build, and modify for personal or internal use. You may not redistribute, publish a public fork, rebrand, or sell the Software without written permission. See [`LICENSE`](LICENSE). |
 | **Trademark** | You may **not** use the ShieldPress Marks to present a fork, clone, rebrand, or resale as the official ShieldPress product — or to confuse users about origin, authorship, or endorsement. |
 
 ---
@@ -38,14 +38,14 @@ Any other site, store listing, installer, “ShieldPress Local” binary, or rep
 
 Without prior written permission from vithanhlam, you may **not**:
 
-1. **Clone, re-release, or sell** the Software (source or binaries), modified or unmodified, under any name.
+1. **Redistribute, re-release, or sell** the Software (source or binaries), modified or unmodified, as a standalone or competing product.
 2. Publish the project as if it were your own commercial product, with or without ShieldPress branding.
 3. Use ShieldPress Marks in app stores, marketplaces, domain names, social accounts, ads, or packaging in a way that suggests affiliation, endorsement, or official status.
 4. Distribute installers (`.exe`, `.deb`, AppImage, etc.) labeled as ShieldPress Local that were not built and published by the official project above.
-5. Remove or replace copyright / authorship notices attributing the project to vithanhlam.
+5. Remove or replace copyright, license, or attribution notices.
 6. Register trademarks, companies, or domains that appropriate “ShieldPress” or close variants for competing software.
 
-In short: **do not copy this software and republish or resell it.**
+In short: **do not copy this software and republish or resell it.** A private clone for personal or internal use, or to prepare a contribution, is allowed under [`LICENSE`](LICENSE).
 
 ---
 
@@ -54,11 +54,11 @@ In short: **do not copy this software and republish or resell it.**
 Without extra permission, you **may**:
 
 1. Download and use **official** installers from the channels listed above.
-2. Open issues or submit pull requests under [`CONTRIBUTING.md`](CONTRIBUTING.md) (contributions become proprietary to vithanhlam).
+2. Open issues or submit pull requests under [`CONTRIBUTING.md`](CONTRIBUTING.md). Contributors retain copyright in original code they author; ShieldPress receives a license to use those contributions as part of the project.
 3. Link to the official website or repository for reference.
 4. Use the words “ShieldPress” or “ShieldPress Local” in plain text only to refer factually to the official product, without implying endorsement.
 
-You may **not** treat a local git clone as a license to redistribute source or binaries.
+You may **not** treat a local git clone as a license to redistribute source or binaries, publish a public fork, or rebrand the product.
 
 ---
 
@@ -98,11 +98,11 @@ Include your intended use and distribution channels.
 
 ## 8. Relationship to other documents
 
-- Software license: [`LICENSE`](LICENSE) (proprietary — All Rights Reserved)
+- Software license: [`LICENSE`](LICENSE) (ShieldPress Source-Available License — Source Available ≠ Open Source)
 - Privacy & terms: [`PRIVACY_AND_TERMS.md`](PRIVACY_AND_TERMS.md)
 - Contributions: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ---
 
-Copyright (C) 2026 vithanhlam.  
-ShieldPress trademarks, brand assets, and Software: **All Rights Reserved**.
+Copyright © 2026 ShieldPress. All rights reserved.  
+ShieldPress trademarks and brand assets remain reserved. This software license does not grant trademark rights.

@@ -1,6 +1,6 @@
 # Contributing to ShieldPress Local
 
-Thank you for helping improve ShieldPress Local. Contributions are welcome through GitHub pull requests, under the proprietary license below.
+Thank you for helping improve ShieldPress Local. Contributions are welcome through GitHub pull requests, under the ShieldPress Source-Available License.
 
 ## How to contribute
 
@@ -20,20 +20,24 @@ Thank you for helping improve ShieldPress Local. Contributions are welcome throu
 - Do not commit secrets, credentials, local data, `node_modules/`, `dist/`, `bin/`, or editor/agent folders such as `.cursor/`.
 - Do not add AI co-author trailers (`Co-authored-by: Claude`, ChatGPT, Cursor, etc.) or extra bot names in commits, PRs, or release notes. Author commits as yourself.
 - Prefer English for commit messages, pull request titles, and pull request descriptions.
-- Do not redistribute clones or claim official status for forks. See [LICENSE](LICENSE) and [TRADEMARK.md](TRADEMARK.md).
+- Do not redistribute clones, publish public forks as independent products, or claim official status for unofficial builds. See [LICENSE](LICENSE) and [TRADEMARK.md](TRADEMARK.md).
 
 ## License of contributions
 
-ShieldPress Local is **proprietary software**. By submitting a pull request or other contribution, you agree that:
+ShieldPress Local is licensed under the **ShieldPress Source-Available License**. **Source Available ≠ Open Source.**
 
-- Your contribution is assigned to **vithanhlam**, or you grant vithanhlam a perpetual, irrevocable, worldwide, royalty-free license to use, modify, and distribute it under the proprietary [LICENSE](LICENSE); and
-- You will not use the contribution process as a way to obtain or redistribute the full project under any open-source license.
+By submitting a pull request or other contribution, you agree that:
 
-## Proprietary license (summary)
+- You grant ShieldPress a perpetual, worldwide, non-exclusive, royalty-free license to use, modify, incorporate, distribute, and relicense the contribution as part of ShieldPress;
+- You retain copyright in original code that you author, unless a separate written agreement provides otherwise; and
+- You will not use the contribution process as a way to obtain or redistribute the project under an open-source license.
 
-- Official installers may be used for personal or internal business use.
-- You may **not** copy, clone for republication, modify-and-distribute, sell, or commercially exploit the source or binaries without written permission.
-- Full terms: [LICENSE](LICENSE)
+Full terms: [LICENSE](LICENSE)
+
+## License summary
+
+- You may view, audit, clone, build, and modify the source for personal or internal use, and contribute through pull requests.
+- You may **not**, without written permission, redistribute source or binaries, publish a public fork, rebrand, sell, or offer ShieldPress as a competing or hosted commercial service.
 - Brand rules: [TRADEMARK.md](TRADEMARK.md)
 
 ## Questions

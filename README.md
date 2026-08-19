@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/github/v/release/vithanhlam/shieldpress-local?style=flat-square&color=e07b1a" alt="Release"/>
   <img src="https://img.shields.io/github/downloads/vithanhlam/shieldpress-local/total?style=flat-square&color=22c55e" alt="Downloads"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Ubuntu-blue?style=flat-square" alt="Platform"/>
-  <img src="https://img.shields.io/badge/license-Proprietary-red?style=flat-square" alt="License"/>
+  <img src="https://img.shields.io/badge/license-Source--Available-orange?style=flat-square" alt="License"/>
 </p>
 
 ---
@@ -147,7 +147,7 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 
 Requirements: **Node.js 18+** and **npm**.
 
-Cloning for local development or contribution is allowed. **Redistributing, republishing, or selling** this source (or builds from it) is **not** allowed. See [`LICENSE`](LICENSE).
+Cloning, building, and modifying for personal or internal use is allowed. **Redistributing, publishing a public fork, rebranding, or selling** this source (or builds from it) is **not** allowed. See [`LICENSE`](LICENSE).
 
 ```bash
 git clone https://github.com/vithanhlam/ShieldPress-Local.git
@@ -238,10 +238,13 @@ Contributions are welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for how to
 
 ## License
 
-ShieldPress Local is **proprietary software**. Copyright (C) 2026 **vithanhlam**. **All Rights Reserved.**
+ShieldPress Local is licensed under the **ShieldPress Source-Available License**.  
+Copyright © 2026 ShieldPress. All rights reserved.
 
-- You may download and use **official** installers for personal or internal business use.
-- You may **not** copy, clone for republication, modify-and-distribute, sell, or commercially exploit the source or binaries without written permission.
+**Source Available ≠ Open Source.** Publication on GitHub does not transfer ownership or make ShieldPress open-source software.
+
+- You may view, audit, clone, build, and modify the source for personal or internal use, and contribute through pull requests.
+- You may **not**, without written permission, redistribute source or binaries, publish a public fork, rebrand, sell, or offer ShieldPress as a competing or hosted commercial service.
 - Full terms: **[LICENSE](LICENSE)**
 - Brand / trademark rules: **[TRADEMARK.md](TRADEMARK.md)**
 
@@ -258,5 +261,5 @@ Official releases come only from [vithanhlam/ShieldPress-Local](https://github.c
 
 ---
 
-Copyright (C) 2026 vithanhlam. **All Rights Reserved.**  
+Copyright © 2026 ShieldPress. All rights reserved.  
 See [`LICENSE`](LICENSE) and [`TRADEMARK.md`](TRADEMARK.md).

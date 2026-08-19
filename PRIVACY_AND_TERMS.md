@@ -60,22 +60,25 @@ ShieldPress Local does not integrate with any third-party services for data proc
 
 ### 1. License
 
-ShieldPress Local is **proprietary software**. Copyright (C) 2026 **vithanhlam**. **All Rights Reserved.** The full license text is in [`LICENSE`](LICENSE).
+ShieldPress Local is licensed under the **ShieldPress Source-Available License**. Copyright © 2026 ShieldPress. All rights reserved. **Source Available ≠ Open Source.** The full license text is in [`LICENSE`](LICENSE).
 
 You may:
 
+- View, audit, clone, build, and modify the source for personal or internal use
 - Download and use official installers for personal or internal business use
 - Open issues and submit contributions under [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 You may **not**, without prior written permission:
 
-- Copy, clone, mirror, or republish the source code for public distribution
-- Modify and distribute the Software or builds derived from it
-- Sell, rent, sublicense, or commercially exploit the Software
-- Remove copyright or proprietary notices
+- Redistribute source code or binaries as a standalone product
+- Publish or distribute a public fork or modified version
+- Rebrand ShieldPress and then distribute it
+- Sell, sublicense, or commercialize the Software or a derivative product primarily based on it
+- Offer ShieldPress as a competing product, hosted service, SaaS offering, or commercial service
+- Remove copyright, license, or attribution notices
 - Use ShieldPress names or logos except as allowed in [`TRADEMARK.md`](TRADEMARK.md)
 
-By contributing, you agree that your contribution is assigned to (or exclusively licensed to) vithanhlam under the proprietary license.
+By contributing, you grant ShieldPress a perpetual, worldwide, non-exclusive, royalty-free license to use the contribution as part of ShieldPress. You retain copyright in original code you author unless a separate written agreement provides otherwise.
 
 ### 2. Your Data, Your Responsibility
 
@@ -146,5 +149,5 @@ We may update this Privacy Policy and Terms of Use from time to time. Changes wi
 
 ---
 
-Copyright (C) 2026 vithanhlam. **All Rights Reserved.**  
+Copyright © 2026 ShieldPress. All rights reserved.  
 See [`LICENSE`](LICENSE) and [`TRADEMARK.md`](TRADEMARK.md).
