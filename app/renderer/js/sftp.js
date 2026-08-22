@@ -12,6 +12,13 @@ window.SFTP = {
   _browserItems: [],
   _deleteBusy: false,
   _remoteSelection: null,
+  _sessionMode: false,
+  _sessionId: null,
+  _sessionKind: null,
+  _sessionConnectionId: null,
+  _termSortKey: "name",
+  _termSortDir: 1,
+  _monacoReady: false,
 
   async init() {
     // Page HTML is cached by the router. Ensure a previous terminal overlay can
@@ -132,6 +139,10 @@ window.SFTP = {
   async load() {
     const r = await api.sftpGetConnections();
     this._connections = r.connections || [];
+    for (const c of this._connections) {
+      const live = !!c.isConnected || (Array.isArray(c.openSessions) && c.openSessions.length > 0);
+      this._connStatus[c.id] = live ? "connected" : "disconnected";
+    }
     this.filter();
   },
 
@@ -147,13 +158,10 @@ window.SFTP = {
       return matchQ && matchType;
     });
     filtered.sort((a, b) => {
-      const ta = Date.parse(a.lastConnectedAt || "") || 0;
-      const tb = Date.parse(b.lastConnectedAt || "") || 0;
-      if (ta !== tb) return tb - ta;
       const sa = a.starred ? 1 : 0;
       const sb = b.starred ? 1 : 0;
       if (sa !== sb) return sb - sa;
-      return String(a.name || "").localeCompare(String(b.name || ""));
+      return String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" });
     });
     this._render(filtered);
   },
@@ -214,11 +222,11 @@ window.SFTP = {
       ? `<button class="btn btn-sm btn-danger" onclick="SFTP.disconnect('${c.id}')"><i class="fas fa-unlink"></i> Disconnect</button>`
       : `<button class="btn btn-sm btn-success" onclick="SFTP.connect('${c.id}')"><i class="fas fa-plug"></i> Connect</button>`
     }
-    <button class="btn btn-sm btn-ghost" title="Browse Files" onclick="SFTP.openBrowser('${c.id}')"><i class="fas fa-folder-open"></i></button>
-    ${c.type === "sftp" ? `<button class="btn btn-sm btn-ghost" title="Terminal" onclick="SFTP.openTerminal('${c.id}')"><i class="fas fa-terminal"></i></button>` : ""}
-    <button class="btn btn-sm btn-ghost" data-sync-connection="${c.id}" title="Sync Upload" onclick="SFTP.openSyncConfig('${c.id}', 'upload')"><i class="fas fa-cloud-upload-alt"></i></button>
-    <button class="btn btn-sm btn-ghost" data-sync-connection="${c.id}" title="Sync Download" onclick="SFTP.openSyncConfig('${c.id}', 'download')"><i class="fas fa-cloud-download-alt"></i></button>
-    <button class="btn btn-sm btn-ghost btn-edit" title="Edit" onclick="SFTP.openEdit('${c.id}')"><i class="fas fa-cog"></i></button>
+    <button class="btn btn-sm btn-ghost" title="Open ${c.type === "ftp" ? "FTP" : "SFTP"} files" onclick="SFTP.openBrowser('${c.id}')"><i class="fas fa-folder-open"></i> Files</button>
+    ${c.type === "sftp" ? `<button class="btn btn-sm btn-ghost" title="Open Terminal window" onclick="SFTP.openTerminal('${c.id}')"><i class="fas fa-terminal"></i> Terminal</button>` : ""}
+    <button class="btn btn-sm btn-ghost" data-sync-connection="${c.id}" title="Sync Upload" onclick="SFTP.openSyncConfig('${c.id}', 'upload')"><i class="fas fa-cloud-upload-alt"></i> Sync Up</button>
+    <button class="btn btn-sm btn-ghost" data-sync-connection="${c.id}" title="Sync Download" onclick="SFTP.openSyncConfig('${c.id}', 'download')"><i class="fas fa-cloud-download-alt"></i> Sync Down</button>
+    <button class="btn btn-sm btn-ghost btn-edit" title="Settings" onclick="SFTP.openEdit('${c.id}')"><i class="fas fa-cog"></i> Setting</button>
     <button class="btn btn-sm btn-danger-ghost" title="Delete" onclick="SFTP.del('${c.id}')"><i class="fas fa-trash"></i></button>
   </div>
 </div>`;
@@ -409,7 +417,7 @@ window.SFTP = {
     await api.sftpDisconnect(id);
     this._connStatus[id] = "disconnected";
     toast("Disconnected", "info");
-    this._render();
+    await this.load();
   },
 
   // ── File Browser ──────────────────────────────────────────────────────────
@@ -418,61 +426,139 @@ window.SFTP = {
   async openBrowser(id) {
     const conn = this._connections.find((c) => c.id === id);
     if (!conn) return;
-
-    const cr = await api.sftpConnect(id);
-    if (!cr.success) {
-      if (!(await this._handleVaultLocked(cr, () => this.openBrowser(id)))) {
-        toast("Connect failed: " + cr.message, "error");
+    toast(`Opening ${conn.type === "ftp" ? "FTP" : "SFTP"} window…`, "info");
+    const r = await api.sftpOpenWindow(conn.type === "ftp" ? "ftp" : "sftp", id);
+    if (!r.success) {
+      if (!(await this._handleVaultLocked(r, () => this.openBrowser(id)))) {
+        toast("Open failed: " + r.message, "error");
       }
       return;
     }
     this._connStatus[id] = "connected";
     await this.load();
-
-    document.getElementById("sftp-browser-conn-id").value = id;
-    document.getElementById("sftp-browser-title").textContent = `${conn.name} — Remote Files`;
-    // Restore last browsed path, fallback to remotePath
-    this._currentPath = conn.lastBrowsedPath || conn.remotePath || "/";
-    openModal("m-sftp-browser");
-    this._setupDragDrop();
-    await this._loadDir();
   },
 
   _setupDragDrop() {
-    if (this._dropSetup) return;
-    const zone = document.getElementById("sftp-file-list");
+    const zone =
+      document.querySelector('[data-drop-zone="browser"]')
+      || document.getElementById("remote-browser-pane")
+      || document.getElementById("sftp-file-list");
     if (!zone) return;
-    this._dropSetup = true;
+    this._bindFileDropZone(zone, async (paths) => {
+      const id = document.getElementById("sftp-browser-conn-id")?.value;
+      if (!id) return toast("Not connected", "warn");
+      await this._uploadLocalPaths(id, paths, this._currentPath, () => this._loadDir());
+    });
+    const list = document.getElementById("sftp-file-list");
+    if (list) this._bindRemoteListEvents(list, "browser");
+  },
+
+  _getLocalPathFromFile(file) {
+    if (!file) return "";
+    try {
+      if (typeof api.getPathForFile === "function") {
+        const fromUtils = api.getPathForFile(file);
+        if (fromUtils) return fromUtils;
+      }
+    } catch (_) {}
+    return file.path || "";
+  },
+
+  _extractDropPaths(event) {
+    const paths = [];
+    const seen = new Set();
+    const add = (value) => {
+      const path = String(value || "").trim();
+      if (!path || seen.has(path)) return;
+      seen.add(path);
+      paths.push(path);
+    };
+
+    const dt = event?.dataTransfer;
+    if (!dt) return paths;
+
+    // items is more reliable than files for folders on Linux file managers
+    if (dt.items && dt.items.length) {
+      for (let i = 0; i < dt.items.length; i++) {
+        const item = dt.items[i];
+        if (!item || item.kind !== "file") continue;
+        add(this._getLocalPathFromFile(item.getAsFile()));
+      }
+    }
+
+    if (!paths.length && dt.files && dt.files.length) {
+      for (let i = 0; i < dt.files.length; i++) {
+        add(this._getLocalPathFromFile(dt.files[i]));
+      }
+    }
+
+    return paths;
+  },
+
+  _bindFileDropZone(zone, onPaths) {
+    if (!zone || zone.dataset.fileDropBound === "1") return;
+    zone.dataset.fileDropBound = "1";
+    let depth = 0;
+
+    // Needed so Chromium/Electron actually accepts the drop (otherwise drop is often ignored).
+    if (!document.documentElement.dataset.dropGuardBound) {
+      document.documentElement.dataset.dropGuardBound = "1";
+      document.addEventListener("dragover", (e) => {
+        if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+      });
+      document.addEventListener("drop", (e) => {
+        if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+      });
+    }
+
+    const paint = (active) => {
+      zone.classList.toggle("is-drop-target", !!active);
+    };
+    const reset = () => {
+      depth = 0;
+      paint(false);
+    };
+
+    zone.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      depth += 1;
+      paint(true);
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    });
 
     zone.addEventListener("dragover", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      zone.style.outline = "2px dashed var(--accent)";
-      zone.style.outlineOffset = "-4px";
-      zone.style.background = "rgba(61,138,255,0.05)";
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      paint(true);
     });
 
     zone.addEventListener("dragleave", (e) => {
       e.preventDefault();
-      zone.style.outline = "";
-      zone.style.outlineOffset = "";
-      zone.style.background = "";
+      e.stopPropagation();
+      // Ignore leave events that stay inside this zone (child <-> child)
+      const related = e.relatedTarget;
+      if (related && zone.contains(related)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) paint(false);
     });
 
     zone.addEventListener("drop", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      zone.style.outline = "";
-      zone.style.outlineOffset = "";
-      zone.style.background = "";
-
-      const paths = [...(e.dataTransfer?.files || [])].map((file) => file.path).filter(Boolean);
-      if (!paths.length) return;
-      const id = document.getElementById("sftp-browser-conn-id").value;
-      await this._uploadLocalPaths(id, paths, this._currentPath, () => this._loadDir());
+      reset();
+      const paths = this._extractDropPaths(e);
+      if (!paths.length) {
+        toast("Could not read dropped files. Try again or use Upload.", "warn");
+        return;
+      }
+      try {
+        await onPaths(paths);
+      } catch (err) {
+        toast(err?.message || "Upload failed", "error");
+      }
     });
-
-    this._bindRemoteListEvents(zone, "browser");
   },
 
   async _loadDir() {
@@ -501,7 +587,7 @@ window.SFTP = {
     if (this._sortKey === key) this._sortDir *= -1;
     else {
       this._sortKey = key;
-      this._sortDir = 1;
+      this._sortDir = key === "modified" ? -1 : 1;
     }
     this._renderBrowserList();
   },
@@ -554,10 +640,9 @@ window.SFTP = {
     listEl.innerHTML = `<table style="width:100%;font-size:13px;border-collapse:collapse">
 <thead><tr style="background:var(--bg3);text-align:left">
   ${th("name", "Name")}
-  ${th("kind", "Type", "110px")}
   ${th("size", "Size", "80px")}
-  ${th("permissions", "Permissions", "145px")}
   ${th("modified", "Modified", "150px")}
+  ${th("permissions", "Permissions", "145px")}
   <th style="padding:8px 10px;width:150px;text-align:right">Actions</th>
 </tr></thead>
 <tbody>${items.map((item) => {
@@ -574,10 +659,9 @@ window.SFTP = {
     <i class="fas ${icon}" style="color:${color};margin-right:8px"></i>
     ${this._esc(item.name)}${item.isLink ? ' <span style="font-size:10px;color:var(--text3)">link</span>' : ""}
   </td>
-  <td style="padding:8px 10px;color:var(--text3)">${this._esc(this._itemKind(item))}</td>
-  <td style="padding:8px 10px;color:var(--text3)">${isDir ? "" : this._fmtSize(item.size)}</td>
-  <td style="padding:8px 10px;color:var(--text3);font-family:var(--mono);font-size:11px;white-space:nowrap">${this._esc(item.permissions || "—")}</td>
+  <td style="padding:8px 10px;color:var(--text3)">${isDir ? "—" : this._fmtSize(item.size)}</td>
   <td style="padding:8px 10px;color:var(--text3);font-size:12px">${item.modified ? new Date(item.modified).toLocaleString("vi-VN") : ""}</td>
+  <td style="padding:8px 10px;color:var(--text3);font-family:var(--mono);font-size:11px;white-space:nowrap">${this._esc(item.permissions || "—")}</td>
   <td style="padding:8px 10px;text-align:right;white-space:nowrap">
     ${`<button class="btn btn-ghost btn-xs" title="Download" onclick="SFTP.downloadItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-download"></i></button>`}
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Edit inline" onclick="SFTP.editFile(decodeURIComponent('${encodedPath}'))"><i class="fas fa-edit"></i></button>` : ""}
@@ -588,6 +672,7 @@ window.SFTP = {
 </tr>`;
 }).join("")}</tbody></table>`;
     this._applyRemoteSelectionHighlight(listEl);
+    this._bindHorizontalScroll(listEl);
   },
 
   enterEncodedDir(encodedName) {
@@ -1159,7 +1244,41 @@ window.SFTP = {
     document.getElementById("sftp-editor-path").value = remotePath;
     document.getElementById("sftp-editor-file").textContent = fileName;
     document.getElementById("sftp-editor-content").value = r.content;
+    const errEl = document.getElementById("sftp-editor-error");
+    if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+
+    const langInfo = await api.sftpDetectLanguage(remotePath).catch(() => ({ language: "plaintext" }));
+    const language = langInfo.language || "plaintext";
+    const langEl = document.getElementById("sftp-editor-lang");
+    if (langEl) langEl.textContent = language.toUpperCase();
+
     openModal("m-sftp-editor");
+    const mount = document.getElementById("sftp-editor-monaco");
+    if (mount && window.ShieldPressMonaco) {
+      try {
+        await ShieldPressMonaco.mount(mount, {
+          value: r.content,
+          language,
+          onCursor: ({ line, column }) => {
+            const cursor = document.getElementById("sftp-editor-cursor");
+            if (cursor) cursor.textContent = `Ln ${line}, Col ${column}`;
+          },
+        });
+        this._monacoReady = true;
+      } catch (err) {
+        this._monacoReady = false;
+        mount.innerHTML = "";
+        const ta = document.getElementById("sftp-editor-content");
+        if (ta) ta.style.display = "block";
+        toast("Monaco unavailable, using plain editor", "warn");
+      }
+    }
+  },
+
+  cancelFileEdit() {
+    try { ShieldPressMonaco?.dispose(); } catch {}
+    this._monacoReady = false;
+    closeModal("m-sftp-editor");
   },
 
   async openExternal(remotePath) {
@@ -1167,18 +1286,58 @@ window.SFTP = {
     const fileName = remotePath.split("/").pop();
     toast(`Opening ${fileName} in external editor...`, "info");
     const r = await api.sftpOpenExternal(id, remotePath);
-    if (r.success) {
-      toast(r.message, "success");
-    } else {
-      toast("Failed: " + r.message, "error");
+    if (r.success) toast(r.message, "success");
+    else toast("Failed: " + r.message, "error");
+  },
+
+  async saveFileEdit() {
+    const id = document.getElementById("sftp-editor-conn-id").value;
+    const remotePath = document.getElementById("sftp-editor-path").value;
+    const content = this._monacoReady && window.ShieldPressMonaco
+      ? ShieldPressMonaco.getValue()
+      : document.getElementById("sftp-editor-content").value;
+    document.getElementById("sftp-editor-content").value = content;
+
+    const r = await api.sftpWriteFile(id, remotePath, content);
+    const errEl = document.getElementById("sftp-editor-error");
+    if (!r.success) {
+      if (r.code === "VALIDATION_ERROR") {
+        const msg = `Syntax Error\n\n${r.line ? `Line ${r.line}\n` : ""}${r.message || "Validation failed"}`;
+        if (errEl) {
+          errEl.style.display = "block";
+          errEl.innerHTML = `<strong>⚠ Syntax Error</strong><div style="margin-top:6px;white-space:pre-wrap">${this._esc(r.message || "")}${r.line ? `\nLine ${r.line}` : ""}</div><button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="document.getElementById('sftp-editor-error').style.display='none'">Back to Editor</button>`;
+        }
+        if (this._monacoReady && r.line) {
+          ShieldPressMonaco.setMarkers([{
+            startLineNumber: r.line, startColumn: 1,
+            endLineNumber: r.line, endColumn: 1e5,
+            message: r.message || "Syntax error",
+            severity: 8,
+          }]);
+          ShieldPressMonaco.revealLine(r.line);
+        }
+        toast("Fix syntax errors before saving", "error");
+        return;
+      }
+      toast("Save failed: " + r.message, "error");
+      return;
     }
+    if (errEl) errEl.style.display = "none";
+    try { ShieldPressMonaco?.dispose(); } catch {}
+    this._monacoReady = false;
+    toast(r.backupPath ? `File saved (backup: ${r.backupPath})` : "File saved!", "success");
+    closeModal("m-sftp-editor");
+    if (document.getElementById("sftp-browser-conn-id")?.value) await this._loadDir();
+    if (document.getElementById("sftp-term-conn-id")?.value) await this.loadTermFiles();
   },
 
   getRemoteContext(target) {
     const terminalBrowser = target?.closest?.("[data-terminal-remote-browser]");
     const regularBrowser = target?.closest?.("[data-remote-browser]");
-    const inTerminal = !!terminalBrowser && document.getElementById("m-sftp-terminal")?.classList.contains("open");
-    const inBrowser = !!regularBrowser && document.getElementById("m-sftp-browser")?.classList.contains("open");
+    const termModalOpen = document.getElementById("m-sftp-terminal")?.classList.contains("open");
+    const browserModalOpen = document.getElementById("m-sftp-browser")?.classList.contains("open");
+    const inTerminal = !!terminalBrowser && (this._sessionMode || termModalOpen);
+    const inBrowser = !!regularBrowser && (this._sessionMode || browserModalOpen);
     if (!inTerminal && !inBrowser) return null;
     const row = target.closest("[data-remote-path]");
     const scope = inTerminal ? "terminal" : "browser";
@@ -1195,6 +1354,17 @@ window.SFTP = {
         editable: row.dataset.remoteEditable === "true",
       },
     };
+  },
+
+  _bindHorizontalScroll(el) {
+    if (!el || el.dataset.hscrollBound) return;
+    el.dataset.hscrollBound = "1";
+    el.addEventListener("wheel", (e) => {
+      if (!e.shiftKey) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    }, { passive: false });
   },
 
   contextOpenFolder(encodedPath) {
@@ -1322,19 +1492,6 @@ window.SFTP = {
 
   contextRefresh() { return this._loadDir(); },
 
-  async saveFileEdit() {
-    const id = document.getElementById("sftp-editor-conn-id").value;
-    const remotePath = document.getElementById("sftp-editor-path").value;
-    const content = document.getElementById("sftp-editor-content").value;
-    const r = await api.sftpWriteFile(id, remotePath, content);
-    if (r.success) {
-      toast("File saved!", "success");
-      closeModal("m-sftp-editor");
-    } else {
-      toast("Save failed: " + r.message, "error");
-    }
-  },
-
   // ── Terminal ──────────────────────────────────────────────────────────────
   _cmdHistory: [],
   _historyIdx: -1,
@@ -1368,37 +1525,19 @@ window.SFTP = {
       toast("Terminal only available for SFTP (SSH) connections", "warn");
       return;
     }
-
-    await this.cleanupTerminal();
-
-    const cr = await api.sftpConnect(id);
-    if (!cr.success) {
-      if (!(await this._handleVaultLocked(cr, () => this.openTerminal(id)))) {
-        toast("Connect failed: " + cr.message, "error");
+    toast("Opening Terminal window…", "info");
+    const r = await api.sftpOpenWindow("terminal", id);
+    if (!r.success) {
+      if (!(await this._handleVaultLocked(r, () => this.openTerminal(id)))) {
+        toast("Open failed: " + r.message, "error");
       }
       return;
     }
     this._connStatus[id] = "connected";
     await this.load();
-
-    document.getElementById("sftp-term-conn-id").value = id;
-    document.getElementById("sftp-term-name").textContent = conn.name;
-    const osEl = document.getElementById("sftp-term-os");
-    if (osEl) osEl.innerHTML = '<i class="fas fa-circle" style="font-size:7px"></i> Connected';
-    this._cmdHistory = [];
-    this._historyIdx = -1;
-    this.hideTermSuggestions();
-    this._termPath = conn.lastBrowsedPath || conn.remotePath || "/";
-    openModal("m-sftp-terminal");
-    this._setupTermDragDrop();
-    this._setupTerminalClipboard();
-    this._loadRemoteSystemSuggestions(id);
-    this._startRemoteMetrics(id);
-    await this.loadTermFiles();
-    await this._startInteractiveTerminal(id);
   },
 
-  async _startInteractiveTerminal(id) {
+  async _startInteractiveTerminal(connectionKey, preferredShellSessionId = null) {
     this._resizeObserver?.disconnect();
     this._xtermDataDisposable?.dispose();
     this._xterm?.dispose();
@@ -1424,7 +1563,11 @@ window.SFTP = {
     this._xterm.loadAddon(this._fitAddon);
     this._xterm.open(container);
     this._fitAddon.fit();
-    this._xtermDataDisposable = this._xterm.onData((data) => api.sftpShellWrite(id, data));
+
+    let shellSessionId = preferredShellSessionId;
+    this._xtermDataDisposable = this._xterm.onData((data) => {
+      if (shellSessionId) api.sftpShellWrite(shellSessionId, data);
+    });
     this._xterm.onSelectionChange(() => this.autoCopyTerminalSelection());
     this._xterm.attachCustomKeyEventHandler((event) => {
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "c") {
@@ -1437,14 +1580,22 @@ window.SFTP = {
     });
     this._resizeObserver = new ResizeObserver(() => {
       this._fitAddon?.fit();
-      api.sftpShellResize(id, this._xterm.cols, this._xterm.rows);
+      if (shellSessionId) api.sftpShellResize(shellSessionId, this._xterm.cols, this._xterm.rows);
     });
     this._resizeObserver.observe(container);
-    this._activeShellId = id;
-    const result = await api.sftpShellStart(id, this._xterm.cols, this._xterm.rows);
+
+    const result = await api.sftpShellStart(
+      connectionKey,
+      this._xterm.cols,
+      this._xterm.rows,
+      preferredShellSessionId || undefined,
+    );
     if (!result.success) {
       this._activeShellId = null;
       this._xterm.writeln(`\x1b[31mSSH shell failed: ${result.message}\x1b[0m`);
+    } else {
+      shellSessionId = result.sessionId;
+      this._activeShellId = result.sessionId;
     }
     this._xterm.focus();
   },
@@ -1486,18 +1637,60 @@ window.SFTP = {
       listEl.innerHTML = `<div style="padding:12px;color:var(--red);font-size:12px">${this._esc(r.message)}</div>`;
       return;
     }
-    if (!r.items.length) {
+    this._termItems = r.items || [];
+    this._renderTermFiles();
+  },
+
+  sortTermFiles(key) {
+    if (this._termSortKey === key) this._termSortDir *= -1;
+    else {
+      this._termSortKey = key;
+      this._termSortDir = key === "modified" ? -1 : 1;
+    }
+    this._renderTermFiles();
+  },
+
+  _termSortMarker(key) {
+    if (this._termSortKey !== key) return "";
+    return this._termSortDir > 0 ? " ▲" : " ▼";
+  },
+
+  _renderTermFiles() {
+    const listEl = document.getElementById("sftp-term-files");
+    if (!listEl) return;
+    let items = [...(this._termItems || [])];
+    if (!items.length) {
       listEl.innerHTML = '<div style="padding:18px;text-align:center;color:var(--text3);font-size:12px">Empty directory</div>';
       return;
     }
+    items.sort((a, b) => {
+      const aDir = this._isDir(a);
+      const bDir = this._isDir(b);
+      if (aDir !== bDir) return aDir ? -1 : 1;
+      let cmp = 0;
+      if (this._termSortKey === "modified") cmp = String(a.modified || "").localeCompare(String(b.modified || ""));
+      else if (this._termSortKey === "size") cmp = (a.size || 0) - (b.size || 0);
+      else if (this._termSortKey === "permissions") cmp = String(a.permissions || "").localeCompare(String(b.permissions || ""));
+      else if (this._termSortKey === "owner") {
+        cmp = `${a.owner || ""}/${a.group || ""}`.localeCompare(`${b.owner || ""}/${b.group || ""}`);
+      }
+      else cmp = String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
+      return cmp * this._termSortDir;
+    });
+
     const base = this._termPath;
-    const rows = r.items.map((item) => {
+    const th = (key, label, align = "left") =>
+      `<th style="padding:7px 6px;text-align:${align};cursor:pointer;user-select:none" onclick="SFTP.sortTermFiles('${key}')">${label}${this._termSortMarker(key)}</th>`;
+    const rows = items.map((item) => {
       const fullPath = base.replace(/\/+$/, "") + "/" + item.name;
       const encoded = encodeURIComponent(fullPath);
       const isDir = item.isDirectory || item.type === "directory";
       const editable = !isDir && /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|env|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(item.name);
       const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
-      const chmod = String(item.permissions || "").match(/\((\d{3,4})\)/)?.[1] || "—";
+      const chmod = String(item.permissions || "").match(/\((\d{3,4})\)/)?.[1] || item.permissions || "—";
+      const ownerGroup = (item.owner || item.group)
+        ? `${item.owner || "—"}/${item.group || "—"}`
+        : "—";
       const action = isDir
         ? `SFTP.termEnterPath('${encoded}')`
         : editable ? `SFTP.termEditFile('${encoded}')` : `SFTP.copyRemotePath(decodeURIComponent('${encoded}'))`;
@@ -1508,11 +1701,10 @@ window.SFTP = {
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(item.name)}</span>
           </button>
         </td>
-        <td style="padding:6px;color:var(--text3);white-space:nowrap">${this._esc(this._itemKind(item))}</td>
         <td style="padding:6px;color:var(--text3);text-align:right;white-space:nowrap">${isDir ? "—" : this._fmtSize(item.size)}</td>
-        <td style="padding:6px;color:var(--accent);font-family:var(--mono);text-align:center" title="${this._esc(item.permissions || "")}">${chmod}</td>
-        <td style="padding:6px;color:var(--text2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this._esc(item.owner || "")}">${this._esc(item.owner || "—")}</td>
-        <td style="padding:6px;color:var(--text2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this._esc(item.group || "")}">${this._esc(item.group || "—")}</td>
+        <td style="padding:6px;color:var(--text3);white-space:nowrap;font-size:11px">${item.modified ? new Date(item.modified).toLocaleString("vi-VN") : "—"}</td>
+        <td style="padding:6px;color:var(--accent);font-family:var(--mono);text-align:center" title="${this._esc(item.permissions || "")}">${this._esc(chmod)}</td>
+        <td style="padding:6px;color:var(--text2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this._esc(ownerGroup)}">${this._esc(ownerGroup)}</td>
         <td style="padding:5px;text-align:right;white-space:nowrap">
           <button class="btn btn-ghost btn-xs" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'))" title="Copy path"><i class="fas fa-copy"></i></button>
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termContextDownload('${encoded}',${isDir})" title="Download"><i class="fas fa-download"></i></button>
@@ -1522,25 +1714,25 @@ window.SFTP = {
         </td>
       </tr>`;
     }).join("");
-    listEl.innerHTML = `<table style="width:100%;min-width:820px;border-collapse:collapse;table-layout:fixed;font-size:11px">
+    listEl.innerHTML = `<table style="width:100%;min-width:860px;border-collapse:collapse;table-layout:fixed;font-size:11px">
       <colgroup>
-        <col style="width:210px"><col style="width:75px"><col style="width:75px">
-        <col style="width:65px"><col style="width:100px"><col style="width:100px"><col style="width:150px">
+        <col style="width:200px"><col style="width:70px"><col style="width:120px">
+        <col style="width:65px"><col style="width:120px"><col style="width:140px">
       </colgroup>
       <thead style="position:sticky;top:0;z-index:1;background:var(--bg2)">
-        <tr style="color:var(--text3);text-align:left;border-bottom:1px solid var(--border)">
-          <th style="padding:7px 8px">Name</th>
-          <th style="padding:7px 6px">Type</th>
-          <th style="padding:7px 6px;text-align:right">Size</th>
-          <th style="padding:7px 6px;text-align:center">Chmod</th>
-          <th style="padding:7px 6px">User</th>
-          <th style="padding:7px 6px">Group</th>
+        <tr style="color:var(--text3);border-bottom:1px solid var(--border)">
+          ${th("name", "Name")}
+          ${th("size", "Size", "right")}
+          ${th("modified", "Modified")}
+          ${th("permissions", "Perm", "center")}
+          ${th("owner", "User/Group")}
           <th style="padding:7px 6px;text-align:right">Actions</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
     this._applyRemoteSelectionHighlight(listEl);
+    this._bindHorizontalScroll(listEl);
   },
 
   termEnterPath(encodedPath) {
@@ -1830,23 +2022,16 @@ window.SFTP = {
   termCreateDir() { this.openRemoteCreate("terminal", "folder"); },
 
   _setupTermDragDrop() {
-    if (this._termDropSetup) return;
-    const zone = document.getElementById("sftp-term-files");
+    const zone =
+      document.querySelector('[data-drop-zone="terminal"]')
+      || document.getElementById("sftp-term-files")?.closest("aside")
+      || document.getElementById("sftp-term-files");
     if (!zone) return;
-    this._termDropSetup = true;
-    zone.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      zone.style.outline = "2px dashed var(--accent)";
-      zone.style.outlineOffset = "-4px";
+    this._bindFileDropZone(zone, async (paths) => {
+      await this._termUploadPaths(paths);
     });
-    zone.addEventListener("dragleave", () => { zone.style.outline = ""; });
-    zone.addEventListener("drop", async (event) => {
-      event.preventDefault();
-      zone.style.outline = "";
-      const paths = [...(event.dataTransfer?.files || [])].map((file) => file.path).filter(Boolean);
-      if (paths.length) await this._termUploadPaths(paths);
-    });
-    this._bindRemoteListEvents(zone, "terminal");
+    const list = document.getElementById("sftp-term-files");
+    if (list) this._bindRemoteListEvents(list, "terminal");
   },
 
   async termKeyDown(event) {

@@ -2,9 +2,11 @@
 const fs = require("fs-extra");
 const path = require("path");
 const crypto = require("crypto");
+const { spawn } = require("child_process");
 const log = require("./logger");
 const platform = require("./platform");
 const vaultCrypto = require("./credential-vault");
+const sessionManager = require("./session-manager");
 
 // Encryption key derived from machine ID
 const ALGO = "aes-256-gcm";
@@ -97,7 +99,7 @@ async function unlockVault(masterPassword) {
 
 async function lockVault() {
   vaultKey = null;
-  for (const id of Object.keys(activeConnections)) await disconnect(id);
+  await disconnectAll();
   return { success: true, configured: !!(await readVaultMetadata()), unlocked: false };
 }
 
@@ -151,6 +153,10 @@ async function getConnections() {
       lastBrowsedPath: c.lastBrowsedPath || "",
       lastConnectedAt: c.lastConnectedAt || "",
       starred: !!c.starred,
+      isConnected: Object.entries(activeConnections).some(
+        ([key, value]) => connectionIdOf(key, value) === c.id,
+      ),
+      openSessions: sessionManager.listByConnection(c.id).map((s) => ({ id: s.id, kind: s.kind, title: s.title })),
     }));
     return { success: true, connections: safe };
   } catch {
@@ -231,7 +237,18 @@ async function getRawConnection(id) {
 }
 
 // ─── SFTP Operations ─────────────────────────────────────────────────────────
-let activeConnections = {}; // { connId: { client, sftp } }
+// Keys are either connectionId (pool / list Connect) or sessionId (window sessions).
+let activeConnections = {}; // { id: { client, sftp?, type, connectionId } }
+
+function connectionIdOf(id, ac) {
+  if (ac?.connectionId) return ac.connectionId;
+  const parsed = sessionManager.parseSessionId(id);
+  return parsed ? parsed.connectionId : id;
+}
+
+function getActive(id) {
+  return activeConnections[id] || null;
+}
 
 function isPipeError(err) {
   const code = err && err.code;
@@ -257,19 +274,28 @@ function safeCloseSsh(client) {
 
 function dropActiveConnection(id) {
   const ac = activeConnections[id];
+  stopShellsForKey(id);
   if (!ac) return;
   delete activeConnections[id];
-  delete remoteSystemCache[id];
-  delete remoteStatsCache[id];
-  stopShell(id);
+  const connId = connectionIdOf(id, ac);
+  // Only clear shared caches when no other live sessions remain for this connection.
+  const stillLive = Object.entries(activeConnections).some(([key, value]) => connectionIdOf(key, value) === connId);
+  if (!stillLive) {
+    delete remoteSystemCache[connId];
+    delete remoteStatsCache[connId];
+    delete terminalCwd[connId];
+  }
   try {
     if (ac.type === "sftp") safeCloseSsh(ac.client);
-    else if (ac.type === "ftp") ac.client.close();
+    else if (ac.type === "ftp") {
+      try { ac.client.close(); } catch {}
+      try { ac.client.close?.(); } catch {}
+    }
   } catch {}
 }
 
 async function pingConnection(id) {
-  const ac = activeConnections[id];
+  const ac = getActive(id);
   if (!ac) return false;
   try {
     if (ac.type === "sftp") {
@@ -291,7 +317,22 @@ async function pingConnection(id) {
 }
 
 async function connect(id, progressCb) {
-  const conn = await getRawConnection(id);
+  if (sessionManager.isSessionId(id)) {
+    return connectSession(id, progressCb);
+  }
+  return connectInternal(id, id, progressCb, { allowReuse: true });
+}
+
+async function connectSession(sessionId, progressCb) {
+  const parsed = sessionManager.parseSessionId(sessionId);
+  if (!parsed) return { success: false, message: "Invalid session id" };
+  // Window sessions always get a brand-new transport — never reuse.
+  if (activeConnections[sessionId]) dropActiveConnection(sessionId);
+  return connectInternal(sessionId, parsed.connectionId, progressCb, { allowReuse: false });
+}
+
+async function connectInternal(storageKey, connectionId, progressCb, { allowReuse }) {
+  const conn = await getRawConnection(connectionId);
   if (!conn) return { success: false, message: "Connection not found" };
   if (conn.credentialError === "VAULT_LOCKED") {
     return { success: false, code: "VAULT_LOCKED", message: "Credential vault is locked" };
@@ -301,39 +342,42 @@ async function connect(id, progressCb) {
   }
   if (conn.credentialError) return { success: false, code: conn.credentialError, message: "Stored credential cannot be decrypted" };
 
-  if (activeConnections[id]) {
-    const alive = await pingConnection(id);
-    if (alive) {
-      await touchLastConnected(id);
-      return { success: true, message: "Already connected" };
+  if (activeConnections[storageKey]) {
+    if (allowReuse) {
+      const alive = await pingConnection(storageKey);
+      if (alive) {
+        await touchLastConnected(connectionId);
+        return { success: true, message: "Already connected", sessionId: storageKey };
+      }
     }
-    dropActiveConnection(id);
+    dropActiveConnection(storageKey);
     progressCb && progressCb(`Reconnecting to ${conn.host}:${conn.port}...`);
   } else {
     progressCb && progressCb(`Connecting to ${conn.host}:${conn.port}...`);
   }
 
   const result = conn.type === "ftp"
-    ? await connectFtp(id, conn, progressCb)
-    : await connectSftp(id, conn, progressCb);
-  if (result.success) await touchLastConnected(id);
+    ? await connectFtp(storageKey, conn, progressCb, connectionId)
+    : await connectSftp(storageKey, conn, progressCb, connectionId);
+  if (result.success) {
+    await touchLastConnected(connectionId);
+    result.sessionId = storageKey;
+  }
   return result;
 }
 
 async function ensureConnected(id) {
-  if (!activeConnections[id]) return { success: false, message: "Not connected" };
+  if (!getActive(id)) return { success: false, message: "Not connected" };
   const alive = await pingConnection(id);
   if (alive) return { success: true };
-  // Reconnect silently
-  const conn = await getRawConnection(id);
-  if (!conn) return { success: false, message: "Connection config not found" };
+  const connId = connectionIdOf(id, getActive(id));
   dropActiveConnection(id);
   log.info(`Auto-reconnecting ${id}...`);
-  const r = await connect(id);
-  return r;
+  if (sessionManager.isSessionId(id)) return connectSession(id);
+  return connect(connId);
 }
 
-async function connectSftp(id, conn, progressCb) {
+async function connectSftp(storageKey, conn, progressCb, connectionId = storageKey) {
   const { Client } = require("ssh2");
   return new Promise((resolve) => {
     const client = new Client();
@@ -368,28 +412,28 @@ async function connectSftp(id, conn, progressCb) {
           return done({ success: false, message: err.message });
         }
         sinkStreamErrors(sftp);
-        activeConnections[id] = { client, sftp, type: "sftp" };
+        activeConnections[storageKey] = { client, sftp, type: "sftp", connectionId };
         progressCb && progressCb("Connected!");
-        log.ok(`SFTP connected: ${conn.host}`);
+        log.ok(`SFTP connected: ${conn.host} [${storageKey}]`);
         done({ success: true });
       });
     });
 
     client.on("error", (err) => {
-      if (isPipeError(err) && activeConnections[id] && activeConnections[id].client === client) {
-        dropActiveConnection(id);
+      if (isPipeError(err) && activeConnections[storageKey] && activeConnections[storageKey].client === client) {
+        dropActiveConnection(storageKey);
         log.err("SSH connection dropped: " + err.message);
         return;
       }
       log.err("SSH error: " + err.message);
-      if (activeConnections[id] && activeConnections[id].client === client) dropActiveConnection(id);
+      if (activeConnections[storageKey] && activeConnections[storageKey].client === client) dropActiveConnection(storageKey);
       else safeCloseSsh(client);
       done({ success: false, message: err.message });
     });
 
     client.on("close", () => {
-      if (activeConnections[id] && activeConnections[id].client === client) {
-        dropActiveConnection(id);
+      if (activeConnections[storageKey] && activeConnections[storageKey].client === client) {
+        dropActiveConnection(storageKey);
       }
       if (!settled) done({ success: false, message: "SSH connection closed" });
     });
@@ -402,7 +446,7 @@ async function connectSftp(id, conn, progressCb) {
   });
 }
 
-async function connectFtp(id, conn, progressCb) {
+async function connectFtp(storageKey, conn, progressCb, connectionId = storageKey) {
   const ftp = require("basic-ftp");
   const client = new ftp.Client();
   client.ftp.verbose = false;
@@ -415,20 +459,57 @@ async function connectFtp(id, conn, progressCb) {
       password: conn.password,
       secure: !!conn.secure,
     });
-    activeConnections[id] = { client, type: "ftp" };
+    activeConnections[storageKey] = { client, type: "ftp", connectionId };
     progressCb && progressCb("Connected!");
-    log.ok(`FTP connected: ${conn.host}`);
+    log.ok(`FTP connected: ${conn.host} [${storageKey}]`);
     return { success: true };
   } catch (err) {
     log.err("FTP error: " + err.message);
+    try { client.close(); } catch {}
     return { success: false, message: err.message };
   }
 }
 
 async function disconnect(id) {
-  if (!activeConnections[id]) return { success: true };
+  if (sessionManager.isSessionId(id)) {
+    dropActiveConnection(id);
+    sessionManager.remove(id);
+    try { require("./remote-windows").closeWindow(id); } catch {}
+    log.info(`Disconnected session: ${id}`);
+    return { success: true };
+  }
+
   dropActiveConnection(id);
+  for (const session of sessionManager.listByConnection(id)) {
+    dropActiveConnection(session.id);
+    sessionManager.remove(session.id);
+    try { require("./remote-windows").closeWindow(session.id); } catch {}
+  }
   log.info(`Disconnected: ${id}`);
+  return { success: true };
+}
+
+async function disconnectAll() {
+  for (const id of Object.keys(activeConnections)) {
+    dropActiveConnection(id);
+  }
+  for (const sid of Object.keys(activeShells)) {
+    hardStopShell(sid);
+  }
+  for (const session of sessionManager.listAll()) {
+    sessionManager.remove(session.id);
+  }
+  try { require("./remote-windows").closeAllWindows(); } catch {}
+  log.info("Disconnected all remote sessions");
+  return { success: true };
+}
+
+async function closeSession(sessionId) {
+  if (!sessionId) return { success: true };
+  dropActiveConnection(sessionId);
+  hardStopShell(sessionId);
+  sessionManager.remove(sessionId);
+  try { require("./remote-windows").closeWindow(sessionId); } catch {}
   return { success: true };
 }
 
@@ -1292,65 +1373,142 @@ async function syncDownload(id, progressCb, opts = {}) {
   return { success: true, downloaded, skipped, errors };
 }
 
-// ─── Terminal (SSH exec) ─────────────────────────────────────────────────────
+// ─── Terminal (SSH interactive shell) ────────────────────────────────────────
 // Track current working directory per connection for cd support
 const terminalCwd = {};
 const remoteSystemCache = {};
 const remoteStatsCache = {};
+/** @type {Record<string, { stream: any, connectionId: string, webContentsId: number|null }>} */
 const activeShells = {};
 
-async function startShell(id, cols = 100, rows = 30) {
-  const connected = await ensureConnected(id);
-  if (!connected.success) return connected;
-  const ac = activeConnections[id];
-  if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
-  if (activeShells[id] && !activeShells[id].destroyed) {
-    activeShells[id].setWindow(rows, cols, 0, 0);
-    return { success: true, reused: true };
+function emitShell(sessionId, webContentsId, channel, payload) {
+  if (sessionManager.send(sessionId, channel, payload)) return;
+  if (webContentsId != null) {
+    try {
+      const { webContents } = require("electron");
+      const wc = webContents.fromId(Number(webContentsId));
+      if (wc && !wc.isDestroyed()) {
+        wc.send(channel, payload);
+        return;
+      }
+    } catch {}
   }
+  try { global.STATE.mainWindow?.webContents?.send(channel, payload); } catch {}
+}
+
+function hardStopShell(sessionId) {
+  const entry = activeShells[sessionId];
+  if (!entry) return { success: true };
+  delete activeShells[sessionId];
+  const stream = entry.stream;
+  if (!stream) return { success: true };
+  try {
+    if (typeof stream.removeAllListeners === "function") {
+      stream.removeAllListeners("data");
+      stream.removeAllListeners("close");
+      stream.stderr?.removeAllListeners?.("data");
+    }
+  } catch {}
+  try { if (stream.writable !== false) stream.write("\x03"); } catch {}
+  try { if (stream.writable !== false) stream.end("exit\n"); } catch {}
+  try { if (typeof stream.destroy === "function") stream.destroy(); } catch {}
+  setTimeout(() => {
+    try { if (stream && !stream.destroyed && typeof stream.destroy === "function") stream.destroy(); } catch {}
+  }, 400);
+  return { success: true };
+}
+
+function stopShellsForKey(id) {
+  for (const [sessionId, entry] of Object.entries(activeShells)) {
+    if (sessionId === id || entry.connectionId === id || entry.storageKey === id) {
+      hardStopShell(sessionId);
+    }
+  }
+}
+
+/**
+ * Start an interactive SSH shell. Always creates a NEW session id — never reuses.
+ * @returns {{ success: boolean, sessionId?: string, message?: string }}
+ */
+async function startShell(id, cols = 100, rows = 30, opts = {}) {
+  const storageKey = id;
+  const connected = await ensureConnected(storageKey);
+  if (!connected.success) return connected;
+  const ac = getActive(storageKey);
+  if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
+
+  const connectionId = connectionIdOf(storageKey, ac);
+  const sessionId = opts.sessionId && String(opts.sessionId).startsWith("terminal:")
+    ? String(opts.sessionId)
+    : `terminal:${connectionId}:${crypto.randomUUID()}`;
+
+  // Never reuse an existing PTY/stream — destroy any leftover for this session id.
+  if (activeShells[sessionId]) hardStopShell(sessionId);
+
+  const webContentsId = opts.webContentsId != null
+    ? Number(opts.webContentsId)
+    : (sessionManager.get(sessionId)?.webContentsId ?? null);
+
   return new Promise((resolve) => {
     ac.client.shell({ term: "xterm-256color", cols, rows }, (error, stream) => {
       if (error) return resolve({ success: false, message: error.message });
-      activeShells[id] = stream;
+      activeShells[sessionId] = {
+        stream,
+        connectionId,
+        storageKey,
+        webContentsId,
+      };
       sinkStreamErrors(stream);
-      stream.on("data", (data) => global.STATE.mainWindow?.webContents?.send("sftp-shell-data", { id, data: data.toString("utf8") }));
-      stream.stderr?.on("data", (data) => global.STATE.mainWindow?.webContents?.send("sftp-shell-data", { id, data: data.toString("utf8") }));
-      stream.on("close", () => {
-        delete activeShells[id];
-        global.STATE.mainWindow?.webContents?.send("sftp-shell-exit", { id });
+      stream.on("data", (data) => {
+        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data: data.toString("utf8") });
       });
-      resolve({ success: true });
+      stream.stderr?.on("data", (data) => {
+        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data: data.toString("utf8") });
+      });
+      stream.on("close", () => {
+        if (activeShells[sessionId]?.stream === stream) delete activeShells[sessionId];
+        emitShell(sessionId, webContentsId, "sftp-shell-exit", { id: sessionId, connectionId });
+      });
+      if (!sessionManager.get(sessionId)) {
+        try {
+          sessionManager.create({
+            kind: "terminal",
+            connectionId,
+            webContentsId,
+            title: opts.title || "",
+            sessionId,
+          });
+        } catch {}
+      } else {
+        sessionManager.update(sessionId, { webContentsId });
+      }
+      resolve({ success: true, sessionId });
     });
   });
 }
 
-function writeShell(id, data) {
-  const stream = activeShells[id];
-  if (!stream || stream.destroyed || stream.writable === false) {
+function writeShell(sessionId, data) {
+  const entry = activeShells[sessionId];
+  if (!entry || !entry.stream || entry.stream.destroyed || entry.stream.writable === false) {
     return { success: false, message: "SSH shell is not running" };
   }
   try {
-    stream.write(String(data || ""));
+    entry.stream.write(String(data || ""));
     return { success: true };
   } catch (err) {
     return { success: false, message: err.message };
   }
 }
 
-function resizeShell(id, cols, rows) {
-  const stream = activeShells[id];
-  if (!stream || stream.destroyed) return { success: false };
-  stream.setWindow(Math.max(2, rows || 30), Math.max(2, cols || 100), 0, 0);
+function resizeShell(sessionId, cols, rows) {
+  const entry = activeShells[sessionId];
+  if (!entry || !entry.stream || entry.stream.destroyed) return { success: false };
+  entry.stream.setWindow(Math.max(2, rows || 30), Math.max(2, cols || 100), 0, 0);
   return { success: true };
 }
 
-function stopShell(id) {
-  const stream = activeShells[id];
-  if (stream) {
-    try { stream.end("exit\n"); } catch {}
-    delete activeShells[id];
-  }
-  return { success: true };
+function stopShell(sessionId) {
+  return hardStopShell(sessionId);
 }
 
 async function getRemoteSystemInfo(id) {
@@ -1679,15 +1837,155 @@ async function readRemoteFile(id, remotePath) {
 }
 
 // ─── Write remote file content (save edit) ───────────────────────────────────
-async function writeRemoteFile(id, remotePath, content) {
-  const ac = activeConnections[id];
+const SENSITIVE_FILE_RE = /(^|\/)(wp-config\.php|\.htaccess|nginx\.conf|php\.ini|my\.cnf|\.env)$/i;
+
+function detectEditorLanguage(remotePath) {
+  const name = path.basename(String(remotePath || "")).toLowerCase();
+  if (name === ".htaccess") return "apache";
+  if (name === ".env") return "dotenv";
+  if (name.endsWith(".php")) return "php";
+  if (name.endsWith(".ts") || name.endsWith(".tsx")) return "typescript";
+  if (name.endsWith(".js") || name.endsWith(".jsx") || name.endsWith(".mjs") || name.endsWith(".cjs")) return "javascript";
+  if (name.endsWith(".json")) return "json";
+  if (name.endsWith(".css")) return "css";
+  if (name.endsWith(".scss")) return "scss";
+  if (name.endsWith(".html") || name.endsWith(".htm")) return "html";
+  if (name.endsWith(".xml")) return "xml";
+  if (name.endsWith(".yml") || name.endsWith(".yaml")) return "yaml";
+  if (name.endsWith(".conf") || name.endsWith(".nginx")) return "nginx";
+  if (name.endsWith(".sh")) return "shell";
+  if (name.endsWith(".py")) return "python";
+  if (name.endsWith(".sql")) return "sql";
+  if (name.endsWith(".md")) return "markdown";
+  return "plaintext";
+}
+
+function isSensitiveRemotePath(remotePath) {
+  return SENSITIVE_FILE_RE.test(String(remotePath || ""));
+}
+
+function runPhpLint(content) {
+  return new Promise((resolve) => {
+    const bundled = global.CONST?.getPhpDir?.("8.3");
+    const bundledPhp = bundled
+      ? path.join(bundled, process.platform === "win32" ? "php.exe" : "bin/php")
+      : null;
+    const bin = (bundledPhp && fs.existsSync(bundledPhp) ? bundledPhp : null)
+      || platform.findCommand(["php"])
+      || "php";
+    const tmp = path.join(require("os").tmpdir(), `shieldpress-lint-${process.pid}-${Date.now()}.php`);
+    fs.writeFile(tmp, content, "utf8").then(() => {
+      const child = spawn(bin, ["-l", tmp], { windowsHide: true });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+      child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+      child.on("error", (err) => {
+        fs.remove(tmp).catch(() => {});
+        resolve({ ok: true, skipped: true, message: err.message });
+      });
+      child.on("close", (code) => {
+        fs.remove(tmp).catch(() => {});
+        if (code === 0) return resolve({ ok: true });
+        const text = `${stdout}\n${stderr}`.trim();
+        const lineMatch = text.match(/on line (\d+)/i);
+        resolve({
+          ok: false,
+          language: "php",
+          line: lineMatch ? Number(lineMatch[1]) : null,
+          message: text || "PHP syntax error",
+        });
+      });
+    }).catch((err) => resolve({ ok: false, message: err.message }));
+  });
+}
+
+async function validateFileContent(remotePath, content) {
+  const language = detectEditorLanguage(remotePath);
+  if (language === "json") {
+    try {
+      JSON.parse(String(content || ""));
+      return { ok: true, language };
+    } catch (err) {
+      const lineMatch = String(err.message || "").match(/position\s+(\d+)/i);
+      let line = null;
+      if (lineMatch) {
+        const pos = Number(lineMatch[1]);
+        line = String(content || "").slice(0, pos).split(/\r?\n/).length;
+      }
+      return { ok: false, language, line, message: err.message || "Invalid JSON" };
+    }
+  }
+  if (language === "php") {
+    return runPhpLint(content);
+  }
+  return { ok: true, language };
+}
+
+async function backupRemoteFile(id, remotePath) {
+  const ac = getActive(id);
   if (!ac) return { success: false, message: "Not connected" };
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19).replace("T", "-");
+  const base = path.posix.basename(remotePath);
+  const dir = path.posix.dirname(remotePath);
+  const backupDir = path.posix.join(dir === "/" ? "/" : dir, ".shieldpress", "backups");
+  const backupPath = `${backupDir}/${base}.${stamp}`;
 
   try {
     if (ac.type === "sftp") {
-      return new Promise((resolve) => {
+      const escapedSrc = remotePath.replace(/'/g, `'\\''`);
+      const escapedDest = backupPath.replace(/'/g, `'\\''`);
+      const escapedDir = backupDir.replace(/'/g, `'\\''`);
+      const result = await execCommand(id, `mkdir -p '${escapedDir}' && cp -a '${escapedSrc}' '${escapedDest}'`);
+      if (!result.success) return { success: false, message: result.error || result.output || "Backup failed" };
+      return { success: true, backupPath };
+    }
+
+    const tmp = path.join(require("os").tmpdir(), `sp-bak-${Date.now()}-${base}`);
+    await ac.client.downloadTo(tmp, remotePath);
+    const parts = backupDir.split("/").filter(Boolean);
+    let cursor = "";
+    for (const part of parts) {
+      cursor += "/" + part;
+      try { await ac.client.ensureDir(cursor); } catch {}
+    }
+    await ac.client.uploadFrom(tmp, backupPath);
+    await fs.remove(tmp).catch(() => {});
+    return { success: true, backupPath };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
+async function writeRemoteFile(id, remotePath, content, options = {}) {
+  const ac = getActive(id) || activeConnections[id];
+  if (!ac) return { success: false, message: "Not connected" };
+
+  if (!options.skipValidation) {
+    const validation = await validateFileContent(remotePath, content);
+    if (!validation.ok) {
+      return {
+        success: false,
+        code: "VALIDATION_ERROR",
+        language: validation.language,
+        line: validation.line || null,
+        message: validation.message || "Validation failed",
+      };
+    }
+  }
+
+  let backupPath = null;
+  if (!options.skipBackup && isSensitiveRemotePath(remotePath)) {
+    const bak = await backupRemoteFile(id, remotePath);
+    if (bak.success) backupPath = bak.backupPath;
+    else log.err("Backup before save failed: " + bak.message);
+  }
+
+  try {
+    if (ac.type === "sftp") {
+      return await new Promise((resolve) => {
         const stream = ac.sftp.createWriteStream(remotePath);
-        stream.on("close", () => resolve({ success: true }));
+        stream.on("close", () => resolve({ success: true, backupPath }));
         stream.on("error", (err) => resolve({ success: false, message: err.message }));
         stream.end(content, "utf8");
       });
@@ -1696,7 +1994,7 @@ async function writeRemoteFile(id, remotePath, content) {
       await fs.writeFile(tempFile, content, "utf8");
       await ac.client.uploadFrom(tempFile, remotePath);
       await fs.remove(tempFile);
-      return { success: true };
+      return { success: true, backupPath };
     }
   } catch (err) {
     return { success: false, message: err.message };
@@ -2106,7 +2404,10 @@ module.exports = {
   saveConnection,
   deleteConnection,
   connect,
+  connectSession,
   disconnect,
+  disconnectAll,
+  closeSession,
   listRemote,
   downloadFile,
   downloadBatch,
@@ -2126,6 +2427,8 @@ module.exports = {
   deleteRemote,
   readRemoteFile,
   writeRemoteFile,
+  validateFileContent,
+  detectEditorLanguage,
   uploadAndExtract,
   createRemoteDir,
   createRemoteFile,
@@ -2139,5 +2442,19 @@ module.exports = {
   checkRemoteExists,
   validateLocalPath,
   statLocalPath,
-  __test: { normalizeRemoteMutationPath, createRemoteDirOnConnection, createRemoteFileOnConnection, joinRemotePath, joinLocalDownloadPath, collectLocalFiles, mapSftpListItem, mapFtpListItem, sortRemoteItems, fileKindLabel },
+  __test: {
+    normalizeRemoteMutationPath,
+    createRemoteDirOnConnection,
+    createRemoteFileOnConnection,
+    joinRemotePath,
+    joinLocalDownloadPath,
+    collectLocalFiles,
+    mapSftpListItem,
+    mapFtpListItem,
+    sortRemoteItems,
+    fileKindLabel,
+    detectEditorLanguage,
+    isSensitiveRemotePath,
+    validateFileContent,
+  },
 };

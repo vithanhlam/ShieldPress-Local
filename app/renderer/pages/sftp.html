@@ -154,7 +154,7 @@
     </div>
 
     <!-- File list (drop zone) -->
-    <div id="sftp-file-list" data-remote-browser="true" style="overflow-y:auto;border:1px solid var(--border);border-radius:6px;transition:outline 0.2s,background 0.2s">
+    <div id="sftp-file-list" data-remote-browser="true" data-drop-zone="browser" style="overflow-y:auto;border:1px solid var(--border);border-radius:6px;transition:outline 0.2s,background 0.2s">
       <div class="loading"><i class="fas fa-spinner fa-spin"></i></div>
     </div>
 
@@ -195,14 +195,24 @@
 
 <!-- Modal: File Editor -->
 <div class="overlay overlay-nested" id="m-sftp-editor" onclick="closeIfOverlay(event,'m-sftp-editor')">
-  <div class="modal" style="max-width:750px;max-height:85vh">
-    <div class="modal-title"><i class="fas fa-edit"></i> Edit — <span id="sftp-editor-file"></span></div>
+  <div class="modal sftp-editor-modal">
+    <div class="modal-title sftp-editor-titlebar">
+      <i class="fas fa-edit"></i>
+      <span id="sftp-editor-file"></span>
+      <span id="sftp-editor-lang" class="sftp-editor-meta"></span>
+      <span id="sftp-editor-encoding" class="sftp-editor-meta">UTF-8</span>
+    </div>
     <input type="hidden" id="sftp-editor-conn-id"/>
     <input type="hidden" id="sftp-editor-path"/>
-    <textarea id="sftp-editor-content" class="fi" style="font-family:var(--mono);font-size:13px;height:400px;resize:vertical;white-space:pre;overflow-wrap:normal;overflow-x:auto"></textarea>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('m-sftp-editor')">Cancel</button>
-      <button class="btn btn-primary" onclick="SFTP.saveFileEdit()"><i class="fas fa-save"></i> Save</button>
+    <div id="sftp-editor-monaco" class="sftp-editor-monaco"></div>
+    <textarea id="sftp-editor-content" class="fi" style="display:none"></textarea>
+    <div id="sftp-editor-error" class="sftp-editor-error" style="display:none"></div>
+    <div class="modal-footer sftp-editor-footer">
+      <span id="sftp-editor-cursor" class="sftp-editor-meta">Ln 1, Col 1</span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="SFTP.cancelFileEdit()">Cancel</button>
+        <button class="btn btn-primary" onclick="SFTP.saveFileEdit()"><i class="fas fa-save"></i> Save</button>
+      </div>
     </div>
   </div>
 </div>

@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+## v2.5.29
+
+**Remote session lifecycle**
+- Adds a main-process SessionManager so Terminal, SFTP, and FTP sessions use unique IDs and no longer reuse stale shells or sockets
+- Closing a Terminal, SFTP, or FTP window disconnects and destroys the matching session
+- Cleans up remaining remote connections on app quit and vault lock
+- Fixes Disconnect so the connection card returns to Connect after the session is closed
+
+**Multi-window SFTP / FTP / Terminal**
+- Opens Files, Terminal, and FTP sessions in dedicated BrowserWindows instead of modals
+- Each Open creates a new window and session; closing the window disconnects that session only
+- Connection actions are labeled Files, Terminal, Sync Up, Sync Down, and Setting
+
+**File Browser & Terminal files**
+- File lists use Name, Size, Modified, and Permissions, with User/Group in the Terminal file panel
+- Adds sortable Modified and User/Group columns, thicker horizontal scrollbars, and Shift+wheel horizontal scrolling
+- Improves drag-and-drop uploads with Electron `webUtils.getPathForFile`, wider drop targets, and clearer drop feedback
+- Expands the remote context menu with Open, Edit, Upload Here, Copy Relative Path, and Properties
+
+**Monaco file editor**
+- Replaces the plain textarea editor with Monaco (line numbers, syntax highlighting, find/replace, minimap)
+- Opens the editor in a near full-screen modal with language detection by file extension
+- Validates JSON and PHP (`php -l`) before save and blocks writing when syntax errors are found
+- Creates `.shieldpress/backups/` copies before overwriting sensitive files such as `wp-config.php`, `.htaccess`, and `nginx.conf`
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.29
+
+---
+
 ## v2.5.28
 
 **SFTP & FTP file management**

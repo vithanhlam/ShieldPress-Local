@@ -18,6 +18,10 @@ const platform = require("./platform");
 const workspace = require("./workspace");
 
 function register(ipcMain, shell, dialog) {
+  global.__shieldpressCloseRemoteSession = (sessionId) => {
+    try { sftp.closeSession(sessionId); } catch {}
+  };
+
   async function directorySize(root) {
     let total = 0;
     const entries = await fs.readdir(root, { withFileTypes: true });
@@ -515,41 +519,85 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-get-connections", () => sftp.getConnections());
   ipcMain.handle("sftp-save-connection", (_e, d) => sftp.saveConnection(d));
   ipcMain.handle("sftp-delete-connection", (_e, id) => sftp.deleteConnection(id));
-  ipcMain.handle("sftp-connect", (_e, id) =>
+  ipcMain.handle("sftp-connect", (e, id) =>
     sftp.connect(id, (msg) => {
+      try { e.sender.send("sftp-progress", msg); } catch {}
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
+    }),
+  );
+  ipcMain.handle("sftp-connect-session", (e, sessionId) =>
+    sftp.connectSession(sessionId, (msg) => {
+      try { e.sender.send("sftp-progress", msg); } catch {}
     }),
   );
   ipcMain.handle("sftp-disconnect", (_e, id) => sftp.disconnect(id));
+  ipcMain.handle("sftp-disconnect-all", () => sftp.disconnectAll());
+  ipcMain.handle("sftp-close-session", (_e, sessionId) => sftp.closeSession(sessionId));
+  ipcMain.handle("sftp-open-window", async (_e, { kind, connectionId }) => {
+    const remoteWindows = require("./remote-windows");
+    const sessionManager = require("./session-manager");
+    const conns = await sftp.getConnections();
+    const conn = (conns.connections || []).find((c) => c.id === connectionId);
+    if (!conn) return { success: false, message: "Connection not found" };
+    const wanted = kind === "terminal" ? "terminal" : (conn.type === "ftp" ? "ftp" : "sftp");
+    if (kind === "terminal" && conn.type !== "sftp") {
+      return { success: false, message: "Terminal only available for SFTP (SSH) connections" };
+    }
+    const title = `${remoteWindows.kindLabel(wanted)} — ${conn.name || conn.host}`;
+    const session = sessionManager.create({
+      kind: wanted,
+      connectionId,
+      title,
+    });
+    const linked = await sftp.connectSession(session.id);
+    if (!linked.success) {
+      sessionManager.remove(session.id);
+      return linked;
+    }
+    return remoteWindows.openRemoteWindow({
+      kind: wanted,
+      connectionId,
+      connectionName: conn.name,
+      host: conn.host,
+      sessionId: session.id,
+    });
+  });
   ipcMain.handle("sftp-list", (_e, { id, remotePath }) => sftp.listRemote(id, remotePath));
-  ipcMain.handle("sftp-download", (_e, { id, remotePath, localPath }) =>
+  ipcMain.handle("sftp-download", (e, { id, remotePath, localPath }) =>
     sftp.downloadFile(id, remotePath, localPath, (msg) => {
+      try { e.sender.send("sftp-progress", msg); } catch {}
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
     }),
   );
-  const sendSftpProgress = (msg) => {
+  const sendSftpProgress = (e, msg) => {
+    try {
+      if (msg && typeof msg === "object") e.sender.send("sftp-upload-progress", msg);
+      else e.sender.send("sftp-progress", msg);
+    } catch {}
     const win = global.STATE.mainWindow?.webContents;
-    if (!win) return;
+    if (!win || win.isDestroyed()) return;
     if (msg && typeof msg === "object") win.send("sftp-upload-progress", msg);
     else win.send("sftp-progress", msg);
   };
-  ipcMain.handle("sftp-download-batch", (_e, { id, items, retry }) =>
-    sftp.downloadBatch(id, items, sendSftpProgress, { retry: !!retry }),
+  ipcMain.handle("sftp-download-batch", (e, { id, items, retry }) =>
+    sftp.downloadBatch(id, items, (msg) => sendSftpProgress(e, msg), { retry: !!retry }),
   );
-  ipcMain.handle("sftp-upload", (_e, { id, localPath, remotePath }) =>
-    sftp.uploadFile(id, localPath, remotePath, sendSftpProgress),
+  ipcMain.handle("sftp-upload", (e, { id, localPath, remotePath }) =>
+    sftp.uploadFile(id, localPath, remotePath, (msg) => sendSftpProgress(e, msg)),
   );
-  ipcMain.handle("sftp-upload-batch", (_e, { id, items, retry }) =>
-    sftp.uploadBatch(id, items, sendSftpProgress, { retry: !!retry }),
+  ipcMain.handle("sftp-upload-batch", (e, { id, items, retry }) =>
+    sftp.uploadBatch(id, items, (msg) => sendSftpProgress(e, msg), { retry: !!retry }),
   );
   ipcMain.handle("sftp-upload-cancel", () => sftp.cancelUpload());
-  ipcMain.handle("sftp-sync-upload", (_e, { id, changedOnly }) =>
+  ipcMain.handle("sftp-sync-upload", (e, { id, changedOnly }) =>
     sftp.syncUpload(id, (msg) => {
+      try { e.sender.send("sftp-progress", msg); } catch {}
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
     }, { changedOnly: !!changedOnly }),
   );
-  ipcMain.handle("sftp-sync-download", (_e, { id, changedOnly }) =>
+  ipcMain.handle("sftp-sync-download", (e, { id, changedOnly }) =>
     sftp.syncDownload(id, (msg) => {
+      try { e.sender.send("sftp-progress", msg); } catch {}
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
     }, { changedOnly: !!changedOnly }),
   );
@@ -557,19 +605,30 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-exec", (_e, { id, command }) => sftp.execCommand(id, command));
   ipcMain.handle("sftp-system-info", (_e, id) => sftp.getRemoteSystemInfo(id));
   ipcMain.handle("sftp-remote-stats", (_e, id) => sftp.getRemoteStats(id));
-  ipcMain.handle("sftp-shell-start", (_e, { id, cols, rows }) => sftp.startShell(id, cols, rows));
+  ipcMain.handle("sftp-shell-start", (e, { id, cols, rows, sessionId }) =>
+    sftp.startShell(id, cols, rows, { sessionId, webContentsId: e.sender.id }),
+  );
   ipcMain.handle("sftp-shell-write", (_e, { id, data }) => sftp.writeShell(id, data));
   ipcMain.handle("sftp-shell-resize", (_e, { id, cols, rows }) => sftp.resizeShell(id, cols, rows));
   ipcMain.handle("sftp-shell-stop", (_e, id) => sftp.stopShell(id));
-  ipcMain.handle("sftp-delete", (_e, { id, remotePath, isDirectory }) =>
+  ipcMain.handle("sftp-delete", (e, { id, remotePath, isDirectory }) =>
     sftp.deleteRemote(id, remotePath, isDirectory, (msg) => {
+      try { e.sender.send("sftp-upload-progress", msg); } catch {}
       global.STATE.mainWindow?.webContents?.send("sftp-upload-progress", msg);
     }),
   );
   ipcMain.handle("sftp-read-file", (_e, { id, remotePath }) => sftp.readRemoteFile(id, remotePath));
-  ipcMain.handle("sftp-write-file", (_e, { id, remotePath, content }) => sftp.writeRemoteFile(id, remotePath, content));
-  ipcMain.handle("sftp-upload-extract", (_e, { id, localZipPath, remotePath }) =>
+  ipcMain.handle("sftp-write-file", (_e, { id, remotePath, content, skipValidation, skipBackup }) =>
+    sftp.writeRemoteFile(id, remotePath, content, { skipValidation: !!skipValidation, skipBackup: !!skipBackup }),
+  );
+  ipcMain.handle("sftp-detect-language", (_e, remotePath) => ({
+    success: true,
+    language: sftp.detectEditorLanguage(remotePath),
+  }));
+  ipcMain.handle("sftp-validate-content", (_e, { remotePath, content }) => sftp.validateFileContent(remotePath, content));
+  ipcMain.handle("sftp-upload-extract", (e, { id, localZipPath, remotePath }) =>
     sftp.uploadAndExtract(id, localZipPath, remotePath, (msg) => {
+      try { e.sender.send("sftp-progress", msg); } catch {}
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
     }),
   );

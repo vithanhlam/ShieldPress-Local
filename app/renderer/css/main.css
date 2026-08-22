@@ -1158,6 +1158,87 @@ code,
   min-height: 240px;
 }
 
+#sftp-file-list,
+#sftp-term-files {
+  scrollbar-width: auto;
+}
+
+.is-drop-target {
+  outline: 2px dashed var(--accent) !important;
+  outline-offset: -4px;
+  background: rgba(61, 138, 255, 0.08) !important;
+}
+
+[data-drop-zone].is-drop-target {
+  outline: 2px dashed var(--accent) !important;
+  outline-offset: -6px;
+  background: rgba(61, 138, 255, 0.06) !important;
+}
+
+#sftp-file-list::-webkit-scrollbar,
+#sftp-term-files::-webkit-scrollbar {
+  width: 10px;
+  height: 12px;
+}
+
+#sftp-file-list::-webkit-scrollbar-thumb,
+#sftp-term-files::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.sftp-editor-modal {
+  width: 90vw !important;
+  height: 90vh !important;
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 12px;
+}
+
+.sftp-editor-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sftp-editor-meta {
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.sftp-editor-monaco {
+  flex: 1;
+  min-height: 360px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1e1e1e;
+}
+
+.sftp-editor-error {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: var(--red);
+  font-size: 12px;
+}
+
+.sftp-editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 #m-sftp-terminal .modal-resizable {
   display: flex;
   flex-direction: column;

@@ -381,6 +381,10 @@ app.on("before-quit", async (e) => {
     win2.webContents.send("quit-stopping");
   }
   await services.stopAll();
+  try {
+    const sftp = require("./src/main/sftp");
+    await sftp.disconnectAll();
+  } catch {}
   app.exit(0);
 });
 

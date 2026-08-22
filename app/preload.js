@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   // Projects
@@ -98,6 +98,15 @@ contextBridge.exposeInMainWorld("api", {
   openPhpMyAdmin: () => ipcRenderer.invoke("open-phpmyadmin"),
   openFileDialog: (opts) => ipcRenderer.invoke("open-file-dialog", opts),
 
+  // Absolute path for File objects from drag-drop / <input type=file>
+  getPathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file) || "";
+    } catch {
+      return (file && file.path) || "";
+    }
+  },
+
   // Page
   readPage: (name) => ipcRenderer.invoke("read-page", name),
 
@@ -135,7 +144,11 @@ contextBridge.exposeInMainWorld("api", {
   sftpSaveConnection: (d) => ipcRenderer.invoke("sftp-save-connection", d),
   sftpDeleteConnection: (id) => ipcRenderer.invoke("sftp-delete-connection", id),
   sftpConnect: (id) => ipcRenderer.invoke("sftp-connect", id),
+  sftpConnectSession: (sessionId) => ipcRenderer.invoke("sftp-connect-session", sessionId),
   sftpDisconnect: (id) => ipcRenderer.invoke("sftp-disconnect", id),
+  sftpDisconnectAll: () => ipcRenderer.invoke("sftp-disconnect-all"),
+  sftpCloseSession: (sessionId) => ipcRenderer.invoke("sftp-close-session", sessionId),
+  sftpOpenWindow: (kind, connectionId) => ipcRenderer.invoke("sftp-open-window", { kind, connectionId }),
   sftpList: (id, remotePath) => ipcRenderer.invoke("sftp-list", { id, remotePath }),
   sftpDownload: (id, remotePath, localPath) => ipcRenderer.invoke("sftp-download", { id, remotePath, localPath }),
   sftpDownloadBatch: (id, items, opts) => ipcRenderer.invoke("sftp-download-batch", { id, items, ...(opts || {}) }),
@@ -148,7 +161,7 @@ contextBridge.exposeInMainWorld("api", {
   sftpExec: (id, command) => ipcRenderer.invoke("sftp-exec", { id, command }),
   sftpSystemInfo: (id) => ipcRenderer.invoke("sftp-system-info", id),
   sftpRemoteStats: (id) => ipcRenderer.invoke("sftp-remote-stats", id),
-  sftpShellStart: (id, cols, rows) => ipcRenderer.invoke("sftp-shell-start", { id, cols, rows }),
+  sftpShellStart: (id, cols, rows, sessionId) => ipcRenderer.invoke("sftp-shell-start", { id, cols, rows, sessionId }),
   sftpShellWrite: (id, data) => ipcRenderer.invoke("sftp-shell-write", { id, data }),
   sftpShellResize: (id, cols, rows) => ipcRenderer.invoke("sftp-shell-resize", { id, cols, rows }),
   sftpShellStop: (id) => ipcRenderer.invoke("sftp-shell-stop", id),
@@ -156,7 +169,9 @@ contextBridge.exposeInMainWorld("api", {
   onSftpShellExit: (cb) => ipcRenderer.on("sftp-shell-exit", (_e, payload) => cb(payload)),
   sftpDelete: (id, remotePath, isDirectory) => ipcRenderer.invoke("sftp-delete", { id, remotePath, isDirectory }),
   sftpReadFile: (id, remotePath) => ipcRenderer.invoke("sftp-read-file", { id, remotePath }),
-  sftpWriteFile: (id, remotePath, content) => ipcRenderer.invoke("sftp-write-file", { id, remotePath, content }),
+  sftpWriteFile: (id, remotePath, content, opts) => ipcRenderer.invoke("sftp-write-file", { id, remotePath, content, ...(opts || {}) }),
+  sftpDetectLanguage: (remotePath) => ipcRenderer.invoke("sftp-detect-language", remotePath),
+  sftpValidateContent: (remotePath, content) => ipcRenderer.invoke("sftp-validate-content", { remotePath, content }),
   sftpUploadExtract: (id, localZipPath, remotePath) => ipcRenderer.invoke("sftp-upload-extract", { id, localZipPath, remotePath }),
   sftpMkdir: (id, remotePath) => ipcRenderer.invoke("sftp-mkdir", { id, remotePath }),
   sftpCreateFile: (id, remotePath) => ipcRenderer.invoke("sftp-create-file", { id, remotePath }),

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Remote Session</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); }
+    #remote-root { height: 100vh; display: flex; flex-direction: column; }
+    .remote-titlebar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      background: var(--bg1); flex-shrink: 0;
+      -webkit-app-region: drag;
+    }
+    .remote-titlebar button, .remote-titlebar .no-drag { -webkit-app-region: no-drag; }
+    .remote-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px; gap: 10px; }
+    #remote-browser-pane, #remote-terminal-pane { flex: 1; min-height: 0; display: none; flex-direction: column; }
+    #remote-browser-pane.active, #remote-terminal-pane.active { display: flex; }
+    #sftp-file-list, #sftp-term-files {
+      flex: 1; min-height: 0; overflow: auto;
+      border: 1px solid var(--border); border-radius: 8px;
+      scrollbar-width: auto;
+    }
+    #sftp-file-list::-webkit-scrollbar,
+    #sftp-term-files::-webkit-scrollbar { width: 10px; height: 12px; }
+    #sftp-file-list::-webkit-scrollbar-thumb,
+    #sftp-term-files::-webkit-scrollbar-thumb {
+      background: var(--border2); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box;
+    }
+    .sftp-terminal-layout { flex: 1; min-height: 0; }
+    #sftp-xterm { flex: 1; min-height: 280px; height: auto !important; }
+    #sftp-term-files { height: auto !important; }
+    #toast-container { position: fixed; right: 16px; bottom: 16px; z-index: 10000; display: flex; flex-direction: column; gap: 8px; }
+  </style>
+</head>
+<body>
+  <div id="remote-root">
+    <div class="remote-titlebar">
+      <i id="remote-kind-icon" class="fas fa-folder-open" style="color:var(--accent)"></i>
+      <strong id="remote-title">Remote</strong>
+      <span id="remote-status" style="margin-left:auto;font-size:12px;color:var(--green)" class="no-drag">
+        <i class="fas fa-circle" style="font-size:7px"></i> Connecting…
+      </span>
+      <button class="btn btn-ghost btn-sm no-drag" onclick="window.close()"><i class="fas fa-times"></i> Close</button>
+    </div>
+    <div class="remote-body">
+      <!-- Browser pane (SFTP / FTP) -->
+      <div id="remote-browser-pane" data-drop-zone="browser">
+        <input type="hidden" id="sftp-browser-conn-id"/>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="SFTP.browseUp()" title="Parent directory"><i class="fas fa-arrow-up"></i></button>
+          <input class="fi" id="sftp-current-path" style="flex:1;font-family:var(--mono);font-size:13px" readonly/>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);white-space:nowrap">
+            <input type="checkbox" id="sftp-show-hidden" checked onchange="SFTP.toggleHiddenFiles()"/>
+            Hidden files
+          </label>
+          <button class="btn btn-ghost btn-sm" onclick="SFTP.refreshBrowser()" title="Refresh"><i class="fas fa-sync"></i></button>
+        </div>
+        <div id="sftp-file-list" data-remote-browser="true"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFromDialog()"><i class="fas fa-upload"></i> Upload File</button>
+          <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFolderDialog()"><i class="fas fa-folder-open"></i> Upload Folder</button>
+          <button class="btn btn-ghost btn-sm" onclick="SFTP.createDirPrompt()"><i class="fas fa-folder-plus"></i> New Folder</button>
+          <button class="btn btn-ghost btn-sm" onclick="SFTP.openRemoteCreate('browser','file')"><i class="fas fa-file-medical"></i> New File</button>
+        </div>
+        <div id="sftp-xfer" class="sftp-xfer" style="display:none">
+          <div class="sftp-xfer-head">
+            <span id="sftp-xfer-label">Preparing upload...</span>
+            <span class="sftp-xfer-head-right">
+              <span id="sftp-xfer-count">0 / 0</span>
+              <button class="btn btn-ghost btn-xs sftp-xfer-stop" onclick="SFTP.stopUpload()"><i class="fas fa-stop"></i> Stop</button>
+            </span>
+          </div>
+          <div class="sftp-xfer-track"><div id="sftp-xfer-bar" class="sftp-xfer-bar"></div></div>
+          <div id="sftp-xfer-current" class="sftp-xfer-current"></div>
+          <div id="sftp-xfer-list" class="sftp-xfer-list"></div>
+        </div>
+      </div>
+
+      <!-- Terminal pane -->
+      <div id="remote-terminal-pane">
+        <input type="hidden" id="sftp-term-conn-id"/>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div id="sftp-term-metrics" class="sftp-term-metrics"></div>
+          <div id="sftp-term-os" style="font-size:11px;color:var(--green)"><i class="fas fa-circle" style="font-size:7px"></i> Connected</div>
+        </div>
+        <div class="sftp-terminal-layout" style="--sftp-files-col:340px">
+          <aside data-drop-zone="terminal" style="min-width:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg1);display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:6px;padding:9px 10px;border-bottom:1px solid var(--border);background:var(--bg2)">
+              <i class="fas fa-folder-open" style="color:var(--yellow)"></i>
+              <strong style="font-size:12px">Remote Files</strong>
+              <button class="btn btn-ghost btn-xs" style="margin-left:auto" onclick="SFTP.termBrowseUp()"><i class="fas fa-arrow-up"></i></button>
+              <button class="btn btn-ghost btn-xs" onclick="SFTP.loadTermFiles()"><i class="fas fa-sync"></i></button>
+            </div>
+            <div style="display:flex;gap:5px;padding:7px;border-bottom:1px solid var(--border)">
+              <input id="sftp-term-path" class="fi" style="min-width:0;flex:1;font-family:var(--mono);font-size:11px;padding:6px" onkeydown="if(event.key==='Enter')SFTP.termGoPath()"/>
+              <button class="btn btn-ghost btn-xs" onclick="SFTP.termGoPath()"><i class="fas fa-arrow-right"></i></button>
+            </div>
+            <div id="sftp-term-files" data-terminal-remote-browser="true" style="flex:1;min-height:0;overflow:auto"></div>
+            <div id="sftp-term-xfer" class="sftp-xfer" style="display:none;margin:8px">
+              <div class="sftp-xfer-head">
+                <span id="sftp-term-xfer-label">Preparing...</span>
+                <span class="sftp-xfer-head-right"><span id="sftp-term-xfer-count">0 / 0</span></span>
+              </div>
+              <div class="sftp-xfer-track"><div id="sftp-term-xfer-bar" class="sftp-xfer-bar"></div></div>
+              <div id="sftp-term-xfer-current" class="sftp-xfer-current"></div>
+              <div id="sftp-term-xfer-list" class="sftp-xfer-list"></div>
+            </div>
+          </aside>
+          <div class="sftp-terminal-splitter" id="sftp-term-splitter" title="Drag to resize"></div>
+          <section style="min-width:0;display:flex;flex-direction:column;min-height:0">
+            <div class="sftp-terminal-toolbar">
+              <span><i class="fas fa-circle" style="color:var(--green);font-size:7px"></i> SSH</span>
+              <button class="btn btn-ghost btn-xs" onclick="SFTP.copyTerminalSelection()"><i class="fas fa-copy"></i></button>
+              <button class="btn btn-ghost btn-xs" onclick="SFTP.pasteIntoTerminal()"><i class="fas fa-paste"></i></button>
+              <button class="btn btn-ghost btn-xs" onclick="SFTP.adjustTerminalFont(-1)">A−</button>
+              <button class="btn btn-ghost btn-xs" onclick="SFTP.adjustTerminalFont(1)">A+</button>
+              <button class="btn btn-ghost btn-xs" onclick="SFTP.execClear()"><i class="fas fa-eraser"></i></button>
+            </div>
+            <div id="sftp-xterm" style="background:#080b11;border:1px solid var(--border);border-radius:8px;padding:8px;overflow:hidden;flex:1;min-height:0"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nested modals used by SFTP helpers -->
+  <div class="overlay overlay-nested" id="m-sftp-create" onclick="closeIfOverlay(event,'m-sftp-create')">
+    <div class="modal" style="max-width:440px">
+      <div class="modal-title"><i id="sftp-create-icon" class="fas fa-file-medical"></i> <span id="sftp-create-title">New File</span></div>
+      <input type="hidden" id="sftp-create-scope"/><input type="hidden" id="sftp-create-kind"/>
+      <div class="fg">
+        <div><div class="fl">Name</div><input class="fi" id="sftp-create-name" onkeydown="if(event.key==='Enter')SFTP.submitRemoteCreate()"/></div>
+        <div id="sftp-create-location" style="font-family:var(--mono);font-size:11px;color:var(--text3)"></div>
+        <div id="sftp-create-error" style="display:none;color:var(--red);font-size:12px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('m-sftp-create')">Cancel</button>
+        <button class="btn btn-primary" onclick="SFTP.submitRemoteCreate()">Create</button>
+      </div>
+    </div>
+  </div>
+  <div class="overlay overlay-nested" id="m-sftp-rename" onclick="closeIfOverlay(event,'m-sftp-rename')">
+    <div class="modal" style="max-width:440px">
+      <div class="modal-title"><i class="fas fa-i-cursor"></i> <span id="sftp-rename-title">Rename</span></div>
+      <input type="hidden" id="sftp-rename-scope"/><input type="hidden" id="sftp-rename-path"/>
+      <div class="fg">
+        <div><div class="fl">New name</div><input class="fi" id="sftp-rename-name" onkeydown="if(event.key==='Enter')SFTP.submitRemoteRename()"/></div>
+        <div id="sftp-rename-location" style="font-family:var(--mono);font-size:11px;color:var(--text3)"></div>
+        <div id="sftp-rename-error" style="display:none;color:var(--red);font-size:12px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('m-sftp-rename')">Cancel</button>
+        <button class="btn btn-primary" onclick="SFTP.submitRemoteRename()">Rename</button>
+      </div>
+    </div>
+  </div>
+  <div class="overlay overlay-nested" id="m-sftp-editor" onclick="closeIfOverlay(event,'m-sftp-editor')">
+    <div class="modal sftp-editor-modal">
+      <div class="modal-title sftp-editor-titlebar">
+        <i class="fas fa-edit"></i>
+        <span id="sftp-editor-file"></span>
+        <span id="sftp-editor-lang" class="sftp-editor-meta"></span>
+        <span id="sftp-editor-encoding" class="sftp-editor-meta">UTF-8</span>
+      </div>
+      <input type="hidden" id="sftp-editor-conn-id"/>
+      <input type="hidden" id="sftp-editor-path"/>
+      <div id="sftp-editor-monaco" class="sftp-editor-monaco"></div>
+      <textarea id="sftp-editor-content" class="fi" style="display:none"></textarea>
+      <div id="sftp-editor-error" class="sftp-editor-error" style="display:none"></div>
+      <div class="modal-footer sftp-editor-footer">
+        <span id="sftp-editor-cursor" class="sftp-editor-meta">Ln 1, Col 1</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost" onclick="SFTP.cancelFileEdit()">Cancel</button>
+          <button class="btn btn-primary" onclick="SFTP.saveFileEdit()"><i class="fas fa-save"></i> Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="js/remote-bootstrap.js"></script>
+  <script src="js/sftp.js"></script>
+  <script src="js/context-menu.js"></script>
+  <script src="js/monaco-loader.js"></script>
+  <script src="js/remote-session.js"></script>
+</body>
+</html>

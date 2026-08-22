@@ -102,23 +102,33 @@ window.ContextMenu = {
     const directory = item?.type === "directory";
     const editable = item?.editable;
     const action = target.scope === "terminal" ? "termContext" : "context";
+    const relativeHint = item
+      ? (item.path.startsWith(target.currentPath) ? item.path.slice(target.currentPath.replace(/\/+$/, "").length).replace(/^\//, "") : item.name)
+      : "";
     this.el.innerHTML = `
       <div class="ctx-section">${SFTP._esc(heading || "Remote Files")}</div>
+      ${item && directory ? `<div class="ctx-item" onclick="SFTP.${action}OpenFolder('${encoded}');ContextMenu.hide()"><i class="fas fa-folder-open"></i> Open</div>` : ""}
+      ${item && !directory && editable ? `<div class="ctx-item" onclick="SFTP.${action}Edit('${encoded}');ContextMenu.hide()"><i class="fas fa-edit"></i> Edit</div>` : ""}
+      ${item && target.scope !== "terminal" && directory ? "" : ""}
+      ${item && target.scope === "browser" && !directory ? "" : ""}
       ${item ? `<div class="ctx-item" onclick="SFTP.${action}Download('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-download"></i> Download${directory ? " Folder" : ""}</div>` : ""}
-      ${item && !directory && editable ? `<div class="ctx-item" onclick="SFTP.${action}Edit('${encoded}');ContextMenu.hide()"><i class="fas fa-edit"></i> Edit in ShieldPress</div>
-        <div class="ctx-item" onclick="SFTP.${action}OpenExternal('${encoded}');ContextMenu.hide()"><i class="fas fa-external-link-alt"></i> Open in Default Editor</div>
+      <div class="ctx-item" onclick="SFTP.${action === "termContext" ? "termUploadFiles" : "uploadFromDialog"}();ContextMenu.hide()"><i class="fas fa-upload"></i> Upload Here</div>
+      ${item && !directory && editable ? `<div class="ctx-item" onclick="SFTP.${action}OpenExternal('${encoded}');ContextMenu.hide()"><i class="fas fa-external-link-alt"></i> Open in Default Editor</div>
         <div class="ctx-item" onclick="SFTP.${action}OpenWith('${encoded}');ContextMenu.hide()"><i class="fas fa-code"></i> Open With...</div>` : ""}
-      ${item && directory ? `<div class="ctx-item" onclick="SFTP.${action}OpenFolder('${encoded}');ContextMenu.hide()"><i class="fas fa-folder-open"></i> Open Folder</div>` : ""}
-      ${item ? `<div class="ctx-item" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'));ContextMenu.hide()"><i class="fas fa-copy"></i> Copy Path</div>
-        <div class="ctx-divider"></div>
-        <div class="ctx-item" onclick="SFTP.${action}Clone('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-clone"></i> Duplicate</div>
+      ${item ? `<div class="ctx-divider"></div>
         <div class="ctx-item" onclick="SFTP.${action}Rename('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-i-cursor"></i> Rename</div>
+        <div class="ctx-item" onclick="SFTP.${action}Clone('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-clone"></i> Duplicate</div>
         <div class="ctx-item" onclick="SFTP.${action}Move('${encoded}');ContextMenu.hide()"><i class="fas fa-arrows-alt"></i> Move...</div>` : ""}
-      ${item ? '<div class="ctx-divider"></div>' : ""}
+      <div class="ctx-divider"></div>
       <div class="ctx-item" onclick="SFTP.${action}NewFile();ContextMenu.hide()"><i class="fas fa-file-medical"></i> New File</div>
       <div class="ctx-item" onclick="SFTP.${action}NewFolder();ContextMenu.hide()"><i class="fas fa-folder-plus"></i> New Folder</div>
       <div class="ctx-item" onclick="SFTP.${action}Refresh();ContextMenu.hide()"><i class="fas fa-sync"></i> Refresh</div>
-      ${item ? `<div class="ctx-divider"></div><div class="ctx-item ctx-danger" onclick="SFTP.${action}Delete('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-trash"></i> Delete</div>` : ""}
+      ${item ? `<div class="ctx-divider"></div>
+        <div class="ctx-item" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'));ContextMenu.hide()"><i class="fas fa-copy"></i> Copy Path</div>
+        <div class="ctx-item" onclick="navigator.clipboard.writeText('${relativeHint.replace(/'/g, "\\'")}').then(()=>toast('Relative path copied','success'));ContextMenu.hide()"><i class="fas fa-copy"></i> Copy Relative Path</div>
+        <div class="ctx-item" onclick="toast('Name: ${SFTP._esc(item.name)}\\nPath: ${SFTP._esc(item.path)}\\nType: ${directory ? "Folder" : "File"}','info');ContextMenu.hide()"><i class="fas fa-info-circle"></i> Properties</div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-item ctx-danger" onclick="SFTP.${action}Delete('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-trash"></i> Delete</div>` : ""}
     `;
     this._position(x, y);
   },
