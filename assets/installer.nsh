@@ -29,30 +29,6 @@
   _sp_vc_ok:
 !macroend
 
-; ── Uninstall: offer to remove workspace data ─────────────────────────────────
-!macro customUnInstall
-  IfFileExists "C:\ShieldPress_Project\*.*" 0 _sp_check_d
-    MessageBox MB_YESNO|MB_ICONQUESTION "Do you want to remove all ShieldPress Local data?$\n$\nC:\ShieldPress_Project$\n$\nThis will permanently delete all projects, databases, backups, and configurations." IDYES _sp_remove_c IDNO _sp_check_d
-    _sp_remove_c:
-      RMDir /r "C:\ShieldPress_Project"
-
-  _sp_check_d:
-  IfFileExists "D:\ShieldPress_Project\*.*" 0 _sp_check_e
-    MessageBox MB_YESNO|MB_ICONQUESTION "Remove ShieldPress Local data on D: drive?$\n$\nD:\ShieldPress_Project" IDYES _sp_remove_d IDNO _sp_check_e
-    _sp_remove_d:
-      RMDir /r "D:\ShieldPress_Project"
-
-  _sp_check_e:
-  IfFileExists "E:\ShieldPress_Project\*.*" 0 _sp_check_f
-    MessageBox MB_YESNO|MB_ICONQUESTION "Remove ShieldPress Local data on E: drive?$\n$\nE:\ShieldPress_Project" IDYES _sp_remove_e IDNO _sp_check_f
-    _sp_remove_e:
-      RMDir /r "E:\ShieldPress_Project"
-
-  _sp_check_f:
-  IfFileExists "F:\ShieldPress_Project\*.*" 0 _sp_cleanup_done
-    MessageBox MB_YESNO|MB_ICONQUESTION "Remove ShieldPress Local data on F: drive?$\n$\nF:\ShieldPress_Project" IDYES _sp_remove_f IDNO _sp_cleanup_done
-    _sp_remove_f:
-      RMDir /r "F:\ShieldPress_Project"
-
-  _sp_cleanup_done:
-!macroend
+; Workspace data is intentionally never removed by the installer or updater.
+; Project folders may be outside the application directory and must survive
+; both upgrades and uninstallation.

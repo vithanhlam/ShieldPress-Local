@@ -56,11 +56,47 @@ window.SFTP = {
   async refreshVaultStatus() {
     this._vault = await api.sftpVaultStatus();
     const btn = document.getElementById("sftp-vault-btn");
+    const changeBtn = document.getElementById("sftp-vault-change-btn");
     if (!btn) return;
     btn.innerHTML = this._vault.unlocked
       ? '<i class="fas fa-lock-open"></i> Vault unlocked'
       : '<i class="fas fa-lock"></i> Vault locked';
     btn.style.color = this._vault.unlocked ? "var(--green)" : "var(--yellow)";
+    if (changeBtn) changeBtn.style.display = this._vault.unlocked ? "inline-flex" : "none";
+  },
+
+  openChangeVault() {
+    if (!this._vault.unlocked) return this.openVault();
+    for (const id of ["sftp-vault-current-pass", "sftp-vault-new-pass", "sftp-vault-new-confirm"]) {
+      document.getElementById(id).value = "";
+    }
+    openModal("m-sftp-vault-change");
+    setTimeout(() => document.getElementById("sftp-vault-current-pass")?.focus(), 50);
+  },
+
+  changeVaultKeyDown(event, isConfirmation) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (!isConfirmation) return this.submitChangeVault();
+    this.submitChangeVault();
+  },
+
+  cancelChangeVault() {
+    closeModal("m-sftp-vault-change");
+  },
+
+  async submitChangeVault() {
+    const currentPassword = document.getElementById("sftp-vault-current-pass").value;
+    const newPassword = document.getElementById("sftp-vault-new-pass").value;
+    const confirmation = document.getElementById("sftp-vault-new-confirm").value;
+    if (newPassword.length < 12) return toast("Master Password must contain at least 12 characters", "warn");
+    if (newPassword !== confirmation) return toast("Master Password confirmation does not match", "warn");
+    const result = await api.sftpVaultChangePassword({ currentPassword, newPassword });
+    if (!result.success) return toast(result.message, "error");
+    this.cancelChangeVault();
+    await this.refreshVaultStatus();
+    await this.load();
+    toast("Credential vault password changed", "success");
   },
 
   async openVault(onUnlocked = null) {

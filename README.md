@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.30)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.31)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.30.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.30_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.31.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.31_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -168,21 +168,21 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download `ShieldPress.Local.Setup.2.5.30.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.5.31.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.30_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.30_amd64.deb`
+1. Download `shieldpresslocal_2.5.31_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.31_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 
 The Ubuntu package includes isolated PHP 8.3, PHP 8.4, and PHP 8.5 runtimes. Projects always start with the exact PHP version selected in their configuration. The extension manager detects Linux `.so` modules for the bundled versions and can install ionCube Loader 15.5 for PHP 8.3–8.5.
 
-When using SFTP or FTP for the first time, create a Master Password from the **Credential Vault** button. Workspaces copied from another computer may require you to edit legacy connections and enter their passwords once so they can be re-encrypted in the portable vault. Prefer SFTP or FTPS over unencrypted FTP.
+When using SFTP or FTP for the first time, create a Master Password from the **Credential Vault** button. You can change the Vault password later from **Change pass**; this only re-encrypts local credentials and does not change passwords on remote servers. The app verifies and backs up the Vault before committing the change. Workspaces copied from another computer may require you to edit legacy connections and enter their passwords once so they can be re-encrypted in the portable vault. Prefer SFTP or FTPS over unencrypted FTP.
 
 Remote connection settings are portable. Copy the workspace `data/remote-connections/` directory to the same location on another computer, then unlock it with the same Master Password. This directory contains connection metadata and encrypted passwords; private key files referenced from another location must be copied separately and selected again on the new computer.
 

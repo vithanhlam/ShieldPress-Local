@@ -141,6 +141,7 @@ contextBridge.exposeInMainWorld("api", {
   sftpVaultStatus: () => ipcRenderer.invoke("sftp-vault-status"),
   sftpVaultSetup: (password) => ipcRenderer.invoke("sftp-vault-setup", password),
   sftpVaultUnlock: (password) => ipcRenderer.invoke("sftp-vault-unlock", password),
+  sftpVaultChangePassword: (data) => ipcRenderer.invoke("sftp-vault-change-password", data),
   sftpVaultLock: () => ipcRenderer.invoke("sftp-vault-lock"),
   sftpGetConnections: () => ipcRenderer.invoke("sftp-get-connections"),
   sftpSaveConnection: (d) => ipcRenderer.invoke("sftp-save-connection", d),

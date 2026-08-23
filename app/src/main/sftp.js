@@ -59,7 +59,41 @@ function getVaultFile() {
   return path.join(getRemoteDataDir(), "vault.json");
 }
 
+function getVaultTransactionPaths() {
+  const dir = getRemoteDataDir();
+  return {
+    vault: path.join(dir, "vault.json"),
+    connections: path.join(dir, "connections.json"),
+    vaultBackup: path.join(dir, "vault.json.rekey-backup"),
+    connectionsBackup: path.join(dir, "connections.json.rekey-backup"),
+    vaultNext: path.join(dir, "vault.json.rekey-next"),
+    connectionsNext: path.join(dir, "connections.json.rekey-next"),
+  };
+}
+
+async function recoverVaultTransaction() {
+  const paths = getVaultTransactionPaths();
+  const hasBackups = await fs.pathExists(paths.vaultBackup) || await fs.pathExists(paths.connectionsBackup);
+  if (!hasBackups) return;
+
+  // A process crash during commit can leave one or both live files missing.
+  // Restore both originals before any further vault operation.
+  const incomplete = !(await fs.pathExists(paths.vault)) || !(await fs.pathExists(paths.connections));
+  if (incomplete) {
+    await fs.remove(paths.vault);
+    await fs.remove(paths.connections);
+    if (await fs.pathExists(paths.vaultBackup)) await fs.rename(paths.vaultBackup, paths.vault);
+    if (await fs.pathExists(paths.connectionsBackup)) await fs.rename(paths.connectionsBackup, paths.connections);
+  } else {
+    await fs.remove(paths.vaultBackup);
+    await fs.remove(paths.connectionsBackup);
+  }
+  await fs.remove(paths.vaultNext);
+  await fs.remove(paths.connectionsNext);
+}
+
 async function readVaultMetadata() {
+  await recoverVaultTransaction();
   try { return await fs.readJson(getVaultFile()); } catch { return null; }
 }
 
@@ -95,6 +129,112 @@ async function unlockVault(masterPassword) {
     vaultKey = null;
     return { success: false, message: "Invalid Master Password" };
   }
+}
+
+async function changeVaultPassword(currentPassword, newPassword) {
+  const nextPassword = String(newPassword || "");
+  if (nextPassword.length < 12) {
+    return { success: false, message: "Master Password must contain at least 12 characters" };
+  }
+  const metadata = await readVaultMetadata();
+  if (!metadata) return { success: false, message: "Master Password has not been set" };
+  const paths = getVaultTransactionPaths();
+
+  let currentKey;
+  try {
+    currentKey = vaultCrypto.unlock(currentPassword, metadata);
+  } catch {
+    return { success: false, message: "Current Master Password is invalid" };
+  }
+
+  // Decrypt everything before writing anything, so a bad credential cannot
+  // leave the vault half-rekeyed.
+  const connectionsFile = getConnectionsFile();
+  let connections = [];
+  if (await fs.pathExists(connectionsFile)) {
+    try {
+      connections = await fs.readJson(connectionsFile);
+    } catch {
+      return { success: false, message: "Saved server credentials could not be read" };
+    }
+  }
+  const plaintextPasswords = [];
+  try {
+    for (const connection of connections) {
+      if (!connection.password || !String(connection.password).startsWith("v2:")) {
+        const plaintext = connection.password ? decryptLegacy(connection.password) : "";
+        if (connection.password && !plaintext) {
+          throw new Error("Legacy credential could not be decrypted");
+        }
+        plaintextPasswords.push(plaintext);
+        continue;
+      }
+      plaintextPasswords.push(vaultCrypto.open(connection.password, currentKey));
+    }
+  } catch {
+    return { success: false, message: "A saved server credential could not be decrypted" };
+  }
+
+  const created = vaultCrypto.createMetadata(nextPassword);
+  const rekeyedConnections = connections.map((connection, index) => ({
+    ...connection,
+    password: plaintextPasswords[index]
+      ? vaultCrypto.seal(plaintextPasswords[index], created.key)
+      : "",
+  }));
+
+  // Stage and verify the complete new vault before touching the live files.
+  await fs.writeJson(paths.connectionsNext, rekeyedConnections, { spaces: 2, mode: 0o600 });
+  await fs.writeJson(paths.vaultNext, created.metadata, { spaces: 2, mode: 0o600 });
+  const stagedMetadata = await fs.readJson(paths.vaultNext);
+  const stagedKey = vaultCrypto.unlock(nextPassword, stagedMetadata);
+  const stagedConnections = await fs.readJson(paths.connectionsNext);
+  for (const connection of stagedConnections) {
+    if (connection.password && String(connection.password).startsWith("v2:")) {
+      vaultCrypto.open(connection.password, stagedKey);
+    }
+  }
+
+  // Keep the old pair until the new pair has been committed and verified.
+  await fs.remove(paths.vaultBackup);
+  await fs.remove(paths.connectionsBackup);
+  await fs.copyFile(paths.vault, paths.vaultBackup);
+  if (await fs.pathExists(paths.connections)) {
+    await fs.copyFile(paths.connections, paths.connectionsBackup);
+  }
+
+  try {
+    await disconnectAll();
+    await fs.remove(paths.connections);
+    await fs.rename(paths.connectionsNext, paths.connections);
+    await fs.remove(paths.vault);
+    await fs.rename(paths.vaultNext, paths.vault);
+
+    // Verify the actual committed files, not only the staged copies.
+    const committedMetadata = await fs.readJson(paths.vault);
+    const committedKey = vaultCrypto.unlock(nextPassword, committedMetadata);
+    const committedConnections = await fs.readJson(paths.connections);
+    for (const connection of committedConnections) {
+      if (connection.password && String(connection.password).startsWith("v2:")) {
+        vaultCrypto.open(connection.password, committedKey);
+      }
+    }
+  } catch (error) {
+    // Roll back immediately. recoverVaultTransaction() also handles a later
+    // restart if the process is interrupted during the commit sequence.
+    await fs.remove(paths.vault);
+    await fs.remove(paths.connections);
+    if (await fs.pathExists(paths.vaultBackup)) await fs.rename(paths.vaultBackup, paths.vault);
+    if (await fs.pathExists(paths.connectionsBackup)) await fs.rename(paths.connectionsBackup, paths.connections);
+    await fs.remove(paths.vaultNext);
+    await fs.remove(paths.connectionsNext);
+    return { success: false, message: `Vault password was not changed: ${error.message}` };
+  }
+
+  await fs.remove(paths.vaultBackup);
+  await fs.remove(paths.connectionsBackup);
+  vaultKey = created.key;
+  return { success: true, configured: true, unlocked: true };
 }
 
 async function lockVault() {
@@ -2399,6 +2539,7 @@ module.exports = {
   getVaultStatus,
   setupVault,
   unlockVault,
+  changeVaultPassword,
   lockVault,
   getConnections,
   saveConnection,

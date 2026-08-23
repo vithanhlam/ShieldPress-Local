@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v2.5.31
+
+**Credential Vault security**
+- Adds changing the Vault Master Password from the SFTP & FTP page
+- Re-encrypts all saved SSH/FTP passwords without changing the passwords on remote servers
+- Verifies staged credentials before committing the change and automatically rolls back on failure
+- Preserves a recovery transaction if the application is interrupted during a Vault password change
+
+**Windows installer safety**
+- Stops the installer and updater from asking to delete or recursively removing project workspaces
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.31
+- Contributor: `vithanhlam`
+
 ## v2.5.30
 
 **Database security and credentials**

@@ -517,6 +517,9 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-vault-status", () => sftp.getVaultStatus());
   ipcMain.handle("sftp-vault-setup", (_e, password) => sftp.setupVault(password));
   ipcMain.handle("sftp-vault-unlock", (_e, password) => sftp.unlockVault(password));
+  ipcMain.handle("sftp-vault-change-password", (_e, data) =>
+    sftp.changeVaultPassword(data?.currentPassword, data?.newPassword),
+  );
   ipcMain.handle("sftp-vault-lock", () => sftp.lockVault());
   ipcMain.handle("sftp-get-connections", () => sftp.getConnections());
   ipcMain.handle("sftp-save-connection", (_e, d) => sftp.saveConnection(d));

@@ -17,11 +17,36 @@
     <button class="btn btn-ghost" id="sftp-vault-btn" onclick="SFTP.openVault()" title="Credential vault">
       <i class="fas fa-lock"></i> Vault
     </button>
+    <button class="btn btn-ghost" id="sftp-vault-change-btn" onclick="SFTP.openChangeVault()" title="Change vault password" style="display:none">
+      <i class="fas fa-key"></i> Change pass
+    </button>
     <button class="btn btn-primary" onclick="SFTP.openAdd()">
       <i class="fas fa-plus"></i> New Connection
     </button>
   </div>
 </div>
+</div>
+
+<!-- Modal: change encrypted credential vault password -->
+<div class="overlay" id="m-sftp-vault-change" onclick="if(event.target===this)SFTP.cancelChangeVault()">
+  <div class="modal" style="max-width:430px">
+    <div class="modal-title"><i class="fas fa-key"></i> Change Vault Password</div>
+    <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-top:0">
+      This changes only the local Vault encryption. SSH/FTP server passwords are not changed. All saved credentials are verified and backed up before the change.
+    </p>
+    <div class="fg">
+      <div><div class="fl">Current Master Password</div>
+        <input class="fi" id="sftp-vault-current-pass" type="password" autocomplete="current-password" onkeydown="SFTP.changeVaultKeyDown(event, false)"/></div>
+      <div><div class="fl">New Master Password</div>
+        <input class="fi" id="sftp-vault-new-pass" type="password" autocomplete="new-password" onkeydown="SFTP.changeVaultKeyDown(event, false)"/></div>
+      <div><div class="fl">Confirm New Master Password</div>
+        <input class="fi" id="sftp-vault-new-confirm" type="password" autocomplete="new-password" onkeydown="SFTP.changeVaultKeyDown(event, true)"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="SFTP.cancelChangeVault()">Cancel</button>
+      <button class="btn btn-primary" onclick="SFTP.submitChangeVault()"><i class="fas fa-save"></i> Change password</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: Create remote file or folder -->
