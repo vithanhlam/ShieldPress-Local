@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld("api", {
   openImportDialog: () => ipcRenderer.invoke("open-import-dialog"),
   getMariaDBPort: () => ipcRenderer.invoke("get-mariadb-port"),
   setMariaDBPort: (port) => ipcRenderer.invoke("set-mariadb-port", port),
+  getRootPasswordStatus: () => ipcRenderer.invoke("get-root-password-status"),
+  changeRootPassword: (password) => ipcRenderer.invoke("change-root-password", password),
 
   // Laravel
   installLaravel: (d) => ipcRenderer.invoke("install-laravel", d),

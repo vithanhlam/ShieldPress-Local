@@ -187,6 +187,8 @@ function register(ipcMain, shell, dialog) {
       return { success: false, message: err.message };
     }
   });
+  ipcMain.handle("get-root-password-status", () => db.getRootPasswordStatus());
+  ipcMain.handle("change-root-password", (_e, password) => db.changeRootPassword(password));
 
   // ── Laravel ──
   ipcMain.handle("install-laravel", (e, d) =>

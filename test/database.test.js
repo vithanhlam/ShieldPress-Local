@@ -8,6 +8,12 @@ test("Windows MariaDB commands include the configured root password", () => {
   ]);
 });
 
+test("Windows MariaDB commands preserve an intentionally empty root password", () => {
+  assert.deepEqual(connectionArgsFor("win32", { port: 3310, root_password: "" }), [
+    "-h", "127.0.0.1", "-P", "3310", "-u", "root", "--password=",
+  ]);
+});
+
 test("Linux MariaDB commands use the isolated port without a password", () => {
   assert.deepEqual(connectionArgsFor("linux", { port: 3307, root_password: "ignored" }), [
     "-h", "127.0.0.1", "-P", "3307", "-u", "root",

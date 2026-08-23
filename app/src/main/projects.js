@@ -350,7 +350,9 @@ async function createProject(data) {
     phpVersion: phpVersion || "8.3",
     dbName: db,
     dbUser: "root",
-    dbPassword: platform.isWindows ? (cfg.mysql.root_password || "root") : "",
+    dbPassword: platform.isWindows
+      ? (cfg.mysql.root_password === undefined ? "root" : cfg.mysql.root_password)
+      : "",
     dbPort: cfg.mysql?.port || (process.platform === "win32" ? 3306 : 3307),
     projectType: type,
     nodePort: nodePort || 3000,

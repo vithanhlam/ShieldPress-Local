@@ -28,7 +28,9 @@ async function installWordPress(data) {
   const cfg    = await fs.readJson(CONFIG_FILE);
   const dbPort = cfg.mysql?.port || proj.dbPort || (process.platform === "win32" ? 3306 : 3307);
   const dbPassword = platform.isWindows
-    ? (cfg.mysql?.root_password || proj.dbPassword || "root")
+    ? (cfg.mysql?.root_password !== undefined
+      ? cfg.mysql.root_password
+      : (proj.dbPassword === undefined ? "root" : proj.dbPassword))
     : (proj.dbUser && proj.dbUser !== "root" ? (proj.dbPassword || "") : "");
   const salts = {
     auth: wpSalt(),

@@ -46,8 +46,48 @@
   <span id="db-port-status" style="font-size:12px;color:var(--text3)"></span>
 </div>
 
+<div class="card" style="margin-bottom:12px">
+  <div class="card-hdr">
+    <span class="card-title"><i class="fas fa-key" style="color:var(--yellow)"></i> MariaDB root password</span>
+    <span id="db-root-password-status" class="tag">Checking...</span>
+  </div>
+  <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div style="font-size:12px;color:var(--text3)">
+      This password is used by local WordPress and Laravel projects.
+      Leave the new password empty to disable password authentication.
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="openModal('m-root-password')">
+      <i class="fas fa-key"></i> Change password
+    </button>
+  </div>
+</div>
+
 <div id="db-list">
   <div class="loading"><i class="fas fa-spinner fa-spin"></i></div>
+</div>
+
+<!-- Modal: Root password -->
+<div class="overlay" id="m-root-password" onclick="closeIfOverlay(event,'m-root-password')">
+  <div class="modal">
+    <div class="modal-title"><i class="fas fa-key" style="color:var(--yellow)"></i> Change root password</div>
+    <p style="font-size:13px;color:var(--text3);margin:0 0 14px">
+      MariaDB must be running. Existing local projects using root will be updated automatically.
+    </p>
+    <div class="fg">
+      <div><div class="fl">New password</div>
+        <input class="fi" id="db-root-password-input" type="password" autocomplete="new-password"
+          placeholder="Leave empty for no password"/>
+      </div>
+      <div><div class="fl">Confirm password</div>
+        <input class="fi" id="db-root-password-confirm" type="password" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter') Database.changeRootPassword()"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('m-root-password')">Cancel</button>
+      <button class="btn btn-primary" onclick="Database.changeRootPassword()"><i class="fas fa-save"></i> Save password</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: Create DB -->

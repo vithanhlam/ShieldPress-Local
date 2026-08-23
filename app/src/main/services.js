@@ -849,7 +849,9 @@ async function stopMariaDB() {
       const port = await getMariaDBPort();
       let mysqlConfig = {};
       try { mysqlConfig = (await fs.readJson(global.CONST.CONFIG_FILE)).mysql || {}; } catch {}
-      const auth = platform.isWindows ? [`--password=${mysqlConfig.root_password || "root"}`] : [];
+      const auth = platform.isWindows
+        ? [`--password=${mysqlConfig.root_password === undefined ? "root" : mysqlConfig.root_password}`]
+        : [];
       await new Promise((resolve) => {
         const proc = spawn(mysqladmin, ["-h", "127.0.0.1", "-P", String(port), "-u", "root", ...auth, "shutdown"], { stdio: "ignore", ...WIN_SPAWN });
         const timer = setTimeout(() => { try { proc.kill(); } catch {} resolve(); }, 8000);

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v2.5.30
+
+**Database security and credentials**
+- Adds a Database page control for changing the MariaDB `root` password
+- Shows whether root currently has a password or requires no password
+- Allows intentionally setting an empty root password on both Ubuntu and Windows
+- Synchronizes root credential changes to local WordPress and Laravel projects
+
+**Laravel installation**
+- Fixes Laravel `.env` generation when `DB_*` entries are commented out in `.env.example`
+- Prevents Laravel from falling back to port `3306`, database `laravel`, or an empty password
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.30
+
 ## v2.5.29
 
 **Remote session lifecycle**

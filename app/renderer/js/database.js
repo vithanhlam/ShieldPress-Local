@@ -5,6 +5,7 @@ window.Database = {
     const el = document.getElementById("db-list");
     if (!el) return;
     await this.loadPortSetting();
+    await this.loadRootPasswordStatus();
     if (!App.serviceStatus.mariadb) {
       el.innerHTML =
         '<div class="empty-state"><i class="fas fa-database"></i><p>MariaDB is not running</p></div>';
@@ -171,6 +172,38 @@ window.Database = {
     } else {
       toast("Save failed: " + r.message, "error");
     }
+  },
+
+  async loadRootPasswordStatus() {
+    const status = document.getElementById("db-root-password-status");
+    if (!status) return;
+    const r = await api.getRootPasswordStatus();
+    if (!r.success) {
+      status.textContent = "Unavailable";
+      return;
+    }
+    status.textContent = r.hasPassword ? "Password configured" : "No password required";
+    status.style.color = r.hasPassword ? "var(--yellow)" : "var(--green)";
+  },
+
+  async changeRootPassword() {
+    const input = document.getElementById("db-root-password-input");
+    const confirm = document.getElementById("db-root-password-confirm");
+    const password = input?.value || "";
+    if (password !== (confirm?.value || "")) {
+      toast("Passwords do not match", "warn");
+      return;
+    }
+    const r = await api.changeRootPassword(password);
+    if (!r.success) {
+      toast("Change password failed: " + r.message, "error");
+      return;
+    }
+    closeModal("m-root-password");
+    if (input) input.value = "";
+    if (confirm) confirm.value = "";
+    await this.loadRootPasswordStatus();
+    toast(password ? "MariaDB root password updated" : "MariaDB root password cleared", "success");
   },
 
   async reload() {

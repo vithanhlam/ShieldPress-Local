@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.29)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.30)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.29.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.29_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.30.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.30_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -82,7 +82,7 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **Full Backup** | Backup source files + database into a single ZIP |
 | **Cloud Backup** | Backup to Google Drive, OneDrive, or Dropbox — no login required |
 | **Clone WordPress** | Clone any project with automatic URL replacement |
-| **Database Manager** | Create, import, export, and drop databases with progress, table count, and size |
+| **Database Manager** | Create, import, export, drop databases, and change the MariaDB root password |
 | **Project Disk Usage** | View total source and metadata size directly on every project card |
 | **Config Editor** | Edit php.ini, my.ini, and per-project Nginx config |
 | **SSL (HTTPS)** | One-click local HTTPS via mkcert |
@@ -168,15 +168,15 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download `ShieldPress.Local.Setup.2.5.29.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.5.30.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.29_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.29_amd64.deb`
+1. Download `shieldpresslocal_2.5.30_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.30_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 

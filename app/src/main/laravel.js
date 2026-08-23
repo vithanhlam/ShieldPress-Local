@@ -132,12 +132,14 @@ async function installLaravel({ id, phpVersion }, onProgress) {
 
   // Read app config for MariaDB port
   let dbPort = proj.dbPort || (process.platform === "win32" ? 3306 : 3307);
-  let dbPassword = platform.isWindows ? (proj.dbPassword || "root") : "";
+  let dbPassword = platform.isWindows
+    ? (proj.dbPassword === undefined ? "root" : proj.dbPassword)
+    : "";
   try {
     const cfg = await fs.readJson(CONFIG_FILE);
     dbPort = cfg.mysql?.port || (process.platform === "win32" ? 3306 : 3307);
     dbPassword = platform.isWindows
-      ? (cfg.mysql?.root_password || dbPassword)
+      ? (cfg.mysql?.root_password === undefined ? dbPassword : cfg.mysql.root_password)
       : (proj.dbUser && proj.dbUser !== "root" ? (proj.dbPassword || "") : "");
   } catch (_) {}
 
@@ -175,17 +177,26 @@ async function installLaravel({ id, phpVersion }, onProgress) {
 
     if (await fs.pathExists(envExample)) {
       let env = await fs.readFile(envExample, "utf8");
-      env = env
-        .replace(/APP_NAME=.*/,      `APP_NAME="${proj.name}"`)
-        .replace(/APP_ENV=.*/,       `APP_ENV=local`)
-        .replace(/APP_DEBUG=.*/,     `APP_DEBUG=true`)
-        .replace(/APP_URL=.*/,       `APP_URL=http://${proj.domain}:${proj.port}`)
-        .replace(/DB_CONNECTION=.*/, `DB_CONNECTION=mysql`)
-        .replace(/DB_HOST=.*/,       `DB_HOST=127.0.0.1`)
-        .replace(/DB_PORT=.*/,       `DB_PORT=${dbPort}`)
-        .replace(/DB_DATABASE=.*/,   `DB_DATABASE=${proj.dbName}`)
-        .replace(/DB_USERNAME=.*/,   `DB_USERNAME=${proj.dbUser || "root"}`)
-        .replace(/DB_PASSWORD=.*/,   `DB_PASSWORD=${dbPassword}`);
+      // Laravel's .env.example may ship DB_* settings commented out. Replace
+      // both active and commented settings, and append missing keys so the
+      // generated .env never falls back to Laravel's defaults (3306/laravel).
+      const setEnv = (key, value) => {
+        const line = `${key}=${value}`;
+        const pattern = new RegExp(`^\\s*#?\\s*${key}=.*$`, "m");
+        if (pattern.test(env)) env = env.replace(pattern, line);
+        else env += `${env.endsWith("\n") ? "" : "\n"}${line}\n`;
+      };
+
+      setEnv("APP_NAME",      `"${proj.name}"`);
+      setEnv("APP_ENV",       "local");
+      setEnv("APP_DEBUG",     "true");
+      setEnv("APP_URL",       `http://${proj.domain}:${proj.port}`);
+      setEnv("DB_CONNECTION", "mysql");
+      setEnv("DB_HOST",       "127.0.0.1");
+      setEnv("DB_PORT",       dbPort);
+      setEnv("DB_DATABASE",   proj.dbName);
+      setEnv("DB_USERNAME",   proj.dbUser || "root");
+      setEnv("DB_PASSWORD",   dbPassword);
       await fs.writeFile(envFile, env, "utf8");
     }
 

@@ -18,7 +18,8 @@ function connectionArgsFor(platformName, mysqlConfig = {}) {
   // The bundled Windows database is initialized with this root password.
   // Linux uses a separate passwordless, user-owned MariaDB instance.
   if (platformName === "win32") {
-    args.push(`--password=${mysqlConfig.root_password || "root"}`);
+    const password = mysqlConfig.root_password === undefined ? "root" : mysqlConfig.root_password;
+    args.push(`--password=${password}`);
   }
   return args;
 }
@@ -264,6 +265,104 @@ async function dropDatabase(dbName) {
   }
 }
 
+function escapeSqlString(value) {
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\0/g, "\\0")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+}
+
+async function getRootPasswordStatus() {
+  try {
+    const config = await fs.readJson(global.CONST.CONFIG_FILE);
+    const password = String(config.mysql?.root_password ?? "");
+    return {
+      success: true,
+      hasPassword: password.length > 0,
+      label: password.length > 0 ? "Password configured" : "No password required",
+    };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+async function syncProjectDatabasePasswords(password) {
+  const projectsDir = global.CONST.PROJECTS_DIR;
+  if (!projectsDir || !(await fs.pathExists(projectsDir))) return;
+
+  const entries = await fs.readdir(projectsDir, { withFileTypes: true });
+  await Promise.all(entries.filter((entry) => entry.isDirectory()).map(async (entry) => {
+    const projectDir = path.join(projectsDir, entry.name);
+    const projectFile = path.join(projectDir, "project.json");
+    if (!(await fs.pathExists(projectFile))) return;
+
+    try {
+      const project = await fs.readJson(projectFile);
+      if ((project.dbUser || "root") !== "root") return;
+
+      project.dbPassword = password;
+      await fs.writeJson(projectFile, project, { spaces: 2 });
+
+      const envFile = path.join(projectDir, "www", ".env");
+      if (await fs.pathExists(envFile)) {
+        let env = await fs.readFile(envFile, "utf8");
+        const line = `DB_PASSWORD=${password}`;
+        const pattern = /^\s*#?\s*DB_PASSWORD=.*$/m;
+        env = pattern.test(env)
+          ? env.replace(pattern, line)
+          : `${env}${env.endsWith("\n") ? "" : "\n"}${line}\n`;
+        await fs.writeFile(envFile, env, "utf8");
+      }
+
+      const wpConfig = path.join(projectDir, "www", "wp-config.php");
+      if (await fs.pathExists(wpConfig)) {
+        let content = await fs.readFile(wpConfig, "utf8");
+        content = content.replace(
+          /(define\(\s*['"]DB_PASSWORD['"]\s*,\s*['"])[^'"]*(['"]\s*\))/i,
+          (_match, prefix, suffix) => `${prefix}${password.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}${suffix}`,
+        );
+        await fs.writeFile(wpConfig, content, "utf8");
+      }
+    } catch (e) {
+      log.warn(`Could not sync database password for ${entry.name}: ${e.message}`);
+    }
+  }));
+}
+
+async function changeRootPassword(newPassword) {
+  const password = String(newPassword ?? "");
+  try {
+    const hostsOutput = await mysqlExec("SELECT Host FROM mysql.user WHERE User='root'");
+    const hosts = hostsOutput
+      .split(/\r?\n/)
+      .slice(1)
+      .map((host) => host.trim())
+      .filter(Boolean);
+    const rootHosts = hosts.length ? hosts : ["localhost"];
+    const sqlPassword = escapeSqlString(password);
+    const statements = rootHosts.map((host) =>
+      `ALTER USER 'root'@'${escapeSqlString(host)}' IDENTIFIED BY '${sqlPassword}'`,
+    );
+    await mysqlExec(`${statements.join("; ")}; FLUSH PRIVILEGES;`);
+
+    const config = await fs.readJson(global.CONST.CONFIG_FILE);
+    config.mysql = { ...(config.mysql || {}), root_password: password };
+    await fs.writeJson(global.CONST.CONFIG_FILE, config, { spaces: 2 });
+    await syncProjectDatabasePasswords(password);
+
+    log.ok(`MariaDB root password ${password ? "updated" : "cleared"}`);
+    return {
+      success: true,
+      hasPassword: password.length > 0,
+      label: password.length > 0 ? "Password configured" : "No password required",
+    };
+  } catch (e) {
+    return { success: false, message: String(e) };
+  }
+}
+
 // Execute raw SQL query and return formatted output
 async function execRawSql(sql) {
   try {
@@ -283,5 +382,7 @@ module.exports = {
   exportDatabase,
   importDatabase,
   dropDatabase,
+  getRootPasswordStatus,
+  changeRootPassword,
   execRawSql,
 };
