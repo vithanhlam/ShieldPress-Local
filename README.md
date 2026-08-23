@@ -234,9 +234,9 @@ ShieldPress Local does not collect, store, or transmit any of your data. All dat
 
 ---
 
-## Contributing
+## Báo lỗi
 
-Contributions are welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for how to fork the project, open pull requests, and submit changes.
+Hiện tại dự án không nhận đóng góp mã nguồn hoặc pull request. Nếu bạn phát hiện lỗi, vui lòng [tạo một GitHub Issue](https://github.com/vithanhlam/shieldpress-local/issues) và mô tả cách tái hiện lỗi. Mình sẽ kiểm tra và sửa lỗi.
 
 ## License
 
@@ -245,7 +245,7 @@ Copyright © 2026 ShieldPress. All rights reserved.
 
 **Source Available ≠ Open Source.** Publication on GitHub does not transfer ownership or make ShieldPress open-source software.
 
-- You may view, audit, clone, build, and modify the source for personal or internal use, and contribute through pull requests.
+- You may view, audit, clone, build, and modify the source for personal or internal use.
 - You may **not**, without written permission, redistribute source or binaries, publish a public fork, rebrand, sell, or offer ShieldPress as a competing or hosted commercial service.
 - Full terms: **[LICENSE](LICENSE)**
 - Brand / trademark rules: **[TRADEMARK.md](TRADEMARK.md)**
