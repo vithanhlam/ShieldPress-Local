@@ -1,6 +1,34 @@
 # Changelog
 
-## Unreleased
+## v2.5.32
+
+**PHP 8.5 on Ubuntu**
+- Replaces the broken PHP 8.5.9 bundle (linked against missing `libssl.so.4`) with Ubuntu 26.04's `8.5.4-0ubuntu1.2`
+- Re-syncs workspace PHP runtimes when a bundled binary fails to start or the package marker changes
+- Falls back to system `php-cgi8.x` when a bundled binary cannot load
+- Stops repeating the same PHP probe warning on every status poll
+
+**Laravel / Node tools**
+- Fixes `npm install` / `npm run dev` buttons doing nothing on Ubuntu when `x-terminal-emulator` is Terminator (rejected gnome-style `--` args)
+- Opens the project `www` directory correctly across Ptyxis, GNOME Terminal, Terminator, Konsole, and other common Linux terminals
+- Hardens the Windows launcher with an explicit window title and `/D` working directory for Command Prompt
+- Loads nvm/fnm/asdf (interactive bash + PATH bootstrap) so `npm` is found when the app is started from the GUI
+
+**Performance**
+- Stops blocking the Projects list on recursive disk size walks; sizes load asynchronously after cards render
+- Caches the project list for 2 seconds and invalidates it on create/delete/start/stop/settings/star changes
+- Measures project size with `du -sb` on Linux (Node walk fallback) and keeps size cache for 10 minutes
+- Rebuilds service buttons and the tray menu only when service status actually changes
+- Pauses service/system polling while the window is hidden
+- Streams live log lines to the renderer only on the Debug page
+- Lowers SFTP remote metrics polling to 5s and caps xterm scrollback at 2000 lines
+
+**Developer experience**
+- Makes `npm start` / `npm run dev` work on Ubuntu by launching Electron with `--no-sandbox` (avoids the unconfigured `chrome-sandbox` SUID abort after a plain `npm install`)
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.32
+- Contributor: `vithanhlam`
 
 ## v2.5.31
 

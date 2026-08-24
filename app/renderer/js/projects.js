@@ -7,6 +7,24 @@ window.Projects = {
     App.projects = list;
     this.render(list);
     this._populateTags(list);
+    this._fillSizes(list);
+  },
+
+  async _fillSizes(list) {
+    const missing = (list || []).filter((p) => p.sizeBytes == null).map((p) => p.id);
+    if (!missing.length || !api.getProjectSizes) return;
+    try {
+      const r = await api.getProjectSizes(missing);
+      if (!r?.success || !r.sizes) return;
+      App.projects = (App.projects || []).map((p) =>
+        r.sizes[p.id] != null ? { ...p, sizeBytes: r.sizes[p.id] } : p
+      );
+      for (const [id, sizeBytes] of Object.entries(r.sizes)) {
+        const safeId = String(id).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        const badge = document.querySelector(`.proj-card[data-id="${safeId}"] .proj-size-badge`);
+        if (badge) badge.innerHTML = `<i class="fas fa-hdd" style="margin-right:4px"></i>${fmtBytes(sizeBytes)}`;
+      }
+    } catch {}
   },
 
   _populateTags(list) {
@@ -78,7 +96,8 @@ window.Projects = {
     const phpBadge = p.phpVersion
       ? `<span class="tag" style="background:rgba(119,74,182,0.18);color:#a78bfa;border-color:rgba(119,74,182,0.3)">PHP ${p.phpVersion}</span>`
       : "";
-    const sizeBadge = `<span class="tag"><i class="fas fa-hdd" style="margin-right:4px"></i>${fmtBytes(p.sizeBytes || 0)}</span>`;
+    const sizeLabel = p.sizeBytes == null ? "…" : fmtBytes(p.sizeBytes);
+    const sizeBadge = `<span class="tag proj-size-badge"><i class="fas fa-hdd" style="margin-right:4px"></i>${sizeLabel}</span>`;
     return `
 <div class="proj-card ${running ? "running" : ""}" data-id="${p.id}">
   <div class="proj-card-top">

@@ -1,7 +1,7 @@
 {
   "name": "shieldpresslocal",
   "productName": "ShieldPress Local",
-  "version": "2.5.31",
+  "version": "2.5.32",
   "description": "ShieldPress Local Development Environment Manager",
   "main": "app/main.js",
   "author": {
@@ -11,8 +11,8 @@
   "homepage": "https://shieldpress.net",
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron .",
+    "start": "electron . --no-sandbox",
+    "dev": "electron . --no-sandbox",
     "pack": "electron-builder --dir",
     "dist:win": "bash scripts/prepare-vc-redist.sh && electron-builder --win nsis --x64",
     "dist:linux": "bash scripts/build-linux.sh",

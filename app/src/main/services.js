@@ -337,12 +337,16 @@ function getPhpPort(version) {
 async function getAvailablePhpVersions() {
   if (platform.isLinux) {
     const versions = new Set();
+    const warned = getAvailablePhpVersions._warned || (getAvailablePhpVersions._warned = new Set());
     for (const phpCgi of platform.phpCgiExecutables()) {
       const phpDir = path.dirname(phpCgi);
       const result = probePhpCgi(phpCgi, phpDir, ["-v"]);
       const match = result.output.match(/PHP\s+(\d+\.\d+)/i);
       if (result.ok && match) versions.add(match[1]);
-      else if (!result.ok) log.warn(`PHP probe failed for ${phpCgi}: ${result.message}`);
+      else if (!result.ok && !warned.has(phpCgi)) {
+        warned.add(phpCgi);
+        log.warn(`PHP probe failed for ${phpCgi}: ${result.message}`);
+      }
     }
     return [...versions].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }

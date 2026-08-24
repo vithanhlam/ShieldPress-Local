@@ -213,6 +213,11 @@ async function installLaravel({ id, phpVersion }, onProgress) {
     proj.dbPort = dbPort;
     proj.dbPassword = dbPassword;
     await fs.writeJson(cfgPath, proj, { spaces: 2 });
+    try {
+      const { invalidateProjectListCache, invalidateProjectSize } = require("./projects");
+      invalidateProjectListCache();
+      invalidateProjectSize(projDir);
+    } catch {}
 
     emit("Laravel installed successfully!", onProgress);
     return { success: true };

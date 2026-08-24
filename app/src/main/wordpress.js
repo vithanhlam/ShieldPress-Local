@@ -108,9 +108,11 @@ require_once ABSPATH . 'wp-settings.php';
   await fs.writeJson(cfgPath, proj, { spaces: 2 });
 
   // Refresh nginx config
-  const { buildNginxConf } = require("./projects");
+  const { buildNginxConf, invalidateProjectListCache, invalidateProjectSize } = require("./projects");
   const nginxConfPath = path.join(NGINX_DIR, "conf", "servers", `${proj.domain}.conf`);
   await fs.writeFile(nginxConfPath, buildNginxConf(proj));
+  invalidateProjectListCache();
+  invalidateProjectSize(path.join(PROJECTS_DIR, id));
 
   return {
     success: true,

@@ -1,7 +1,8 @@
 // src/main/projects.js
 const fs = require("fs-extra");
 const path = require("path");
-const { exec } = require("child_process");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
 const log = require("./logger");
 const svc = require("./services");
 const platform = require("./platform");
@@ -9,6 +10,9 @@ const database = require("./database");
 const HOSTS_FILE = platform.hostsFile();
 const projectStartPromises = new Map();
 const projectSizeCache = new Map();
+const projectSizeInflight = new Map();
+const execFileAsync = promisify(execFile);
+const SIZE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 async function directorySize(root) {
   let total = 0;
@@ -21,12 +25,73 @@ async function directorySize(root) {
   return total;
 }
 
-async function cachedProjectSize(projectDir) {
+/** Prefer OS `du` on Linux; fall back to recursive Node walk. */
+async function measureDirectorySize(root) {
+  if (!(await fs.pathExists(root))) return 0;
+  if (platform.isLinux) {
+    try {
+      const { stdout } = await execFileAsync("du", ["-sb", root], {
+        timeout: 120000,
+        maxBuffer: 1024 * 1024,
+      });
+      const bytes = parseInt(String(stdout).trim().split(/\s+/)[0], 10);
+      if (Number.isFinite(bytes) && bytes >= 0) return bytes;
+    } catch {
+      // Fall through to Node walk when du is missing or fails.
+    }
+  }
+  return directorySize(root);
+}
+
+function peekProjectSize(projectDir) {
   const cached = projectSizeCache.get(projectDir);
-  if (cached && Date.now() - cached.time < 60000) return cached.size;
-  const size = await directorySize(projectDir);
-  projectSizeCache.set(projectDir, { size, time: Date.now() });
-  return size;
+  if (!cached) return null;
+  return cached.size;
+}
+
+function invalidateProjectSize(projectDir) {
+  if (!projectDir) {
+    projectSizeCache.clear();
+    projectSizeInflight.clear();
+    return;
+  }
+  projectSizeCache.delete(projectDir);
+  projectSizeInflight.delete(projectDir);
+}
+
+async function computeProjectSize(projectDir) {
+  const cached = projectSizeCache.get(projectDir);
+  if (cached && Date.now() - cached.time < SIZE_CACHE_TTL) return cached.size;
+  if (projectSizeInflight.has(projectDir)) return projectSizeInflight.get(projectDir);
+
+  const pending = measureDirectorySize(projectDir)
+    .then((size) => {
+      projectSizeCache.set(projectDir, { size, time: Date.now() });
+      return size;
+    })
+    .finally(() => projectSizeInflight.delete(projectDir));
+  projectSizeInflight.set(projectDir, pending);
+  return pending;
+}
+
+async function getProjectSize(id) {
+  const { PROJECTS_DIR } = global.CONST;
+  const projectDir = path.join(PROJECTS_DIR, id);
+  if (!(await fs.pathExists(path.join(projectDir, "project.json")))) {
+    return { success: false, message: "Not found" };
+  }
+  const sizeBytes = await computeProjectSize(projectDir);
+  return { success: true, id, sizeBytes };
+}
+
+async function getProjectSizes(ids = []) {
+  const list = Array.isArray(ids) ? ids : [];
+  const sizes = {};
+  await Promise.all(list.map(async (id) => {
+    const r = await getProjectSize(id);
+    if (r.success) sizes[id] = r.sizeBytes;
+  }));
+  return { success: true, sizes };
 }
 
 // Sanitize project name to a safe directory name:
@@ -274,11 +339,28 @@ let _projectCache = null;
 let _cacheTime = 0;
 const CACHE_TTL = 2000; // 2s
 
+function invalidateProjectListCache() {
+  _projectCache = null;
+  _cacheTime = 0;
+}
+
+function attachListFields(list) {
+  const { runningProjects } = global.STATE;
+  return list.map((p) => ({
+    ...p,
+    isRunning: !!runningProjects[p.id],
+    sizeBytes: peekProjectSize(p.path),
+  }));
+}
+
 async function getProjects() {
   const { PROJECTS_DIR } = global.CONST;
-  const { runningProjects } = global.STATE;
 
   if (!fs.existsSync(PROJECTS_DIR)) return [];
+
+  if (_projectCache && Date.now() - _cacheTime < CACHE_TTL) {
+    return attachListFields(_projectCache);
+  }
 
   const dirs = await fs.readdir(PROJECTS_DIR);
   const list = [];
@@ -289,9 +371,7 @@ async function getProjects() {
       if (!(await fs.pathExists(cf))) return;
       try {
         const c = await sanitizeProjectSsl(await fs.readJson(cf), cf);
-        c.isRunning = !!runningProjects[c.id];
         c.path = path.join(PROJECTS_DIR, d);
-        c.sizeBytes = await cachedProjectSize(c.path);
         // Detect WordPress installation by checking wp-config.php on disk
         const wpCfg = path.join(PROJECTS_DIR, d, "www", "wp-config.php");
         if (await fs.pathExists(wpCfg)) c.wordpressInstalled = true;
@@ -302,12 +382,16 @@ async function getProjects() {
     }),
   );
 
-  return list.sort((a, b) => {
+  list.sort((a, b) => {
     const sa = a.starred ? 1 : 0;
     const sb = b.starred ? 1 : 0;
     if (sa !== sb) return sb - sa;
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
+
+  _projectCache = list;
+  _cacheTime = Date.now();
+  return attachListFields(list);
 }
 
 async function createProject(data) {
@@ -398,6 +482,7 @@ async function createProject(data) {
   }
 
   await fs.writeJson(path.join(dir, "project.json"), projCfg, { spaces: 2 });
+  invalidateProjectListCache();
   log.ok(`Project created: ${name} port=${port}`);
   return { success: true, project: projCfg };
 }
@@ -450,6 +535,8 @@ async function deleteProject(id) {
   // Reload nginx without restart (fast)
   if (global.STATE.isNginxRunning) await svc.reloadNginx();
 
+  invalidateProjectListCache();
+  invalidateProjectSize(projDir);
   return { success: true };
 }
 
@@ -617,6 +704,7 @@ async function startProjectUnlocked(id) {
   const c = await fs.readJson(cfgPath);
   c.status = "running";
   await fs.writeJson(cfgPath, c, { spaces: 2 });
+  invalidateProjectListCache();
 
   const url = `http://${proj.domain}:${proj.port}`;
   log.ok(`Project started: ${url}`);
@@ -642,6 +730,7 @@ async function stopProject(id) {
     c.status = "stopped";
     await fs.writeJson(cfgPath, c, { spaces: 2 });
   }
+  invalidateProjectListCache();
   log.info(`Project ${id} stopped`);
   return { success: true };
 }
@@ -692,6 +781,7 @@ async function updateProjectSettings(data) {
     }
   }
 
+  invalidateProjectListCache();
   return { success: true };
 }
 
@@ -715,6 +805,7 @@ async function saveNginxConfig({ id, content }) {
   const proj = await fs.readJson(cfgPath);
   const p = path.join(NGINX_DIR, "conf", "servers", `${proj.domain}.conf`);
   await fs.writeFile(p, content);
+  invalidateProjectListCache();
   return svc.reloadNginx();
 }
 
@@ -768,17 +859,21 @@ async function runNodeTool({ id, cmd }) {
     const { spawn } = require("child_process");
     log.info(`Opening terminal for ${proj.name} with command: ${cmd || "Terminal"}`);
 
-    // Open a new cmd window: /k keeps it open after running the command
-    const terminal = platform.isWindows
-      ? { bin: "cmd.exe", args: cmd ? ["/c", "start", "cmd.exe", "/k", cmd] : ["/c", "start", "cmd.exe"] }
-      : platform.findCommand(["x-terminal-emulator", "gnome-terminal", "konsole"]);
-    if (!terminal) throw new Error("No terminal emulator found");
-    const linuxArgs = cmd ? ["--", "bash", "-lc", `${cmd}; exec bash`] : [];
-    const p = spawn(platform.isWindows ? terminal.bin : terminal, platform.isWindows ? terminal.args : linuxArgs, {
+    const terminal = platform.buildExternalTerminalLaunch(wwwDir, cmd || "");
+    if (!terminal) {
+      throw new Error(
+        "No terminal emulator found. Install gnome-terminal, ptyxis, or terminator."
+      );
+    }
+
+    const p = spawn(terminal.bin, terminal.args, {
       cwd: wwwDir,
       detached: true,
-      stdio: "ignore"
+      stdio: "ignore",
+      windowsHide: false,
+      env: platform.envWithDeveloperPath(process.env),
     });
+    p.on("error", (err) => log.err("Terminal spawn error: " + err.message));
     p.unref();
 
     return { success: true };
@@ -891,11 +986,18 @@ async function toggleStar(id) {
   const cfg = await fs.readJson(cfgPath);
   cfg.starred = !cfg.starred;
   await fs.writeJson(cfgPath, cfg, { spaces: 2 });
+  invalidateProjectListCache();
   return { success: true, starred: cfg.starred };
 }
 
 module.exports = {
   getProjects,
+  getProjectSize,
+  getProjectSizes,
+  invalidateProjectListCache,
+  invalidateProjectSize,
+  measureDirectorySize,
+  peekProjectSize,
   toggleStar,
   createProject,
   deleteProject,

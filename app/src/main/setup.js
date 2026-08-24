@@ -78,6 +78,28 @@ async function migrateLinuxDatabasePort(projectsDir, fromPort = 3306, toPort = 3
   }
 }
 
+async function linuxPhpCgiWorks(phpDir) {
+  const phpCgi = path.join(phpDir, "php-cgi");
+  if (!(await fs.pathExists(phpCgi))) return false;
+  try {
+    const { spawnSync } = require("child_process");
+    const libDir = path.join(phpDir, "lib");
+    const env = { ...process.env };
+    if (await fs.pathExists(libDir)) {
+      env.LD_LIBRARY_PATH = env.LD_LIBRARY_PATH ? `${libDir}:${env.LD_LIBRARY_PATH}` : libDir;
+    }
+    const result = spawnSync(phpCgi, ["-v"], {
+      encoding: "utf8",
+      timeout: 5000,
+      env,
+      cwd: phpDir,
+    });
+    return !result.error && result.status === 0 && /PHP\s+\d+\.\d+/i.test(`${result.stdout || ""}\n${result.stderr || ""}`);
+  } catch {
+    return false;
+  }
+}
+
 async function ensureLinuxPhpRuntime() {
   if (process.platform !== "linux") return;
   const {
@@ -96,12 +118,24 @@ async function ensureLinuxPhpRuntime() {
     const sourceDir = path.join(BUNDLED_PHP_BASE_DIR, version.name);
     const targetDir = path.join(PHP_BASE_DIR, version.name);
     const marker = path.join(targetDir, ".shieldpress-bundle-version");
+    const sourceMarker = path.join(sourceDir, ".shieldpress-php-source");
+    const targetSourceMarker = path.join(targetDir, ".shieldpress-php-source");
     const expectedMarker = String(APP_VERSION || "development");
     const currentMarker = await fs.readFile(marker, "utf8").catch(() => "");
-    const executableName = process.platform === "win32" ? "php-cgi.exe" : "php-cgi";
-    const alreadySynced =
+    const expectedSource = await fs.readFile(sourceMarker, "utf8").catch(() => "");
+    const currentSource = await fs.readFile(targetSourceMarker, "utf8").catch(() => "");
+    const executableName = "php-cgi";
+    const sourceHasCgi = await fs.pathExists(path.join(sourceDir, executableName));
+    if (!sourceHasCgi) continue; // Windows-only tree or incomplete bundle — leave target alone
+
+    const markerOk =
       currentMarker.trim() === expectedMarker &&
-      await fs.pathExists(path.join(targetDir, executableName));
+      (!expectedSource.trim() || currentSource.trim() === expectedSource.trim());
+    const alreadySynced =
+      markerOk &&
+      await fs.pathExists(path.join(targetDir, executableName)) &&
+      await linuxPhpCgiWorks(targetDir);
+
     if (!alreadySynced) {
       await fs.ensureDir(targetDir);
       const files = await fs.readdir(sourceDir, { withFileTypes: true });
@@ -113,6 +147,9 @@ async function ensureLinuxPhpRuntime() {
         await fs.copy(source, target, { overwrite: true });
       }
       await fs.writeFile(marker, expectedMarker + "\n", "utf8");
+      if (expectedSource.trim()) {
+        await fs.writeFile(targetSourceMarker, expectedSource.trim() + "\n", "utf8");
+      }
       log.ok(`PHP ${version.name} runtime synced to writable workspace`);
     }
     await syncLinuxPhpExtensionDir(targetDir);

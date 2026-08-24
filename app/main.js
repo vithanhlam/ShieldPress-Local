@@ -95,6 +95,7 @@ global.STATE = {
   isRedisRunning: false,
   runningProjects: {},
   logBuffer: [],
+  liveLogsEnabled: false,
   mainWindow: null,
 };
 
@@ -135,6 +136,11 @@ function getTrayIcon() {
 function updateTrayMenu() {
   if (!tray) return;
   const s = global.STATE;
+  const fingerprint = [
+    !!s.isNginxRunning, !!s.isPhpRunning, !!s.isDBRunning, !!s.isRedisRunning,
+  ].join("|");
+  if (fingerprint === tray._statusFingerprint) return;
+  tray._statusFingerprint = fingerprint;
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: "ShieldPress Local v" + APP_VERSION, enabled: false },

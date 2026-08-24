@@ -49,13 +49,14 @@ window.Services = {
     if (r?.success !== false) {
       const type = action === "stop" ? "info" : "success";
       toast(`${label} ${action}ed`, type, 2000);
+      if (window.App) App._svcFingerprint = "";
+      if (typeof refreshServiceStatus === "function") refreshServiceStatus();
     } else {
       toast(`${label} ${action} failed: ${r?.message || ""}`, "error");
       // Restore nếu lỗi
       if (firstBtn) firstBtn.innerHTML = origHTML;
       btns?.forEach((b) => (b.disabled = false));
     }
-    // refreshServiceStatus tự poll mỗi 5s sẽ render lại buttons
   },
 
   // Giữ các method cũ để tray menu gọi được

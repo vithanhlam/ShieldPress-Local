@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 contextBridge.exposeInMainWorld("api", {
   // Projects
   getProjects: () => ipcRenderer.invoke("get-projects"),
+  getProjectSize: (id) => ipcRenderer.invoke("get-project-size", id),
+  getProjectSizes: (ids) => ipcRenderer.invoke("get-project-sizes", ids),
   createProject: (d) => ipcRenderer.invoke("create-project", d),
   deleteProject: (id) => ipcRenderer.invoke("delete-project", id),
   startProject: (id) => ipcRenderer.invoke("start-project", id),
@@ -86,6 +88,7 @@ contextBridge.exposeInMainWorld("api", {
   saveMariaDBConfig: (content) => ipcRenderer.invoke("save-mariadb-config", content),
   getLogs: (id) => ipcRenderer.invoke("get-logs", id),
   getLogBuffer: () => ipcRenderer.invoke("get-log-buffer"),
+  setLiveLogs: (enabled) => ipcRenderer.invoke("set-live-logs", enabled),
 
   // App
   checkBinaries: () => ipcRenderer.invoke("check-binaries"),

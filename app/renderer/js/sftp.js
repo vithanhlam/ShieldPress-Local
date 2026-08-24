@@ -1586,7 +1586,7 @@ window.SFTP = {
       fontFamily: "'DejaVu Sans Mono', 'Liberation Mono', monospace",
       fontSize,
       lineHeight: 1.15,
-      scrollback: 10000,
+      scrollback: 2000,
       allowProposedApi: false,
       theme: {
         background: "#080b11", foreground: "#d8dee9", cursor: "#5ee787",
@@ -2027,7 +2027,7 @@ window.SFTP = {
     this._renderRemoteMetrics(null);
     this._refreshRemoteMetrics(id);
     setTimeout(() => this._refreshRemoteMetrics(id), 800);
-    this._metricsTimer = setInterval(() => this._refreshRemoteMetrics(id), 2000);
+    this._metricsTimer = setInterval(() => this._refreshRemoteMetrics(id), 5000);
   },
 
   adjustTerminalFont(delta) {

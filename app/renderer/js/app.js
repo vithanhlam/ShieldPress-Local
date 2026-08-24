@@ -7,6 +7,7 @@ window.App = {
   filterTag: "",
   serviceStatus: { nginx: false, php: false, mariadb: false },
   _pageCache: {},
+  _svcFingerprint: "",
 };
 
 // ── Page loader ───────────────────────────────────────────────────────────────
@@ -79,6 +80,7 @@ window.nav = async function (page) {
     titleEl.textContent = page.charAt(0).toUpperCase() + page.slice(1);
 
   App.currentPage = page;
+  if (api.setLiveLogs) api.setLiveLogs(page === "debug");
 
   if (page === "projects" && typeof Projects !== "undefined") Projects.load();
   if (page === "database" && typeof Database !== "undefined") Database.load();
@@ -128,10 +130,23 @@ window.fmtBytes = (b) =>
 window.fmtDate = (d) => new Date(d).toLocaleDateString("vi-VN");
 
 // ── Service status ────────────────────────────────────────────────────────────
+let _svcPortsCache = { cfg: null, phpVersions: null, at: 0 };
+const SVC_META_TTL = 30000;
+
+function serviceFingerprint(s) {
+  return [
+    !!s.nginx, !!s.php, !!s.mariadb, !!s.redis, !!s.redisInstalled,
+  ].join("|");
+}
+
 async function refreshServiceStatus() {
+  if (document.hidden) return;
   try {
     const s = await api.getServiceStatus();
     App.serviceStatus = s;
+    const fp = serviceFingerprint(s);
+    const statusChanged = fp !== App._svcFingerprint;
+    App._svcFingerprint = fp;
 
     const dot = (id, on) => {
       const el = document.getElementById(id);
@@ -141,40 +156,45 @@ async function refreshServiceStatus() {
     dot("svc-php", s.php);
     dot("svc-mariadb", s.mariadb);
 
-    // Redis row: show only if installed (port known) or running
     const redisRow = document.getElementById("svc-row-redis");
     if (redisRow) {
       dot("svc-redis", s.redis);
-      renderSvcBtns("redis", s.redis);
+      if (statusChanged) renderSvcBtns("redis", s.redis);
       if (s.redis || s.redisInstalled) redisRow.style.display = "";
     }
 
-    // Update buttons
-    renderSvcBtns("nginx", s.nginx);
-    renderSvcBtns("php", s.php);
-    renderSvcBtns("mariadb", s.mariadb);
+    if (statusChanged) {
+      renderSvcBtns("nginx", s.nginx);
+      renderSvcBtns("php", s.php);
+      renderSvcBtns("mariadb", s.mariadb);
+    }
 
-    // Update port labels
-    updateSvcPorts(s);
+    await updateSvcPorts(s);
   } catch (e) {}
 }
 
 async function updateSvcPorts(s) {
   try {
-    const cfg = await api.getConfig();
+    const now = Date.now();
+    if (!_svcPortsCache.cfg || now - _svcPortsCache.at > SVC_META_TTL) {
+      const [cfg, versions] = await Promise.all([
+        api.getConfig(),
+        api.getAvailablePhp().catch(() => []),
+      ]);
+      _svcPortsCache = { cfg, phpVersions: versions || [], at: now };
+    }
+    const cfg = _svcPortsCache.cfg || {};
 
-    // Nginx — base port from config
     const nginxEl = document.getElementById("svc-port-nginx");
     if (nginxEl) {
       const nginxPort = cfg.nginx?.base_port || 8000;
       nginxEl.textContent = s.nginx ? `:${nginxPort}` : "";
     }
 
-    // PHP — one port per version (9080 + minor)
     const phpEl = document.getElementById("svc-port-php");
     if (phpEl && s.php) {
-      const versions = await api.getAvailablePhp();
-      if (versions && versions.length > 0) {
+      const versions = _svcPortsCache.phpVersions || [];
+      if (versions.length > 0) {
         const ports = versions.map((v) => {
           const minor = parseInt((v.split(".")[1] || "3"), 10);
           return `:${9080 + minor}`;
@@ -185,14 +205,12 @@ async function updateSvcPorts(s) {
       phpEl.textContent = "";
     }
 
-    // MariaDB — from config
     const dbEl = document.getElementById("svc-port-mariadb");
     if (dbEl) {
       const dbPort = cfg.mysql?.port || 3306;
       dbEl.textContent = s.mariadb ? `:${dbPort}` : "";
     }
 
-    // Redis — from config
     const redisEl = document.getElementById("svc-port-redis");
     if (redisEl) {
       const redisPort = cfg.redis?.port || 6379;
@@ -204,6 +222,9 @@ async function updateSvcPorts(s) {
 function renderSvcBtns(svc, running) {
   const el = document.getElementById("svc-btns-" + svc);
   if (!el) return;
+  const next = running ? "running" : "stopped";
+  if (el.dataset.state === next && el.childElementCount) return;
+  el.dataset.state = next;
 
   if (running) {
     el.innerHTML = `
@@ -300,6 +321,7 @@ window.AboutPage = {
 
 // ── System Stats ─────────────────────────────────────────────────────────────
 async function refreshSystemStats() {
+  if (document.hidden) return;
   try {
     const s = await api.getSystemStats();
     const fmtGB = (b) => (b / 1073741824).toFixed(1) + "G";
@@ -347,8 +369,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     .getElementById("btn-close")
     ?.addEventListener("click", () => api.close());
 
-  // Live log
+  // Live log (only appended while Debug page is mounted / live-logs enabled)
   api.onLogLine((line) => {
+    if (App.currentPage !== "debug") return;
     const el = document.getElementById("debug-log");
     if (el) {
       el.textContent += line + "\n";
@@ -361,13 +384,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   const verEl = document.getElementById("app-version");
   if (verEl) verEl.textContent = `v${info.version}`;
 
-  // Service status polling
+  // Service status / system stats — pause while the window is hidden
   await refreshServiceStatus();
-  setInterval(refreshServiceStatus, 5000);
-
-  // System stats polling (every 10s to minimize overhead)
+  const svcTimer = setInterval(refreshServiceStatus, 5000);
   refreshSystemStats();
-  setInterval(refreshSystemStats, 10000);
+  const statsTimer = setInterval(refreshSystemStats, 10000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      refreshServiceStatus();
+      refreshSystemStats();
+    }
+  });
+  window.addEventListener("beforeunload", () => {
+    clearInterval(svcTimer);
+    clearInterval(statsTimer);
+  });
 
   // Check for updates after 6s — non-blocking, network optional
   setTimeout(() => UpdateChecker.check(), 6000);

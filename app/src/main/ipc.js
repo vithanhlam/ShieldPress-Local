@@ -34,6 +34,8 @@ function register(ipcMain, shell, dialog) {
   }
   // ── Projects ──
   ipcMain.handle("get-projects", () => proj.getProjects());
+  ipcMain.handle("get-project-size", (_e, id) => proj.getProjectSize(id));
+  ipcMain.handle("get-project-sizes", (_e, ids) => proj.getProjectSizes(ids));
   ipcMain.handle("create-project", (e, d) => proj.createProject(d));
   ipcMain.handle("delete-project", (e, id) => proj.deleteProject(id));
   ipcMain.handle("start-project", (e, id) => proj.startProject(id));
@@ -330,6 +332,10 @@ function register(ipcMain, shell, dialog) {
     return Promise.resolve(global.STATE.logBuffer.join("\n"));
   });
   ipcMain.handle("get-log-buffer", () => global.STATE.logBuffer.join("\n"));
+  ipcMain.handle("set-live-logs", (_e, enabled) => {
+    global.STATE.liveLogsEnabled = !!enabled;
+    return { success: true };
+  });
 
   // ── App info / shell ──
   ipcMain.handle("check-binaries", () => {

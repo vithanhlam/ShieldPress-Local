@@ -236,6 +236,10 @@
     <div class="card" style="margin-top:12px">
       <div class="card-hdr"><span class="card-title"><i class="fab fa-node-js" style="color:#68a063"></i> Node / NPM Tools</span></div>
       <div class="card-body">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px">
+          Opens your system terminal in this project's <code>www</code> folder (Command Prompt on Windows, Terminal on Ubuntu).
+          Node.js/npm must be installed and available on your PATH.
+        </p>
         <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('lv-proj-id', '')"><i class="fas fa-terminal"></i> Open Terminal</button>
           <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('lv-proj-id', 'npm install')">npm install</button>
@@ -262,8 +266,8 @@
       <div class="card-hdr"><span class="card-title"><i class="fas fa-terminal" style="color:var(--text1)"></i> Interactive Terminal</span></div>
       <div class="card-body">
         <p style="color:var(--text2);font-size:13px;margin-bottom:12px">
-          These actions will open a native OS Command Prompt in your project's directory. 
-          Use it to monitor logs, build processes, or hot-reload servers like <code>npm run dev</code>.
+          Opens your system terminal in this project's <code>www</code> folder (Command Prompt on Windows, Terminal on Ubuntu).
+          Use it for logs, builds, or hot-reload servers like <code>npm run dev</code>. Node.js/npm must be on your PATH.
         </p>
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" onclick="NodeTools.runCmd('node-proj-id', '')"><i class="fas fa-terminal"></i> Open Terminal (Empty)</button>
