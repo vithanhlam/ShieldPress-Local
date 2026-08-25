@@ -219,7 +219,7 @@
 </div>
 
 <!-- Modal: File Editor -->
-<div class="overlay overlay-nested" id="m-sftp-editor" onclick="closeIfOverlay(event,'m-sftp-editor')">
+<div class="overlay overlay-nested" id="m-sftp-editor">
   <div class="modal sftp-editor-modal">
     <div class="modal-title sftp-editor-titlebar">
       <i class="fas fa-edit"></i>
@@ -235,8 +235,9 @@
     <div class="modal-footer sftp-editor-footer">
       <span id="sftp-editor-cursor" class="sftp-editor-meta">Ln 1, Col 1</span>
       <div style="margin-left:auto;display:flex;gap:8px">
-        <button class="btn btn-ghost" onclick="SFTP.cancelFileEdit()">Cancel</button>
-        <button class="btn btn-primary" onclick="SFTP.saveFileEdit()"><i class="fas fa-save"></i> Save</button>
+        <button class="btn btn-ghost" onclick="SFTP.cancelFileEdit()">Close</button>
+        <button class="btn btn-primary" onclick="SFTP.saveFileEdit(false)"><i class="fas fa-save"></i> Save</button>
+        <button class="btn btn-primary" onclick="SFTP.saveFileEdit(true)"><i class="fas fa-save"></i> Save &amp; Close</button>
       </div>
     </div>
   </div>

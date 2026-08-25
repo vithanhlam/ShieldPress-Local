@@ -126,7 +126,7 @@ window.ContextMenu = {
       ${item ? `<div class="ctx-divider"></div>
         <div class="ctx-item" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'));ContextMenu.hide()"><i class="fas fa-copy"></i> Copy Path</div>
         <div class="ctx-item" onclick="navigator.clipboard.writeText('${relativeHint.replace(/'/g, "\\'")}').then(()=>toast('Relative path copied','success'));ContextMenu.hide()"><i class="fas fa-copy"></i> Copy Relative Path</div>
-        <div class="ctx-item" onclick="toast('Name: ${SFTP._esc(item.name)}\\nPath: ${SFTP._esc(item.path)}\\nType: ${directory ? "Folder" : "File"}','info');ContextMenu.hide()"><i class="fas fa-info-circle"></i> Properties</div>
+        <div class="ctx-item" onclick="SFTP.${action}Properties('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-info-circle"></i> Properties</div>
         <div class="ctx-divider"></div>
         <div class="ctx-item ctx-danger" onclick="SFTP.${action}Delete('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-trash"></i> Delete</div>` : ""}
     `;

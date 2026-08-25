@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.5.33
+
+**SFTP / FTP remote editor**
+- Fixes creating remote files and folders from the browser and Terminal file panels
+- Makes the Properties action work from the remote context menu
+- Prevents the code editor from closing when clicking outside the editor
+- Adds separate Save and Save & Close actions so a file can remain open after saving
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.33
+- Contributor: `vithanhlam`
+
 ## v2.5.32
 
 **PHP 8.5 on Ubuntu**

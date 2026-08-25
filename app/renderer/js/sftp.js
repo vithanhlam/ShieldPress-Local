@@ -1326,7 +1326,7 @@ window.SFTP = {
     else toast("Failed: " + r.message, "error");
   },
 
-  async saveFileEdit() {
+  async saveFileEdit(closeAfterSave = false) {
     const id = document.getElementById("sftp-editor-conn-id").value;
     const remotePath = document.getElementById("sftp-editor-path").value;
     const content = this._monacoReady && window.ShieldPressMonaco
@@ -1359,12 +1359,14 @@ window.SFTP = {
       return;
     }
     if (errEl) errEl.style.display = "none";
-    try { ShieldPressMonaco?.dispose(); } catch {}
-    this._monacoReady = false;
     toast(r.backupPath ? `File saved (backup: ${r.backupPath})` : "File saved!", "success");
-    closeModal("m-sftp-editor");
     if (document.getElementById("sftp-browser-conn-id")?.value) await this._loadDir();
     if (document.getElementById("sftp-term-conn-id")?.value) await this.loadTermFiles();
+    if (closeAfterSave) {
+      try { ShieldPressMonaco?.dispose(); } catch {}
+      this._monacoReady = false;
+      closeModal("m-sftp-editor");
+    }
   },
 
   getRemoteContext(target) {
@@ -1429,6 +1431,10 @@ window.SFTP = {
   contextNewFile() { this.openRemoteCreate("browser", "file"); },
 
   contextNewFolder() { return this.createDirPrompt(); },
+
+  contextProperties(encodedPath, isDirectory) {
+    return this.showRemoteProperties(decodeURIComponent(encodedPath), "browser", !!isDirectory);
+  },
 
   _validRemoteName(name) {
     if (!name) return false;
@@ -1821,6 +1827,32 @@ window.SFTP = {
   termContextEdit(encodedPath) { return this.termEditFile(encodedPath); },
   termContextDelete(encodedPath, isDirectory) { return this.termDeleteItem(encodedPath, isDirectory); },
   termContextRefresh() { return this.loadTermFiles(); },
+
+  termContextProperties(encodedPath, isDirectory) {
+    return this.showRemoteProperties(decodeURIComponent(encodedPath), "terminal", !!isDirectory);
+  },
+
+  showRemoteProperties(remotePath, scope, isDirectory) {
+    const items = scope === "terminal" ? (this._termItems || []) : (this._browserItems || []);
+    const currentPath = scope === "terminal" ? this._termPath : this._currentPath;
+    const name = remotePath.split("/").pop() || remotePath;
+    const item = items.find((entry) => entry.name === name);
+    const type = isDirectory || this._isDir(item) ? "Folder" : "File";
+    const details = [
+      `Name: ${name}`,
+      `Path: ${remotePath}`,
+      `Type: ${type}`,
+    ];
+    if (item) {
+      if (!isDirectory && item.size != null) details.push(`Size: ${this._fmtSize(item.size)}`);
+      if (item.modified) details.push(`Modified: ${new Date(item.modified).toLocaleString("vi-VN")}`);
+      if (item.permissions) details.push(`Permissions: ${item.permissions}`);
+      if (item.owner || item.group) details.push(`User/Group: ${item.owner || "—"}/${item.group || "—"}`);
+    } else if (currentPath) {
+      details.push(`Location: ${currentPath}`);
+    }
+    toast(details.join("\n"), "info", 7000);
+  },
 
   async termContextDownload(encodedPath, isDirectory) {
     const id = document.getElementById("sftp-term-conn-id").value;
