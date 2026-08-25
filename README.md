@@ -116,7 +116,8 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **ShieldPress VPS Command** | Suggest the `shieldpress` command for opening the ShieldPress VPS management menu |
 | **Multiline Commands** | Auto-growing command editor with multiline paste, Shift+Enter line breaks, and Ctrl+Enter execution |
 | **Terminal Clipboard** | Auto-copy selected output, right-click to paste, Ctrl+Shift+C/V shortcuts, and persistent font-size controls |
-| **Sync Upload/Download** | Push/pull files with optional "changed files only" mode and clear busy state |
+| **Sync Upload/Download** | Push/pull files with optional "changed files only" mode, configurable 1–8 SFTP threads, FTP-safe single-thread mode, Stop, and Close controls |
+| **SSH Terminal fallback** | Keeps the SSH terminal available and explains the limitation when a server rejects its SFTP subsystem |
 | **Auto-Reconnect** | Detects dead connections and reconnects transparently before each operation |
 | **Local Path Validation** | Validates local folder exists before sync starts |
 | **Master Password Vault** | Portable credential vault with Enter-to-unlock and automatic prompts before locked connection, browser, or terminal actions |

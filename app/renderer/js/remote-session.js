@@ -46,7 +46,9 @@
   }
 
   // Main already connected the session when opening the window; verify list works.
-  status.innerHTML = '<i class="fas fa-circle" style="font-size:7px"></i> Connected';
+  status.innerHTML = conn.transport === "ssh"
+    ? '<span style="color:var(--yellow)"><i class="fas fa-terminal" style="font-size:11px"></i> SSH connected — SFTP unavailable</span>'
+    : '<i class="fas fa-circle" style="font-size:7px"></i> Connected';
 
   if (kind === "terminal") {
     document.getElementById("remote-terminal-pane").classList.add("active");

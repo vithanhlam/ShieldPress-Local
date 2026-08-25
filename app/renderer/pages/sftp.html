@@ -407,6 +407,13 @@
           <span style="color:var(--text3);font-size:12px"> — skip files that haven't been modified</span>
         </label>
       </div>
+      <div>
+        <div class="fl">Transfer threads</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input class="fi" id="sftp-sync-concurrency" type="number" min="1" max="8" value="3" style="width:100px"/>
+          <span style="font-size:11px;color:var(--text3)">SFTP: 1–8 parallel files. FTP uses 1 for connection safety.</span>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('m-sftp-sync-config')">Cancel</button>
@@ -420,8 +427,9 @@
   <div class="modal" style="max-width:520px">
     <div class="modal-title"><i id="sftp-sync-icon" class="fas fa-sync-alt fa-spin"></i> <span id="sftp-sync-title">Syncing...</span></div>
     <pre id="sftp-sync-output" class="cli-output" style="min-height:150px;max-height:300px;overflow-y:auto"></pre>
-    <div class="modal-footer" id="sftp-sync-footer" style="display:none">
-      <button class="btn btn-ghost" onclick="closeModal('m-sftp-sync')">Close</button>
+    <div class="modal-footer" id="sftp-sync-footer">
+      <button class="btn btn-danger-ghost" id="sftp-sync-stop-btn" onclick="SFTP.stopSync()"><i class="fas fa-stop"></i> Stop</button>
+      <button class="btn btn-ghost" onclick="SFTP.closeSyncProgress()">Close</button>
     </div>
   </div>
 </div>

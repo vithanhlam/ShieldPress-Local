@@ -296,6 +296,10 @@ async function getConnections() {
       isConnected: Object.entries(activeConnections).some(
         ([key, value]) => connectionIdOf(key, value) === c.id,
       ),
+      transport: (() => {
+        const active = Object.values(activeConnections).find((value) => connectionIdOf("", value) === c.id);
+        return active ? active.type : "";
+      })(),
       openSessions: sessionManager.listByConnection(c.id).map((s) => ({ id: s.id, kind: s.kind, title: s.title })),
     }));
     return { success: true, connections: safe };
@@ -426,7 +430,7 @@ function dropActiveConnection(id) {
     delete terminalCwd[connId];
   }
   try {
-    if (ac.type === "sftp") safeCloseSsh(ac.client);
+    if (ac.type === "sftp" || ac.type === "ssh") safeCloseSsh(ac.client);
     else if (ac.type === "ftp") {
       try { ac.client.close(); } catch {}
       try { ac.client.close?.(); } catch {}
@@ -445,6 +449,20 @@ async function pingConnection(id) {
           ac.sftp.stat("/", (err) => { clearTimeout(t); resolve(!err); });
         } catch {
           clearTimeout(t);
+          resolve(false);
+        }
+      });
+    } else if (ac.type === "ssh") {
+      return await new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(false), 5000);
+        try {
+          ac.client.exec("true", (err, stream) => {
+            if (err) { clearTimeout(timer); return resolve(false); }
+            stream.on("close", () => { clearTimeout(timer); resolve(true); });
+            stream.on("error", () => { clearTimeout(timer); resolve(false); });
+          });
+        } catch {
+          clearTimeout(timer);
           resolve(false);
         }
       });
@@ -547,9 +565,23 @@ async function connectSftp(storageKey, conn, progressCb, connectionId = storageK
     client.on("ready", () => {
       client.sftp((err, sftp) => {
         if (err) {
-          log.err("SFTP session error: " + err.message);
-          safeCloseSsh(client);
-          return done({ success: false, message: err.message });
+          const detail = err.message || "SFTP subsystem could not be started";
+          log.err("SFTP session error: " + detail);
+          // SSH authentication succeeded, but the server may not expose the
+          // SFTP subsystem. Keep the SSH transport alive so Terminal remains
+          // usable and report the limitation to the UI.
+          activeConnections[storageKey] = {
+            client,
+            type: "ssh",
+            connectionId,
+            sftpError: detail,
+          };
+          progressCb && progressCb("SSH connected; SFTP unavailable");
+          return done({
+            success: true,
+            transport: "ssh",
+            warning: `SSH login succeeded, but SFTP is unavailable: ${detail}`,
+          });
         }
         sinkStreamErrors(sftp);
         activeConnections[storageKey] = { client, sftp, type: "sftp", connectionId };
@@ -773,6 +805,13 @@ async function listRemote(id, remotePath) {
   if (!ok.success) return { success: false, message: ok.message || "Not connected" };
   const ac = activeConnections[id];
   if (!ac) return { success: false, message: "Not connected" };
+  if (ac.type === "ssh") {
+    return {
+      success: false,
+      code: "SFTP_UNAVAILABLE",
+      message: `SSH terminal is connected, but SFTP is unavailable. The server rejected the SFTP subsystem${ac.sftpError ? `: ${ac.sftpError}` : "."}`,
+    };
+  }
 
   try {
     if (ac.type === "sftp") {
@@ -984,10 +1023,31 @@ function isDisconnectError(message) {
 }
 
 let uploadCancelled = false;
+let syncCancelled = false;
 
 function cancelUpload() {
   uploadCancelled = true;
   return { success: true };
+}
+
+function cancelSync() {
+  syncCancelled = true;
+  return { success: true };
+}
+
+async function runConcurrent(items, concurrency, worker) {
+  const queue = [...items];
+  const limit = Math.max(1, Math.min(8, Number(concurrency) || 1));
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, queue.length || 1) }, async () => {
+    while (!syncCancelled) {
+      const index = cursor++;
+      if (index >= queue.length) return;
+      await worker(queue[index], index);
+    }
+  });
+  await Promise.all(runners);
+  return syncCancelled;
 }
 
 function emitRemainingFailed(progressCb, files, startIndex, total, retry, message) {
@@ -1395,16 +1455,20 @@ async function syncUpload(id, progressCb, opts = {}) {
   const ok = await ensureConnected(id);
   if (!ok.success) return { success: false, message: "Not connected: " + (ok.message || "") };
   const ac = activeConnections[id];
+  if (ac?.type === "ssh") return { success: false, message: "SFTP is unavailable; sync requires SFTP or FTP" };
 
   const excludes = new Set(conn.excludePaths || []);
   const changedOnly = opts.changedOnly === true;
+  const concurrency = ac.type === "ftp" ? 1 : Math.max(1, Math.min(8, Number(opts.concurrency) || 3));
   let uploaded = 0;
   let skipped = 0;
   let errors = 0;
+  const files = [];
 
   async function syncDir(localBase, remoteBase) {
     const entries = await fs.readdir(localBase, { withFileTypes: true });
     for (const entry of entries) {
+      if (syncCancelled) return;
       if (excludes.has(entry.name)) continue;
 
       const localP = path.join(localBase, entry.name);
@@ -1419,34 +1483,41 @@ async function syncUpload(id, progressCb, opts = {}) {
           }
         } catch {}
         await syncDir(localP, remoteP);
-      } else {
-        try {
-          if (changedOnly) {
-            const localStat = await fs.stat(localP);
-            const remoteMtime = await getRemoteMtime(id, remoteP);
-            if (remoteMtime !== null && remoteMtime >= localStat.mtimeMs) {
-              skipped++;
-              continue; // remote is same age or newer → skip
-            }
-          }
-          progressCb && progressCb(`Uploading ${entry.name}...`);
-          const r = await putLocalFile(id, localP, remoteP);
-          if (r.success) uploaded++;
-          else errors++;
-        } catch {
-          errors++;
-        }
-      }
+      } else if (entry.isFile()) files.push({ localPath: localP, remotePath: remoteP, name: entry.name });
     }
   }
 
   const modeLabel = changedOnly ? " (changed files only)" : "";
-  progressCb && progressCb(`Syncing${modeLabel}: ${localDir} → ${conn.remotePath}...`);
+  syncCancelled = false;
+  progressCb && progressCb(`Syncing${modeLabel}: ${localDir} → ${conn.remotePath} (${concurrency} thread${concurrency === 1 ? "" : "s"})...`);
   await syncDir(localDir, conn.remotePath);
-  const msg = `Sync complete: ${uploaded} uploaded, ${skipped} skipped, ${errors} errors`;
+  const pending = [];
+  for (const file of files) {
+    if (syncCancelled) break;
+    if (changedOnly) {
+      const localStat = await fs.stat(file.localPath);
+      const remoteMtime = await getRemoteMtime(id, file.remotePath);
+      if (remoteMtime !== null && remoteMtime >= localStat.mtimeMs) { skipped++; continue; }
+    }
+    pending.push(file);
+  }
+  const cancelled = await runConcurrent(pending, concurrency, async (file) => {
+    if (syncCancelled) return;
+    progressCb && progressCb(`Uploading ${file.name}...`);
+    const parent = path.posix.dirname(file.remotePath);
+    const dirOk = await ensureRemoteDir(id, parent);
+    if (!dirOk.success) { errors++; return; }
+    const r = await putLocalFile(id, file.localPath, file.remotePath);
+    if (r.success) uploaded++;
+    else errors++;
+  });
+  const stopped = cancelled || syncCancelled;
+  const msg = stopped
+    ? `Sync stopped: ${uploaded} uploaded, ${skipped} skipped, ${errors} errors`
+    : `Sync complete: ${uploaded} uploaded, ${skipped} skipped, ${errors} errors`;
   progressCb && progressCb(msg);
   log.ok(msg);
-  return { success: true, uploaded, skipped, errors };
+  return { success: !stopped, uploaded, skipped, errors, cancelled: stopped, message: stopped ? "Sync stopped" : undefined };
 }
 
 async function syncDownload(id, progressCb, opts = {}) {
@@ -1464,18 +1535,23 @@ async function syncDownload(id, progressCb, opts = {}) {
 
   const ok = await ensureConnected(id);
   if (!ok.success) return { success: false, message: "Not connected: " + (ok.message || "") };
+  const ac = activeConnections[id];
+  if (ac?.type === "ssh") return { success: false, message: "SFTP is unavailable; sync requires SFTP or FTP" };
 
   const excludes = new Set(conn.excludePaths || []);
   const changedOnly = opts.changedOnly === true;
+  const concurrency = ac.type === "ftp" ? 1 : Math.max(1, Math.min(8, Number(opts.concurrency) || 3));
   let downloaded = 0;
   let skipped = 0;
   let errors = 0;
+  const files = [];
 
   async function syncDir(remoteBase, localBase) {
     const listResult = await listRemote(id, remoteBase);
     if (!listResult.success) return;
 
     for (const item of listResult.items) {
+      if (syncCancelled) return;
       if (excludes.has(item.name)) continue;
 
       const remoteP = remoteBase + "/" + item.name;
@@ -1485,32 +1561,41 @@ async function syncDownload(id, progressCb, opts = {}) {
         await fs.ensureDir(localP);
         await syncDir(remoteP, localP);
       } else {
-        try {
-          if (changedOnly && fs.existsSync(localP)) {
-            const localStat = await fs.stat(localP);
-            const remoteMtime = item.modified ? new Date(item.modified).getTime() : null;
-            if (remoteMtime !== null && remoteMtime <= localStat.mtimeMs) {
-              skipped++;
-              continue; // local is same age or newer → skip
-            }
-          }
-          const r = await downloadFile(id, remoteP, localP, progressCb);
-          if (r.success) downloaded++;
-          else errors++;
-        } catch {
-          errors++;
-        }
+        files.push({ remotePath: remoteP, localPath: localP, name: item.name, modified: item.modified });
       }
     }
   }
 
   const modeLabel = changedOnly ? " (changed files only)" : "";
-  progressCb && progressCb(`Syncing${modeLabel}: ${conn.remotePath} → ${localDir}...`);
+  syncCancelled = false;
+  progressCb && progressCb(`Syncing${modeLabel}: ${conn.remotePath} → ${localDir} (${concurrency} thread${concurrency === 1 ? "" : "s"})...`);
   await syncDir(conn.remotePath, localDir);
-  const msg = `Sync complete: ${downloaded} downloaded, ${skipped} skipped, ${errors} errors`;
+  const pending = [];
+  for (const file of files) {
+    if (syncCancelled) break;
+    if (changedOnly && fs.existsSync(file.localPath)) {
+      const localStat = await fs.stat(file.localPath);
+      const remoteMtime = file.modified ? new Date(file.modified).getTime() : null;
+      if (remoteMtime !== null && remoteMtime <= localStat.mtimeMs) { skipped++; continue; }
+    }
+    pending.push(file);
+  }
+  const cancelled = await runConcurrent(pending, concurrency, async (file) => {
+    if (syncCancelled) return;
+    try {
+      progressCb && progressCb(`Downloading ${file.name}...`);
+      const r = await downloadFile(id, file.remotePath, file.localPath, progressCb);
+      if (r.success) downloaded++;
+      else errors++;
+    } catch { errors++; }
+  });
+  const stopped = cancelled || syncCancelled;
+  const msg = stopped
+    ? `Sync stopped: ${downloaded} downloaded, ${skipped} skipped, ${errors} errors`
+    : `Sync complete: ${downloaded} downloaded, ${skipped} skipped, ${errors} errors`;
   progressCb && progressCb(msg);
   log.ok(msg);
-  return { success: true, downloaded, skipped, errors };
+  return { success: !stopped, downloaded, skipped, errors, cancelled: stopped, message: stopped ? "Sync stopped" : undefined };
 }
 
 // ─── Terminal (SSH interactive shell) ────────────────────────────────────────
@@ -1575,7 +1660,7 @@ async function startShell(id, cols = 100, rows = 30, opts = {}) {
   const connected = await ensureConnected(storageKey);
   if (!connected.success) return connected;
   const ac = getActive(storageKey);
-  if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
+  if (!ac || (ac.type !== "sftp" && ac.type !== "ssh")) return { success: false, message: "Not connected via SSH" };
 
   const connectionId = connectionIdOf(storageKey, ac);
   const sessionId = opts.sessionId && String(opts.sessionId).startsWith("terminal:")
@@ -2555,6 +2640,7 @@ module.exports = {
   uploadFile,
   uploadBatch,
   cancelUpload,
+  cancelSync,
   syncUpload,
   syncDownload,
   execCommand,

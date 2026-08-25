@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.5.34
+
+**SFTP / FTP and SSH terminal reliability**
+- Keeps an authenticated SSH connection available as Terminal-only when the server rejects the SFTP subsystem
+- Shows a clear `SSH only — SFTP unavailable` status instead of reporting a generic SFTP exit-code failure
+- Separates SFTP, FTP, and SSH transport handling so unsupported file actions explain what must be enabled
+
+**Sync performance and controls**
+- Adds configurable SFTP sync concurrency from 1 to 8 parallel file transfers
+- Keeps FTP sync at one transfer per connection for compatibility and stability
+- Adds Stop and Close controls to Sync Upload/Download
+- Cancels safely while scanning folders or waiting for transfers and reports completed, skipped, and failed counts
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.34
+- Contributor: `vithanhlam`
+
 ## v2.5.33
 
 **SFTP / FTP remote editor**

@@ -220,6 +220,7 @@ window.SFTP = {
 
     el.innerHTML = list.map((c) => {
       const isConn = this._connStatus[c.id] === "connected";
+      const sshOnly = isConn && c.transport === "ssh";
       const statusColor = isConn ? "var(--green)" : "var(--text3)";
       const statusText = isConn ? "Connected" : "Disconnected";
       const statusIcon = isConn ? "fa-circle" : "fa-circle";
@@ -241,6 +242,7 @@ window.SFTP = {
         ${c.hasKey ? `<span class="tag" style="background:rgba(34,197,94,0.12);color:var(--green);border-color:transparent"><i class="fas fa-key" style="font-size:10px"></i> Key Auth</span>` : ""}
         ${c.credentialState === "legacy-unavailable" ? `<span class="tag" style="background:rgba(239,68,68,0.12);color:var(--red);border-color:transparent"><i class="fas fa-exclamation-triangle" style="font-size:10px"></i> Re-enter password</span>` : ""}
         ${c.credentialState === "legacy-migratable" ? `<span class="tag" style="background:rgba(245,158,11,0.12);color:var(--yellow);border-color:transparent"><i class="fas fa-shield-alt" style="font-size:10px"></i> Create vault to migrate</span>` : ""}
+        ${sshOnly ? `<span class="tag" style="background:rgba(245,158,11,0.12);color:var(--yellow);border-color:transparent"><i class="fas fa-terminal" style="font-size:10px"></i> SSH only — SFTP unavailable</span>` : ""}
       </div>
     </div>
     <div class="proj-right">
@@ -258,7 +260,7 @@ window.SFTP = {
       ? `<button class="btn btn-sm btn-danger" onclick="SFTP.disconnect('${c.id}')"><i class="fas fa-unlink"></i> Disconnect</button>`
       : `<button class="btn btn-sm btn-success" onclick="SFTP.connect('${c.id}')"><i class="fas fa-plug"></i> Connect</button>`
     }
-    <button class="btn btn-sm btn-ghost" title="Open ${c.type === "ftp" ? "FTP" : "SFTP"} files" onclick="SFTP.openBrowser('${c.id}')"><i class="fas fa-folder-open"></i> Files</button>
+    <button class="btn btn-sm btn-ghost" title="Open ${c.type === "ftp" ? "FTP" : "SFTP"} files" onclick="SFTP.openBrowser('${c.id}')" ${sshOnly ? "disabled" : ""}><i class="fas fa-folder-open"></i> Files</button>
     ${c.type === "sftp" ? `<button class="btn btn-sm btn-ghost" title="Open Terminal window" onclick="SFTP.openTerminal('${c.id}')"><i class="fas fa-terminal"></i> Terminal</button>` : ""}
     <button class="btn btn-sm btn-ghost" data-sync-connection="${c.id}" title="Sync Upload" onclick="SFTP.openSyncConfig('${c.id}', 'upload')"><i class="fas fa-cloud-upload-alt"></i> Sync Up</button>
     <button class="btn btn-sm btn-ghost" data-sync-connection="${c.id}" title="Sync Download" onclick="SFTP.openSyncConfig('${c.id}', 'download')"><i class="fas fa-cloud-download-alt"></i> Sync Down</button>
@@ -437,7 +439,11 @@ window.SFTP = {
 
     if (r.success) {
       this._connStatus[id] = "connected";
-      toast("Connected!", "success");
+      if (r.transport === "ssh") {
+        toast(r.warning || "SSH connected, but SFTP is unavailable. Terminal is available; file browsing is disabled.", "warn", 9000);
+      } else {
+        toast("Connected!", "success");
+      }
       await this.load();
       return;
     } else {
@@ -462,6 +468,9 @@ window.SFTP = {
   async openBrowser(id) {
     const conn = this._connections.find((c) => c.id === id);
     if (!conn) return;
+    if (conn.transport === "ssh") {
+      return toast("SSH login is active, but the server rejected SFTP. Use Terminal or enable the SFTP subsystem on the server.", "warn", 9000);
+    }
     toast(`Opening ${conn.type === "ftp" ? "FTP" : "SFTP"} window…`, "info");
     const r = await api.sftpOpenWindow(conn.type === "ftp" ? "ftp" : "sftp", id);
     if (!r.success) {
@@ -1673,6 +1682,12 @@ window.SFTP = {
     const listEl = document.getElementById("sftp-term-files");
     if (!id || !pathEl || !listEl) return;
     pathEl.value = this._termPath;
+    const conn = this._connections.find((item) => item.id === this._sessionConnectionId || item.id === id);
+    if (conn?.transport === "ssh") {
+      listEl.innerHTML = '<div style="padding:14px;color:var(--yellow);font-size:12px;line-height:1.5"><i class="fas fa-terminal"></i> SSH terminal only.<br>SFTP was rejected by the server, so remote file browsing is unavailable.</div>';
+      this._termItems = [];
+      return;
+    }
     listEl.innerHTML = '<div style="padding:18px;text-align:center"><i class="fas fa-spinner fa-spin"></i></div>';
     const r = await api.sftpList(id, this._termPath);
     if (!r.success) {
@@ -2319,6 +2334,9 @@ window.SFTP = {
   async openSyncConfig(id, direction) {
     const conn = this._connections.find((c) => c.id === id);
     if (!conn) return;
+    if (conn.transport === "ssh") {
+      return toast("Sync requires SFTP or FTP. This connection is SSH terminal-only because the server rejected SFTP.", "warn", 9000);
+    }
 
     document.getElementById("sftp-sync-conn-id").value = id;
     document.getElementById("sftp-sync-direction").value = direction;
@@ -2326,6 +2344,11 @@ window.SFTP = {
       direction === "upload" ? `Sync Upload — ${conn.name}` : `Sync Download — ${conn.name}`;
     document.getElementById("sftp-sync-remote").value = conn.remotePath || "/";
     document.getElementById("sftp-sync-excludes").value = (conn.excludePaths || []).join("\n");
+    const concurrencyEl = document.getElementById("sftp-sync-concurrency");
+    if (concurrencyEl) {
+      concurrencyEl.value = conn.type === "ftp" ? "1" : "3";
+      concurrencyEl.disabled = conn.type === "ftp";
+    }
 
     // Default local path from project link
     let defaultLocal = conn.localPath || "";
@@ -2384,6 +2407,7 @@ window.SFTP = {
     const excludes = document.getElementById("sftp-sync-excludes").value
       .split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
     const changedOnly = document.getElementById("sftp-sync-changed-only")?.checked || false;
+    const concurrency = Math.max(1, Math.min(8, Number(document.getElementById("sftp-sync-concurrency")?.value) || 3));
     const startButton = document.getElementById("sftp-sync-start-btn");
 
     if (!localPath) { toast("Select a local folder", "warn"); return; }
@@ -2430,16 +2454,21 @@ window.SFTP = {
       document.getElementById("sftp-sync-title").textContent =
         direction === "upload" ? "Uploading to server..." : "Downloading from server...";
       document.getElementById("sftp-sync-output").textContent = "";
-      document.getElementById("sftp-sync-footer").style.display = "none";
+      this._syncActive = true;
+      const stopButton = document.getElementById("sftp-sync-stop-btn");
+      if (stopButton) { stopButton.disabled = false; stopButton.innerHTML = '<i class="fas fa-stop"></i> Stop'; }
       document.getElementById("sftp-sync-icon")?.classList.add("fa-spin");
       openModal("m-sftp-sync");
 
       const r = direction === "upload"
-        ? await api.sftpSyncUpload(id, { changedOnly })
-        : await api.sftpSyncDownload(id, { changedOnly });
+        ? await api.sftpSyncUpload(id, { changedOnly, concurrency })
+        : await api.sftpSyncDownload(id, { changedOnly, concurrency });
 
       document.getElementById("sftp-sync-footer").style.display = "flex";
-      if (r.success) {
+      if (r.cancelled) {
+        document.getElementById("sftp-sync-title").textContent = "Sync Stopped";
+        toast("Sync stopped", "warn");
+      } else if (r.success) {
         const count = direction === "upload" ? r.uploaded : r.downloaded;
         const skipped = r.skipped || 0;
         document.getElementById("sftp-sync-title").textContent = "Sync Complete!";
@@ -2455,12 +2484,24 @@ window.SFTP = {
     } finally {
       document.getElementById("sftp-sync-icon")?.classList.remove("fa-spin");
       this._setSyncBusy(id, false);
+      this._syncActive = false;
       if (startButton) {
         startButton.disabled = false;
         startButton.innerHTML = '<i class="fas fa-sync-alt"></i> Start Sync';
       }
       this._render();
     }
+  },
+
+  async stopSync() {
+    const button = document.getElementById("sftp-sync-stop-btn");
+    if (button) { button.disabled = true; button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...'; }
+    try { await api.sftpSyncCancel(); } catch (error) { toast(error.message || "Could not stop sync", "error"); }
+  },
+
+  async closeSyncProgress() {
+    if (this._syncActive) await this.stopSync();
+    closeModal("m-sftp-sync");
   },
 
   _setSyncBusy(id, busy) {

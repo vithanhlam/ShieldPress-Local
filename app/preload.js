@@ -163,6 +163,7 @@ contextBridge.exposeInMainWorld("api", {
   sftpUploadCancel: () => ipcRenderer.invoke("sftp-upload-cancel"),
   sftpSyncUpload: (id, opts) => ipcRenderer.invoke("sftp-sync-upload", { id, ...(opts || {}) }),
   sftpSyncDownload: (id, opts) => ipcRenderer.invoke("sftp-sync-download", { id, ...(opts || {}) }),
+  sftpSyncCancel: () => ipcRenderer.invoke("sftp-sync-cancel"),
   sftpValidatePath: (localPath) => ipcRenderer.invoke("sftp-validate-path", localPath),
   sftpExec: (id, command) => ipcRenderer.invoke("sftp-exec", { id, command }),
   sftpSystemInfo: (id) => ipcRenderer.invoke("sftp-system-info", id),

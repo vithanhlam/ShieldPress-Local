@@ -600,18 +600,19 @@ function register(ipcMain, shell, dialog) {
     sftp.uploadBatch(id, items, (msg) => sendSftpProgress(e, msg), { retry: !!retry }),
   );
   ipcMain.handle("sftp-upload-cancel", () => sftp.cancelUpload());
-  ipcMain.handle("sftp-sync-upload", (e, { id, changedOnly }) =>
+  ipcMain.handle("sftp-sync-upload", (e, { id, changedOnly, concurrency }) =>
     sftp.syncUpload(id, (msg) => {
       try { e.sender.send("sftp-progress", msg); } catch {}
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
-    }, { changedOnly: !!changedOnly }),
+    }, { changedOnly: !!changedOnly, concurrency }),
   );
-  ipcMain.handle("sftp-sync-download", (e, { id, changedOnly }) =>
+  ipcMain.handle("sftp-sync-download", (e, { id, changedOnly, concurrency }) =>
     sftp.syncDownload(id, (msg) => {
       try { e.sender.send("sftp-progress", msg); } catch {}
       global.STATE.mainWindow?.webContents?.send("sftp-progress", msg);
-    }, { changedOnly: !!changedOnly }),
+    }, { changedOnly: !!changedOnly, concurrency }),
   );
+  ipcMain.handle("sftp-sync-cancel", () => sftp.cancelSync());
   ipcMain.handle("sftp-validate-path", (_e, localPath) => sftp.validateLocalPath(localPath));
   ipcMain.handle("sftp-exec", (_e, { id, command }) => sftp.execCommand(id, command));
   ipcMain.handle("sftp-system-info", (_e, id) => sftp.getRemoteSystemInfo(id));
