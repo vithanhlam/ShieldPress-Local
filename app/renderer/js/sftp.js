@@ -12,6 +12,7 @@ window.SFTP = {
   _browserItems: [],
   _deleteBusy: false,
   _remoteSelection: null,
+  _remoteSelections: [],
   _sessionMode: false,
   _sessionId: null,
   _sessionKind: null,
@@ -656,6 +657,12 @@ window.SFTP = {
     return item.isDirectory || item.type === "directory";
   },
 
+  _isEditableRemoteFile(name) {
+    const fileName = String(name || "");
+    return /^\.env(?:\.[^/\\]+)?$/i.test(fileName)
+      || /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(fileName);
+  },
+
   _renderBrowserList() {
     const listEl = document.getElementById("sftp-file-list");
     if (!listEl) return;
@@ -695,7 +702,7 @@ window.SFTP = {
   const encodedPath = encodeURIComponent(fullPath);
   const encodedName = encodeURIComponent(item.name);
   const isDir = this._isDir(item);
-  const isEditable = !isDir && /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|env|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(item.name);
+  const isEditable = !isDir && this._isEditableRemoteFile(item.name);
   const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
   const color = isDir ? "var(--yellow)" : "var(--text3)";
   return `
@@ -747,6 +754,16 @@ window.SFTP = {
 
   refreshBrowser() { this._loadDir(); },
 
+  goBrowserPath() {
+    const input = document.getElementById("sftp-current-path");
+    const value = String(input?.value || "").trim();
+    if (!value.startsWith("/")) return toast("Remote path must start with /", "warn");
+    this._clearRemoteSelection();
+    this._currentPath = value.replace(/\/+/g, "/") || "/";
+    this._saveCurrentPath();
+    this._loadDir();
+  },
+
   _fmtSize(bytes) {
     if (!bytes) return "0 B";
     if (bytes > 1073741824) return (bytes / 1073741824).toFixed(1) + " GB";
@@ -790,6 +807,38 @@ window.SFTP = {
       else if (downloaded && !failed) toast(`Downloaded ${downloaded} file(s)`, "success");
       else if (downloaded) toast(`Downloaded ${downloaded} file(s), ${failed} failed`, "warn");
       else toast(result.message || "Download failed", "error");
+    } finally {
+      this._xferBusy = false;
+      this._xferSetBusy(false);
+    }
+  },
+
+  async downloadSelected(scope = "browser") {
+    const id = document.getElementById(scope === "terminal" ? "sftp-term-conn-id" : "sftp-browser-conn-id")?.value;
+    const selected = this._remoteSelections.filter((item) => item.scope === scope);
+    if (!id || !selected.length) return toast("Select at least one file or folder", "warn");
+    if (this._xferBusy) return toast("A transfer is already in progress", "warn");
+    const localDir = await api.openFileDialog({ properties: ["openDirectory"] });
+    if (!localDir) return;
+    const jobs = [];
+    for (const item of selected) {
+      const name = item.path.split("/").pop();
+      const dest = localDir.replace(/[\\/]+$/, "") + "/" + name;
+      const localInfo = await api.sftpStatLocal(dest);
+      if (localInfo.exists && !confirm(`"${name}" already exists locally.\n\nOverwrite or merge it?`)) continue;
+      jobs.push({ remotePath: item.path, localPath: dest, isDirectory: item.isDirectory, name });
+    }
+    if (!jobs.length) return;
+    this._xferDirection = "download";
+    this._xferReset();
+    this._xferShow(true);
+    this._xferBusy = true;
+    this._xferConnId = id;
+    this._xferSetBusy(true);
+    try {
+      const result = await api.sftpDownloadBatch(id, jobs);
+      if (result.downloaded && !result.failed) toast(`Downloaded ${result.downloaded} file(s)`, "success");
+      else toast(result.message || `Downloaded ${result.downloaded || 0} file(s)`, result.downloaded ? "warn" : "error");
     } finally {
       this._xferBusy = false;
       this._xferSetBusy(false);
@@ -1125,6 +1174,28 @@ window.SFTP = {
     }
   },
 
+  async deleteSelected(scope = "browser") {
+    const id = document.getElementById(scope === "terminal" ? "sftp-term-conn-id" : "sftp-browser-conn-id")?.value;
+    const selected = this._remoteSelections.filter((item) => item.scope === scope);
+    if (!id || !selected.length) return toast("Select at least one file or folder", "warn");
+    const names = selected.map((item) => item.path.split("/").pop());
+    const summary = names.length === 1 ? `Delete "${names[0]}"?` : `Delete these ${names.length} items?\n\n${names.join("\n")}`;
+    if (!confirm(`${summary}\n\nThis action cannot be undone.`)) return;
+    if (this._deleteBusy) return toast("A delete operation is already in progress", "warn");
+    this._deleteBusy = true;
+    try {
+      for (const item of selected) {
+        const result = await api.sftpDelete(id, item.path, item.isDirectory);
+        if (!result.success) toast(`Delete failed: ${item.path.split("/").pop()} — ${result.message}`, "error");
+      }
+      this._clearRemoteSelection();
+      if (scope === "terminal") await this.loadTermFiles();
+      else await this._loadDir();
+    } finally {
+      this._deleteBusy = false;
+    }
+  },
+
   createDirPrompt() { this.openRemoteCreate("browser", "folder"); },
 
   async deleteItem(remotePath, isDirectory) {
@@ -1152,26 +1223,62 @@ window.SFTP = {
   _clearRemoteSelection() {
     this._clearRemoteSelectionVisual();
     this._remoteSelection = null;
+    this._remoteSelections = [];
+    this._updateSelectionToolbar();
   },
 
-  _setRemoteSelection(row, scope) {
+  _setRemoteSelection(row, scope, event = null) {
     if (!row) return;
-    this._clearRemoteSelectionVisual();
-    row.classList.add("remote-row-selected");
-    this._remoteSelection = {
+    const rows = [...row.closest('[data-remote-browser], [data-terminal-remote-browser]')?.querySelectorAll('[data-remote-path]') || []];
+    const clicked = {
       scope,
       path: decodeURIComponent(row.dataset.remotePath),
       isDirectory: row.dataset.remoteType === "directory",
     };
+    const current = this._remoteSelections.filter((item) => item.scope === scope);
+    if (event?.shiftKey && current.length) {
+      const anchor = rows.findIndex((item) => decodeURIComponent(item.dataset.remotePath) === current[current.length - 1].path);
+      const end = rows.indexOf(row);
+      if (anchor >= 0 && end >= 0) {
+        const [from, to] = anchor < end ? [anchor, end] : [end, anchor];
+        this._remoteSelections = rows.slice(from, to + 1).map((item) => ({
+          scope, path: decodeURIComponent(item.dataset.remotePath), isDirectory: item.dataset.remoteType === "directory",
+        }));
+      }
+    } else if (event?.ctrlKey || event?.metaKey) {
+      const exists = current.some((item) => item.path === clicked.path);
+      this._remoteSelections = this._remoteSelections.filter((item) => item.scope !== scope || item.path !== clicked.path);
+      if (!exists) this._remoteSelections.push(clicked);
+    } else {
+      this._remoteSelections = this._remoteSelections.filter((item) => item.scope !== scope);
+      this._remoteSelections.push(clicked);
+    }
+    this._remoteSelection = this._remoteSelections[this._remoteSelections.length - 1] || null;
+    this._clearRemoteSelectionVisual();
+    this._remoteSelections.forEach((item) => {
+      rows.find((candidate) => decodeURIComponent(candidate.dataset.remotePath) === item.path)?.classList.add("remote-row-selected");
+    });
+    this._updateSelectionToolbar();
+  },
+
+  _updateSelectionToolbar() {
+    for (const scope of ["browser", "terminal"]) {
+      const count = this._remoteSelections.filter((item) => item.scope === scope).length;
+      document.querySelectorAll(`[data-remote-selection-toolbar="${scope}"]`).forEach((bar) => {
+        bar.style.display = count ? "flex" : "none";
+        const label = bar.querySelector("[data-selection-count]");
+        if (label) label.textContent = `${count} selected`;
+      });
+    }
   },
 
   _applyRemoteSelectionHighlight(container) {
-    if (!this._remoteSelection || !container) return;
-    const selectedPath = this._remoteSelection.path;
-    const row = [...container.querySelectorAll("[data-remote-path]")].find(
-      (el) => decodeURIComponent(el.dataset.remotePath) === selectedPath,
-    );
-    if (row) row.classList.add("remote-row-selected");
+    if (!container) return;
+    const selected = new Set(this._remoteSelections.map((item) => item.path));
+    container.querySelectorAll("[data-remote-path]").forEach((row) => {
+      row.classList.toggle("remote-row-selected", selected.has(decodeURIComponent(row.dataset.remotePath)));
+    });
+    this._updateSelectionToolbar();
   },
 
   _bindRemoteListEvents(zone, scope) {
@@ -1179,14 +1286,14 @@ window.SFTP = {
     zone.dataset.remoteListBound = scope;
 
     zone.addEventListener("click", (e) => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest("button") && scope !== "terminal") return;
       const row = e.target.closest("[data-remote-path]");
       if (!row || !zone.contains(row)) return;
-      this._setRemoteSelection(row, scope);
+      this._setRemoteSelection(row, scope, e);
     });
 
     zone.addEventListener("dblclick", (e) => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest("button") && scope !== "terminal") return;
       const row = e.target.closest("[data-remote-path]");
       if (!row || !zone.contains(row) || row.dataset.remoteType !== "directory") return;
       e.preventDefault();
@@ -1742,7 +1849,7 @@ window.SFTP = {
       const fullPath = base.replace(/\/+$/, "") + "/" + item.name;
       const encoded = encodeURIComponent(fullPath);
       const isDir = item.isDirectory || item.type === "directory";
-      const editable = !isDir && /\.(php|html|css|js|json|txt|xml|yml|yaml|conf|ini|env|htaccess|md|sh|py|rb|sql|log|csv|twig)$/i.test(item.name);
+      const editable = !isDir && this._isEditableRemoteFile(item.name);
       const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
       const chmod = String(item.permissions || "").match(/\((\d{3,4})\)/)?.[1] || item.permissions || "—";
       const ownerGroup = (item.owner || item.group)

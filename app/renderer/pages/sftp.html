@@ -170,7 +170,8 @@
     <!-- Current path bar -->
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="SFTP.browseUp()" title="Parent directory"><i class="fas fa-arrow-up"></i></button>
-      <input class="fi" id="sftp-current-path" style="flex:1;font-family:var(--mono);font-size:13px" readonly/>
+      <input class="fi" id="sftp-current-path" style="flex:1;font-family:var(--mono);font-size:13px" onkeydown="if(event.key==='Enter')SFTP.goBrowserPath()"/>
+      <button class="btn btn-ghost btn-sm" onclick="SFTP.goBrowserPath()" title="Open path"><i class="fas fa-arrow-right"></i></button>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);white-space:nowrap">
         <input type="checkbox" id="sftp-show-hidden" checked onchange="SFTP.toggleHiddenFiles()"/>
         Hidden files
@@ -194,6 +195,11 @@
       <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFolderDialog()"><i class="fas fa-folder-open"></i> Upload Folder</button>
       <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadZipDialog()"><i class="fas fa-file-archive"></i> Upload ZIP & Extract</button>
       <button class="btn btn-ghost btn-sm" onclick="SFTP.createDirPrompt()"><i class="fas fa-folder-plus"></i> New Folder</button>
+      <div data-remote-selection-toolbar="browser" style="display:none;gap:8px;align-items:center;margin-left:auto">
+        <span data-selection-count style="font-size:12px;color:var(--text2)"></span>
+        <button class="btn btn-ghost btn-sm" onclick="SFTP.downloadSelected('browser')"><i class="fas fa-download"></i> Download selected</button>
+        <button class="btn btn-danger btn-sm" onclick="SFTP.deleteSelected('browser')"><i class="fas fa-trash"></i> Delete selected</button>
+      </div>
     </div>
 
     <!-- Transfer progress stays at the bottom of the file browser -->
@@ -275,6 +281,11 @@
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termUploadFiles()"><i class="fas fa-upload"></i> Upload</button>
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termUploadFolder()"><i class="fas fa-folder-open"></i> Folder</button>
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termCreateDir()"><i class="fas fa-folder-plus"></i> Folder</button>
+          <div data-remote-selection-toolbar="terminal" style="display:none;gap:5px;align-items:center;margin-left:auto">
+            <span data-selection-count style="font-size:10px;color:var(--text2)"></span>
+            <button class="btn btn-ghost btn-xs" onclick="SFTP.downloadSelected('terminal')" title="Download selected"><i class="fas fa-download"></i></button>
+            <button class="btn btn-danger btn-xs" onclick="SFTP.deleteSelected('terminal')" title="Delete selected"><i class="fas fa-trash"></i></button>
+          </div>
           <span style="font-size:10px;color:var(--text3);align-self:center;margin-left:auto">Drop files or folders to upload</span>
         </div>
         <div id="sftp-term-xfer" class="sftp-xfer" style="display:none;margin:8px">

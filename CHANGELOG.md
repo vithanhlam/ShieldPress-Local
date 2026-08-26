@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.5.35
+
+**SFTP / FTP file browser**
+- Allows entering a remote path directly in the FTP/SFTP path bar
+- Enables editing `.env` and `.env.*` files over both FTP and SFTP
+- Adds Ctrl/Cmd-click and Shift-click multi-selection in remote file lists
+- Adds batch download and batch delete for selected files and folders
+- Requires explicit confirmation before deleting selected remote items
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.35
+- Contributor: `vithanhlam`
+
 ## v2.5.34
 
 **SFTP / FTP and SSH terminal reliability**

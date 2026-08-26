@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.32)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.35)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.32.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.32_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.35.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.35_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
