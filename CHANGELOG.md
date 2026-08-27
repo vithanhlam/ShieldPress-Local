@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.5.36
+
+**S3-compatible Bucket Manager**
+- Adds S3 Bucket configuration under Remote with Vault-protected credentials
+- Supports AWS and custom S3-compatible endpoints such as VNG Cloud vStorage
+- Uses path-style addressing and preserves the configured provider region for SigV4
+- Fixes canonical URI/query signing for `ListObjectsV2` and `GetBucketLocation`
+- Adds bucket browsing by folder with the current path, combined folder/file pagination, and refresh
+- Adds multi-file and multi-folder upload/download while preserving folder structure
+- Adds configurable parallel transfers with progress, current file, count, percentage, Stop, and temporary Activity logs
+- Adds multi-selection download/delete with an explicit `DELETE` confirmation
+- Adds detailed S3 connection test steps and Debug Logs with HTTP status, response, operation, and request metadata without secret keys
+
+**WordPress / Laravel upload reliability**
+- Configures writable PHP upload temp storage and Nginx request temp paths on Ubuntu
+- Reports local file permission errors with the affected WordPress/Laravel workspace path
+- Keeps large upload limits for image, ZIP, and media uploads
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.36
+- Contributor: `vithanhlam`
+
 ## v2.5.35
 
 **SFTP / FTP file browser**

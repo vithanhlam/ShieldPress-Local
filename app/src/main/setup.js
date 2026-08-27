@@ -203,6 +203,7 @@ async function init() {
     path.join(nginxTemp, "scgi_temp"),
   ])
     await fs.ensureDir(d);
+  await ensureLinuxUploadTempPermissions();
 
   // 2. Tạo config trước khi làm gì khác
   let currentConfig = {};
@@ -287,6 +288,41 @@ async function init() {
   }
 }
 
+async function ensureLinuxUploadTempPermissions() {
+  if (process.platform !== "linux") return;
+  const { NGINX_DIR, PHP_BASE_DIR } = global.CONST;
+  const tempRoot = path.join(NGINX_DIR, "temp");
+  const phpUploadTemp = path.join(tempRoot, "php_uploads");
+  const writableDirs = [
+    tempRoot,
+    path.join(tempRoot, "client_body_temp"),
+    path.join(tempRoot, "proxy_temp"),
+    path.join(tempRoot, "fastcgi_temp"),
+    path.join(tempRoot, "uwsgi_temp"),
+    path.join(tempRoot, "scgi_temp"),
+    phpUploadTemp,
+  ];
+  for (const dir of writableDirs) {
+    await fs.ensureDir(dir);
+    // These are disposable request/upload buffers.  1777 lets the app,
+    // nginx and PHP-CGI write there without requiring sudo/chown.
+    await fs.chmod(dir, 0o1777).catch((error) => log.warn(`Upload temp permissions: ${dir}: ${error.message}`));
+  }
+  if (!(await fs.pathExists(PHP_BASE_DIR))) return;
+  const versions = await fs.readdir(PHP_BASE_DIR, { withFileTypes: true });
+  const tempPath = phpUploadTemp.replace(/\\/g, "/");
+  for (const version of versions) {
+    if (!version.isDirectory()) continue;
+    const phpIni = path.join(PHP_BASE_DIR, version.name, "php.ini");
+    if (!(await fs.pathExists(phpIni))) continue;
+    let ini = await fs.readFile(phpIni, "utf8");
+    if (/^\s*;?\s*upload_tmp_dir\s*=/m.test(ini)) ini = ini.replace(/^\s*;?\s*upload_tmp_dir\s*=.*$/m, `upload_tmp_dir = "${tempPath}"`);
+    else ini = ini.replace(/\[PHP\]/, `[PHP]\nupload_tmp_dir = "${tempPath}"`);
+    await fs.writeFile(phpIni, ini, "utf8");
+  }
+  log.ok(`PHP/Nginx upload temp permissions ready: ${phpUploadTemp}`);
+}
+
 async function ensureLinuxNginxLayout() {
   const { NGINX_DIR } = global.CONST;
   const confDir = path.join(NGINX_DIR, "conf");
@@ -298,11 +334,12 @@ async function ensureLinuxNginxLayout() {
   const mimeFile = mimeCandidates.find((file) => fs.existsSync(file));
   const master = path.join(confDir, "nginx.conf");
   const includeMime = mimeFile ? `include ${mimeFile};` : "default_type application/octet-stream;";
+  const tempPath = path.join(NGINX_DIR, "temp").replace(/\\/g, "/");
   // Nginx resolves include paths relative to the main configuration file,
   // not consistently from -p across Linux distributions. Use an absolute
   // quoted glob so every per-project server is actually loaded.
   const serverGlob = path.join(serversDir, "*.conf").replace(/\\/g, "/");
-  const content = `worker_processes 1;\npid logs/nginx.pid;\nerror_log logs/error.log;\nevents { worker_connections 1024; }\nhttp {\n    ${includeMime}\n    sendfile on;\n    include "${serverGlob}";\n}\n`;
+  const content = `worker_processes 1;\npid logs/nginx.pid;\nerror_log logs/error.log;\nevents { worker_connections 1024; }\nhttp {\n    ${includeMime}\n    sendfile on;\n    client_body_temp_path ${tempPath}/client_body_temp;\n    proxy_temp_path ${tempPath}/proxy_temp;\n    fastcgi_temp_path ${tempPath}/fastcgi_temp;\n    uwsgi_temp_path ${tempPath}/uwsgi_temp;\n    scgi_temp_path ${tempPath}/scgi_temp;\n    include "${serverGlob}";\n}\n`;
   await fs.writeFile(master, content, "utf8");
   await fs.writeFile(path.join(NGINX_DIR, "fastcgi_params"),
     "fastcgi_param QUERY_STRING $query_string;\n" +

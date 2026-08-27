@@ -380,6 +380,20 @@ async function getRawConnection(id) {
   return { ...conn, password, credentialError: password ? "" : "LEGACY_CREDENTIAL_UNAVAILABLE" };
 }
 
+// Shared credential helpers for other remote transports (for example S3).
+// The vault key never leaves this module; callers only receive encrypted values.
+function sealCredential(value) {
+  if (!vaultKey) return "";
+  return value ? vaultCrypto.seal(value, vaultKey) : "";
+}
+
+function openCredential(value) {
+  if (!value) return "";
+  if (!vaultKey) return "";
+  try { return String(value).startsWith("v2:") ? vaultCrypto.open(value, vaultKey) : ""; }
+  catch { return ""; }
+}
+
 // ─── SFTP Operations ─────────────────────────────────────────────────────────
 // Keys are either connectionId (pool / list Connect) or sessionId (window sessions).
 let activeConnections = {}; // { id: { client, sftp?, type, connectionId } }
@@ -2627,6 +2641,8 @@ module.exports = {
   changeVaultPassword,
   lockVault,
   getConnections,
+  sealCredential,
+  openCredential,
   saveConnection,
   deleteConnection,
   connect,

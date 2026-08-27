@@ -16,7 +16,7 @@
       -webkit-app-region: drag;
     }
     .remote-titlebar button, .remote-titlebar .no-drag { -webkit-app-region: no-drag; }
-    .remote-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px; gap: 10px; }
+    .remote-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 12px 28px; gap: 10px; }
     #remote-browser-pane, #remote-terminal-pane { flex: 1; min-height: 0; display: none; flex-direction: column; }
     #remote-browser-pane.active, #remote-terminal-pane.active { display: flex; }
     #sftp-file-list, #sftp-term-files {
@@ -31,7 +31,7 @@
       background: var(--border2); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box;
     }
     .sftp-terminal-layout { flex: 1; min-height: 0; }
-    #sftp-xterm { flex: 1; min-height: 280px; height: auto !important; }
+    #sftp-xterm { flex: 1; min-height: 280px; height: auto !important; margin-bottom: 8px; }
     #sftp-term-files { height: auto !important; }
     #toast-container { position: fixed; right: 16px; bottom: 16px; z-index: 10000; display: flex; flex-direction: column; gap: 8px; }
   </style>

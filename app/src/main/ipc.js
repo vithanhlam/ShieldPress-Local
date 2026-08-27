@@ -12,6 +12,7 @@ const ssl     = require("./ssl");
 const ext     = require("./extensions");
 const email   = require("./email");
 const sftp    = require("./sftp");
+const s3      = require("./s3");
 const git     = require("./git");
 const gd      = require("./google-drive");
 const platform = require("./platform");
@@ -613,6 +614,20 @@ function register(ipcMain, shell, dialog) {
     }, { changedOnly: !!changedOnly, concurrency }),
   );
   ipcMain.handle("sftp-sync-cancel", () => sftp.cancelSync());
+  // ── S3-compatible object storage ──
+  ipcMain.handle("s3-get-buckets", () => s3.getBuckets());
+  ipcMain.handle("s3-open-window", async (_e, id) => { const result = await s3.getBuckets(); const bucket = (result.buckets || []).find((item) => item.id === id); if (!bucket) return { success: false, message: "S3 configuration not found" }; return require("./remote-windows").openS3Window({ bucketId: id, bucketName: bucket.name }); });
+  ipcMain.handle("s3-save-bucket", (_e, d) => s3.saveBucket(d));
+  ipcMain.handle("s3-delete-bucket", (_e, id) => s3.deleteBucket(id));
+  ipcMain.handle("s3-test-bucket", (e, id) => s3.test(id, (progress) => { try { e.sender.send("s3-test-progress", progress); } catch {} }));
+  ipcMain.handle("s3-list-objects", (_e, { id, prefix }) => s3.listObjects(id, prefix));
+  ipcMain.handle("s3-delete-object", (_e, { id, key }) => s3.deleteObject(id, key));
+  ipcMain.handle("s3-download-object", (_e, { id, key, localPath }) => s3.downloadObject(id, key, localPath));
+  ipcMain.handle("s3-download-prefix", (e, { id, prefix, localPath, opts }) => s3.downloadPrefix(id, prefix, localPath, opts, (done, total, item) => { try { e.sender.send("s3-progress", { done, total, item: item.key, direction: "down" }); } catch {} }));
+  ipcMain.handle("s3-upload-paths", (e, { id, items, opts }) => s3.uploadPaths(id, items, opts, (done, total, item) => { try { e.sender.send("s3-progress", { done, total, item: item.relative, direction: "up" }); } catch {} }));
+  ipcMain.handle("s3-upload", (e, { id, opts }) => s3.upload(id, opts, (done, total, item) => { try { e.sender.send("s3-progress", { done, total, item: item.relative, direction: "up" }); } catch {} }));
+  ipcMain.handle("s3-download", (e, { id, opts }) => s3.download(id, opts, (done, total, item) => { try { e.sender.send("s3-progress", { done, total, item: item.key, direction: "down" }); } catch {} }));
+  ipcMain.handle("s3-cancel", () => s3.cancel());
   ipcMain.handle("sftp-validate-path", (_e, localPath) => sftp.validateLocalPath(localPath));
   ipcMain.handle("sftp-exec", (_e, { id, command }) => sftp.execCommand(id, command));
   ipcMain.handle("sftp-system-info", (_e, id) => sftp.getRemoteSystemInfo(id));

@@ -91,6 +91,14 @@ function openRemoteWindow({ kind, connectionId, connectionName, host, sessionId 
   return { success: true, sessionId: session.id, windowId: win.id, title };
 }
 
+function openS3Window({ bucketId, bucketName }) {
+  const title = `S3 Objects — ${bucketName || bucketId}`;
+  const win = new BrowserWindow({ width: 1280, height: 860, minWidth: 900, minHeight: 620, title, backgroundColor: "#080b11", autoHideMenuBar: true, show: false, icon: iconPath(), webPreferences: { nodeIntegration: false, contextIsolation: true, preload: preloadPath() } });
+  win.loadFile(path.join(__dirname, "..", "..", "renderer", "s3-session.html"), { search: new URLSearchParams({ bucketId: String(bucketId), title }).toString() });
+  win.once("ready-to-show", () => win.show());
+  return { success: true, windowId: win.id, title };
+}
+
 function getWindow(sessionId) {
   return openWindows.get(sessionId) || null;
 }
@@ -124,6 +132,7 @@ function closeAllWindows() {
 
 module.exports = {
   openRemoteWindow,
+  openS3Window,
   getWindow,
   closeWindow,
   closeWindowsForConnection,

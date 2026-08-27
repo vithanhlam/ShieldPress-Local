@@ -88,6 +88,7 @@ window.nav = async function (page) {
   if (page === "config" && typeof Config !== "undefined") Config.load();
   if (page === "debug" && typeof Debug !== "undefined") Debug.loadGlobal();
   if (page === "sftp" && typeof SFTP !== "undefined") SFTP.init();
+  if (page === "s3" && typeof S3 !== "undefined") S3.init();
   if (page === "cache" && typeof CacheManager !== "undefined") CacheManager.init();
   if (page === "extensions" && typeof Extensions !== "undefined") Extensions.init();
   if (page === "email" && typeof EmailTest !== "undefined") EmailTest.init();

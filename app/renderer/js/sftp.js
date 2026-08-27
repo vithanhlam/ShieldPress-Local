@@ -308,6 +308,11 @@ window.SFTP = {
 
   // ── Add/Edit ──────────────────────────────────────────────────────────────
   async openAdd() {
+    await this.refreshVaultStatus();
+    if (!this._vault.unlocked) {
+      await this.openVault(() => this.openAdd());
+      return;
+    }
     document.getElementById("sftp-modal-title").textContent = "New Connection";
     document.getElementById("sftp-edit-id").value = "";
     document.getElementById("sftp-name").value = "";

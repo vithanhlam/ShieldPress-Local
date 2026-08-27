@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.35)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.36)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress.Local.Setup.2.5.35.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.35_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress.Local.Setup.2.5.36.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.36_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -122,6 +122,20 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **Local Path Validation** | Validates local folder exists before sync starts |
 | **Master Password Vault** | Portable credential vault with Enter-to-unlock and automatic prompts before locked connection, browser, or terminal actions |
 
+### S3 Bucket Manager
+
+| Feature | Description |
+| ------- | ----------- |
+| **S3-compatible storage** | Connect to AWS S3, VNG Cloud vStorage, MinIO, Wasabi, Cloudflare R2, and other custom S3 endpoints |
+| **Custom endpoint and region** | Path-style addressing, custom endpoint, provider region, bucket, and optional remote prefix |
+| **Credential Vault** | Access and secret keys are protected by the same Vault used by SFTP/FTP |
+| **Object browser** | Browse buckets by folder, show the current path beside Back, and paginate combined folders and files |
+| **Upload and download** | Upload multiple files/folders and download files/folders while preserving folder structure |
+| **Parallel transfers** | Configurable concurrent transfer workers with progress, current item, count, percentage, Stop, and temporary Activity logs |
+| **Selection actions** | Select multiple files/folders to download or delete; destructive deletes require typing `DELETE` |
+| **Reliable SigV4** | Correct canonical URI/query signing for custom endpoints, including empty query values such as `prefix=` |
+| **Connection diagnostics** | Step-by-step HeadBucket, bucket location, list, upload, download, and delete checks with detailed Debug Logs |
+
 ### Extensions & Tools
 
 | Feature | Description |
@@ -169,15 +183,15 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download `ShieldPress.Local.Setup.2.5.32.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress.Local.Setup.2.5.36.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.32_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.32_amd64.deb`
+1. Download `shieldpresslocal_2.5.36_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.36_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 
