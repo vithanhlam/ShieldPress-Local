@@ -249,9 +249,9 @@ ShieldPress Local does not collect, store, or transmit any of your data. All dat
 
 ---
 
-## Báo lỗi
+## Bug Reports
 
-Hiện tại dự án không nhận đóng góp mã nguồn hoặc pull request. Nếu bạn phát hiện lỗi, vui lòng [tạo một GitHub Issue](https://github.com/vithanhlam/shieldpress-local/issues) và mô tả cách tái hiện lỗi. Mình sẽ kiểm tra và sửa lỗi.
+This project does not currently accept source-code contributions or pull requests. If you find a bug, please [open a GitHub Issue](https://github.com/vithanhlam/shieldpress-local/issues) and describe how to reproduce it. We will investigate and fix it.
 
 ## License
 
