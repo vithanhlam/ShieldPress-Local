@@ -542,6 +542,7 @@ function register(ipcMain, shell, dialog) {
       try { e.sender.send("sftp-progress", msg); } catch {}
     }),
   );
+  ipcMain.handle("sftp-connection-status", (_e, id) => sftp.getConnectionStatus(id));
   ipcMain.handle("sftp-disconnect", (_e, id) => sftp.disconnect(id));
   ipcMain.handle("sftp-disconnect-all", () => sftp.disconnectAll());
   ipcMain.handle("sftp-close-session", (_e, sessionId) => sftp.closeSession(sessionId));

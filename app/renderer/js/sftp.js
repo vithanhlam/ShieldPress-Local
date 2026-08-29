@@ -723,6 +723,7 @@ window.SFTP = {
     ${`<button class="btn btn-ghost btn-xs" title="Download" onclick="SFTP.downloadItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-download"></i></button>`}
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Edit inline" onclick="SFTP.editFile(decodeURIComponent('${encodedPath}'))"><i class="fas fa-edit"></i></button>` : ""}
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Open in Editor (VS Code, Notepad++...)" onclick="SFTP.openExternal(decodeURIComponent('${encodedPath}'))"><i class="fas fa-external-link-alt"></i></button>` : ""}
+    ${!isDir ? `<button class="btn btn-ghost btn-xs" title="Open With..." onclick="SFTP.contextOpenWith('${encodedPath}')"><i class="fas fa-folder-open"></i></button>` : ""}
     <button class="btn btn-ghost btn-xs" title="Rename (F2)" onclick="SFTP.renameItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-i-cursor"></i></button>
     <button class="btn btn-ghost btn-xs" title="Delete" style="color:var(--red)" onclick="SFTP.deleteItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-trash"></i></button>
   </td>
@@ -932,6 +933,12 @@ window.SFTP = {
     if (this._xferDirection === "delete") return;
     await api.sftpUploadCancel();
     this._xferSetMeta("Stopping...", null, null);
+  },
+
+  async cancelUpload() {
+    if (this._xferDirection === "delete") return;
+    await api.sftpUploadCancel();
+    this._xferSetMeta("Cancelling...", null, null);
   },
 
   toggleTransfer(collapse) {
@@ -1878,6 +1885,7 @@ window.SFTP = {
           <button class="btn btn-ghost btn-xs" onclick="SFTP.copyRemotePath(decodeURIComponent('${encoded}'))" title="Copy path"><i class="fas fa-copy"></i></button>
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termContextDownload('${encoded}',${isDir})" title="Download"><i class="fas fa-download"></i></button>
           ${editable ? `<button class="btn btn-ghost btn-xs" onclick="SFTP.termEditFile('${encoded}')" title="Edit"><i class="fas fa-edit"></i></button>` : ""}
+          ${!isDir ? `<button class="btn btn-ghost btn-xs" onclick="SFTP.termContextOpenWith('${encoded}')" title="Open With..."><i class="fas fa-external-link-alt"></i></button>` : ""}
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termRenameItem('${encoded}',${isDir})" title="Rename (F2)"><i class="fas fa-i-cursor"></i></button>
           <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="SFTP.termDeleteItem('${encoded}',${isDir})" title="Delete"><i class="fas fa-trash"></i></button>
         </td>

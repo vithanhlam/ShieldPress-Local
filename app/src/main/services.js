@@ -285,6 +285,10 @@ function ensureWindowsCppRuntime(force = false) {
 
 function buildPhpSpawnEnv(phpDir) {
   const env = { ...process.env };
+  // Bundled Linux PHP must not inherit the host distro's CGI scan directory.
+  // Ubuntu's /etc/php/*/cgi/conf.d loads the same extensions again and may
+  // also reference extensions (such as mcrypt) that are not in our bundle.
+  if (platform.isLinux) env.PHP_INI_SCAN_DIR = "";
   const libDir = path.join(phpDir, "lib");
   if (platform.isLinux && fs.existsSync(libDir)) {
     env.LD_LIBRARY_PATH = env.LD_LIBRARY_PATH ? `${libDir}:${env.LD_LIBRARY_PATH}` : libDir;

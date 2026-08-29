@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.5.37
+
+**Remote sessions**
+- Adds Stop and Cancel controls for uploads in SFTP, FTP, and Terminal file panels
+- Adds Open With for every remote file, including `.env`, `backup.env`, and files without extensions
+- Shows live SFTP, FTP, and SSH Terminal connection status and reports lost connections
+
+**PHP 8.5 on Ubuntu**
+- Prevents bundled PHP from loading the host Ubuntu CGI extension directory
+- Removes duplicate PHP extension warnings and ignores unavailable host-only extensions such as mcrypt
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.37
+- Contributor: `vithanhlam`
+
 ## v2.5.36
 
 **S3-compatible Bucket Manager**

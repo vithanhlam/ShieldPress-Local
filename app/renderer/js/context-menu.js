@@ -113,7 +113,7 @@ window.ContextMenu = {
       ${item && target.scope === "browser" && !directory ? "" : ""}
       ${item ? `<div class="ctx-item" onclick="SFTP.${action}Download('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-download"></i> Download${directory ? " Folder" : ""}</div>` : ""}
       <div class="ctx-item" onclick="SFTP.${action === "termContext" ? "termUploadFiles" : "uploadFromDialog"}();ContextMenu.hide()"><i class="fas fa-upload"></i> Upload Here</div>
-      ${item && !directory && editable ? `<div class="ctx-item" onclick="SFTP.${action}OpenExternal('${encoded}');ContextMenu.hide()"><i class="fas fa-external-link-alt"></i> Open in Default Editor</div>
+      ${item && !directory ? `<div class="ctx-item" onclick="SFTP.${action}OpenExternal('${encoded}');ContextMenu.hide()"><i class="fas fa-external-link-alt"></i> Open in Default Editor</div>
         <div class="ctx-item" onclick="SFTP.${action}OpenWith('${encoded}');ContextMenu.hide()"><i class="fas fa-code"></i> Open With...</div>` : ""}
       ${item ? `<div class="ctx-divider"></div>
         <div class="ctx-item" onclick="SFTP.${action}Rename('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-i-cursor"></i> Rename</div>

@@ -549,6 +549,17 @@ async function ensureConnected(id) {
   return connect(connId);
 }
 
+async function getConnectionStatus(id) {
+  const ac = getActive(id);
+  if (!ac) return { success: true, connected: false, state: "disconnected" };
+  const connected = await pingConnection(id);
+  if (!connected) {
+    dropActiveConnection(id);
+    return { success: true, connected: false, state: "disconnected", transport: ac.type };
+  }
+  return { success: true, connected: true, state: "connected", transport: ac.type };
+}
+
 async function connectSftp(storageKey, conn, progressCb, connectionId = storageKey) {
   const { Client } = require("ssh2");
   return new Promise((resolve) => {
@@ -2647,6 +2658,7 @@ module.exports = {
   deleteConnection,
   connect,
   connectSession,
+  getConnectionStatus,
   disconnect,
   disconnectAll,
   closeSession,

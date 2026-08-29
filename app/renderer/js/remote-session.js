@@ -33,6 +33,9 @@
       if (id === SFTP._activeShellId) {
         SFTP._xterm?.writeln("\r\n\x1b[33m[SSH session closed]\x1b[0m");
         SFTP._activeShellId = null;
+        document.getElementById("remote-status")?.querySelector("span")?.style && (document.getElementById("remote-status").innerHTML = '<span style="color:var(--red)"><i class="fas fa-circle" style="font-size:7px"></i> Connection lost</span>');
+        const termStatus = document.getElementById("sftp-term-os");
+        if (termStatus) { termStatus.style.color = "var(--red)"; termStatus.innerHTML = '<i class="fas fa-circle" style="font-size:7px"></i> Disconnected'; }
       }
     });
   }
@@ -45,10 +48,29 @@
     return;
   }
 
+  const setStatus = (state, transport) => {
+    const connected = state === "connected";
+    const color = connected ? "var(--green)" : state === "checking" ? "var(--yellow)" : "var(--red)";
+    const label = connected
+      ? (transport === "ssh" ? "SSH connected · SFTP unavailable" : `${kind === "ftp" ? "FTP" : kind === "terminal" ? "SSH" : "SFTP"} connected`)
+      : state === "checking" ? "Checking connection…" : "Connection lost";
+    status.innerHTML = `<span style="color:${color}"><i class="fas fa-circle" style="font-size:7px"></i> ${label}</span>`;
+    const termStatus = document.getElementById("sftp-term-os");
+    if (termStatus) {
+      termStatus.style.color = color;
+      termStatus.innerHTML = `<i class="fas fa-circle" style="font-size:7px"></i> ${connected ? "Connected" : state === "checking" ? "Checking…" : "Disconnected"}`;
+    }
+  };
+  const pollStatus = async () => {
+    const result = await api.sftpConnectionStatus(sessionId).catch(() => ({ connected: false }));
+    setStatus(result.connected ? "connected" : "disconnected", result.transport || conn.transport);
+  };
+  setStatus("checking", conn.transport);
+  pollStatus();
+  const statusPoll = setInterval(pollStatus, 4000);
+
   // Main already connected the session when opening the window; verify list works.
-  status.innerHTML = conn.transport === "ssh"
-    ? '<span style="color:var(--yellow)"><i class="fas fa-terminal" style="font-size:11px"></i> SSH connected — SFTP unavailable</span>'
-    : '<i class="fas fa-circle" style="font-size:7px"></i> Connected';
+  setStatus("connected", conn.transport);
 
   if (kind === "terminal") {
     document.getElementById("remote-terminal-pane").classList.add("active");
@@ -71,6 +93,7 @@
   }
 
   window.addEventListener("beforeunload", () => {
+    clearInterval(statusPoll);
     try {
       if (SFTP._activeShellId) api.sftpShellStop(SFTP._activeShellId);
     } catch {}

@@ -77,7 +77,8 @@
             <span id="sftp-xfer-label">Preparing upload...</span>
             <span class="sftp-xfer-head-right">
               <span id="sftp-xfer-count">0 / 0</span>
-              <button class="btn btn-ghost btn-xs sftp-xfer-stop" onclick="SFTP.stopUpload()"><i class="fas fa-stop"></i> Stop</button>
+              <button class="btn btn-ghost btn-xs sftp-xfer-stop" onclick="SFTP.stopUpload()" title="Finish the current file, then stop the queue"><i class="fas fa-stop"></i> Stop</button>
+              <button class="btn btn-danger btn-xs sftp-xfer-cancel" onclick="SFTP.cancelUpload()" title="Cancel the transfer queue"><i class="fas fa-ban"></i> Cancel</button>
             </span>
           </div>
           <div class="sftp-xfer-track"><div id="sftp-xfer-bar" class="sftp-xfer-bar"></div></div>
@@ -114,7 +115,10 @@
             <div id="sftp-term-xfer" class="sftp-xfer" style="display:none;margin:8px">
               <div class="sftp-xfer-head">
                 <span id="sftp-term-xfer-label">Preparing...</span>
-                <span class="sftp-xfer-head-right"><span id="sftp-term-xfer-count">0 / 0</span></span>
+                <span class="sftp-xfer-head-right"><span id="sftp-term-xfer-count">0 / 0</span>
+                  <button class="btn btn-ghost btn-xs sftp-xfer-stop" onclick="SFTP.stopUpload()" title="Finish the current file, then stop the queue"><i class="fas fa-stop"></i></button>
+                  <button class="btn btn-danger btn-xs sftp-xfer-cancel" onclick="SFTP.cancelUpload()" title="Cancel the transfer queue"><i class="fas fa-ban"></i></button>
+                </span>
               </div>
               <div class="sftp-xfer-track"><div id="sftp-term-xfer-bar" class="sftp-xfer-bar"></div></div>
               <div id="sftp-term-xfer-current" class="sftp-xfer-current"></div>

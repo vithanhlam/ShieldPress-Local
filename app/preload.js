@@ -151,6 +151,7 @@ contextBridge.exposeInMainWorld("api", {
   sftpDeleteConnection: (id) => ipcRenderer.invoke("sftp-delete-connection", id),
   sftpConnect: (id) => ipcRenderer.invoke("sftp-connect", id),
   sftpConnectSession: (sessionId) => ipcRenderer.invoke("sftp-connect-session", sessionId),
+  sftpConnectionStatus: (id) => ipcRenderer.invoke("sftp-connection-status", id),
   sftpDisconnect: (id) => ipcRenderer.invoke("sftp-disconnect", id),
   sftpDisconnectAll: () => ipcRenderer.invoke("sftp-disconnect-all"),
   sftpCloseSession: (sessionId) => ipcRenderer.invoke("sftp-close-session", sessionId),
