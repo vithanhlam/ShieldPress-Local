@@ -17,7 +17,7 @@
     }
     .remote-titlebar button, .remote-titlebar .no-drag { -webkit-app-region: no-drag; }
     .remote-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 12px 28px; gap: 10px; }
-    #remote-browser-pane, #remote-terminal-pane { flex: 1; min-height: 0; display: none; flex-direction: column; }
+    #remote-browser-pane, #remote-terminal-pane { flex: 1; min-height: 0; display: none; flex-direction: column; gap: 10px; position: relative; }
     #remote-browser-pane.active, #remote-terminal-pane.active { display: flex; }
     #sftp-file-list, #sftp-term-files {
       flex: 1; min-height: 0; overflow: auto;
@@ -88,7 +88,7 @@
       </div>
 
       <!-- Terminal pane -->
-      <div id="remote-terminal-pane">
+      <div id="remote-terminal-pane" data-drop-zone="terminal-pane">
         <input type="hidden" id="sftp-term-conn-id"/>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div id="sftp-term-metrics" class="sftp-term-metrics"></div>

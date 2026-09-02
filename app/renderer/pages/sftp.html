@@ -14,6 +14,14 @@
       <option value="sftp">SFTP</option>
       <option value="ftp">FTP</option>
     </select>
+    <div class="sftp-status-filters status-filters" role="group" aria-label="Connection status filter">
+      <button type="button" class="btn btn-ghost" data-sftp-status-filter="connected" onclick="SFTP.filterByStatus('connected')" title="Show connected only">
+        <i class="fas fa-circle" style="font-size:8px;color:var(--green)"></i> Connected
+      </button>
+      <button type="button" class="btn btn-ghost" data-sftp-status-filter="disconnected" onclick="SFTP.filterByStatus('disconnected')" title="Show disconnected only">
+        <i class="fas fa-circle" style="font-size:8px;color:var(--text3)"></i> Disconnected
+      </button>
+    </div>
     <button class="btn btn-ghost" id="sftp-vault-btn" onclick="SFTP.openVault()" title="Credential vault">
       <i class="fas fa-lock"></i> Vault
     </button>

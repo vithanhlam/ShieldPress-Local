@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.5.38
+
+**Uploads**
+- Improves drag-and-drop upload reliability for SFTP, FTP, SSH Terminal, and S3 with more stable drop detection on Linux
+- Expands S3 drop targets to the upload panel and object list, and resolves local paths with Electron `webUtils.getPathForFile`
+- Shows clearer drop feedback while dragging files over remote browser and terminal panes
+
+**Filters**
+- Adds Connected and Disconnected filters on the SFTP & FTP page, including clickable status badges on each connection card
+- Adds Running and Stopped filters on the Projects page, including clickable status badges on each project card
+- Aligns filter controls with search boxes and dropdowns for consistent toolbar height
+
+**Application**
+- Enforces single-instance behavior so launching ShieldPress Local again focuses the existing window instead of starting a second copy
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.38
+- Contributor: `vithanhlam`
+
 ## v2.5.37
 
 **Remote sessions**

@@ -16,7 +16,15 @@
   <select id="filter-tag" onchange="Projects.filter()">
     <option value="">All tags</option>
   </select>
-  <button class="btn btn-ghost btn-sm" onclick="Projects.load()">
+  <div class="status-filters" role="group" aria-label="Project status filter">
+    <button type="button" class="btn btn-ghost" data-proj-status-filter="running" onclick="Projects.filterByStatus('running')" title="Show running projects only">
+      <i class="fas fa-circle" style="font-size:8px;color:var(--green)"></i> Running
+    </button>
+    <button type="button" class="btn btn-ghost" data-proj-status-filter="stopped" onclick="Projects.filterByStatus('stopped')" title="Show stopped projects only">
+      <i class="fas fa-circle" style="font-size:8px;color:var(--text3)"></i> Stopped
+    </button>
+  </div>
+  <button class="btn btn-ghost" onclick="Projects.load()">
     <i class="fas fa-sync"></i>
   </button>
 </div>

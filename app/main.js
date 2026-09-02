@@ -16,6 +16,13 @@ const workspace = require("./src/main/workspace");
 // This dashboard does not need GPU acceleration, so prefer stable software rendering.
 if (process.platform === "linux") app.disableHardwareAcceleration();
 
+// Only one app instance: a second launch focuses the existing window.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+}
+
 const APP_NAME = "ShieldPress Local";
 const APP_VERSION = app.getVersion();
 const APP_AUTHOR = "vithanhlam";
@@ -118,6 +125,17 @@ process.on("uncaughtException", (err) => {
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+app.on("second-instance", () => {
+  focusMainWindow();
+});
 
 // ── Tray ──────────────────────────────────────────────────────────────────────
 function getTrayIcon() {

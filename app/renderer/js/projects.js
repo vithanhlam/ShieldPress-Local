@@ -1,12 +1,14 @@
 // renderer/js/projects.js
 
 window.Projects = {
+  _statusFilter: "", // "" | "running" | "stopped"
+
   async load() {
     this._bindDbBackupProgress();
     const list = await api.getProjects();
     App.projects = list;
-    this.render(list);
     this._populateTags(list);
+    this.filter();
     this._fillSizes(list);
   },
 
@@ -48,6 +50,7 @@ window.Projects = {
       document.getElementById("search-box")?.value || ""
     ).toLowerCase();
     const tag = document.getElementById("filter-tag")?.value || "";
+    const status = this._statusFilter || "";
     App.searchQuery = q;
     App.filterTag = tag;
     const filtered = App.projects.filter((p) => {
@@ -56,9 +59,28 @@ window.Projects = {
         p.name.toLowerCase().includes(q) ||
         p.domain.toLowerCase().includes(q);
       const matchTag = !tag || (p.tags || []).includes(tag);
-      return matchQ && matchTag;
+      const running = !!(p.isRunning || p.status === "running");
+      const matchStatus = !status
+        || (status === "running" && running)
+        || (status === "stopped" && !running);
+      return matchQ && matchTag && matchStatus;
     });
     this.render(filtered);
+    this._syncStatusFilterUi();
+  },
+
+  filterByStatus(status) {
+    this._statusFilter = this._statusFilter === status ? "" : status;
+    this.filter();
+  },
+
+  _syncStatusFilterUi() {
+    const status = this._statusFilter || "";
+    document.querySelectorAll("[data-proj-status-filter]").forEach((btn) => {
+      const active = btn.getAttribute("data-proj-status-filter") === status && !!status;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    });
   },
 
   render(list) {
@@ -107,9 +129,9 @@ window.Projects = {
       <div class="proj-tags">${phpBadge}${sizeBadge}${tags}</div>
     </div>
     <div class="proj-right">
-      <div class="proj-status ${running ? "status-on" : "status-off"}">
+      <button type="button" class="proj-status ${running ? "status-on" : "status-off"}" onclick="Projects.filterByStatus('${running ? "running" : "stopped"}')" title="Show ${running ? "running" : "stopped"} projects">
         <i class="fas fa-circle"></i> ${running ? "Running" : "Stopped"}
-      </div>
+      </button>
       <div class="proj-icon"><i class="${typeIcon}"></i></div>
       <button class="proj-star ${starred ? "starred" : ""}" onclick="Projects.toggleStar('${p.id}')" title="${starred ? "Unstar" : "Star"}">
         <i class="fas fa-star"></i>

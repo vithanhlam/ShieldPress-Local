@@ -1,5 +1,5 @@
 window.S3 = { buckets: [], busy: false, pageSize: 20, currentPage: 1, currentPrefix: "", objects: [], uploadLog: [], selectedEntries: [],
-  async init() { if (!this._listening) { api.onS3Progress((p) => this.progress(p)); api.onS3TestProgress((p) => this.testProgress(p)); this._listening = true; } await this.load(); this.renameConfigButtons(); },
+  async init() { if (!this._listening) { api.onS3Progress((p) => this.progress(p)); api.onS3TestProgress((p) => this.testProgress(p)); this._listening = true; } await this.load(); this.renameConfigButtons(); this.initDropZones(); },
   renameConfigButtons() { document.querySelectorAll('#s3-list button[onclick*="S3.edit"]').forEach((button) => { button.innerHTML='<i class="fas fa-sliders-h"></i> Config'; }); },
   async load() { const r = await api.s3GetBuckets(); this.buckets = r.buckets || []; const el = document.getElementById("s3-list"); if (!el) return; el.innerHTML = this.buckets.length ? this.buckets.map((b) => `<div class="card"><div class="card-hdr"><span class="card-title"><i class="fas fa-cloud" style="color:var(--accent)"></i> ${this.esc(b.name)}</span><span class="badge">${this.esc(b.bucket)}</span></div><div class="card-body"><div class="selectable" style="font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:12px">${this.esc(b.endpoint)} / ${this.esc(b.prefix || "")}</div><div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="S3.openBrowser('${b.id}')"><i class="fas fa-folder-open"></i> Browse / Sync</button><button class="btn btn-ghost btn-sm" onclick="S3.edit('${b.id}')"><i class="fas fa-edit"></i> Edit</button><button class="btn btn-ghost btn-sm" onclick="S3.test('${b.id}')"><i class="fas fa-plug"></i> Test</button><button class="btn btn-danger btn-sm" onclick="S3.remove('${b.id}')"><i class="fas fa-trash"></i></button></div></div></div>`).join("") : '<div class="empty-state"><i class="fas fa-cloud"></i><p>No S3 buckets configured.</p></div>'; },
   async openVault() {
@@ -38,7 +38,81 @@ window.S3 = { buckets: [], busy: false, pageSize: 20, currentPage: 1, currentPre
   async deletePrefix(prefix) { if(prompt(`This permanently deletes all objects in ${prefix}. Type DELETE to confirm:`)!=="DELETE")return; const items=this.objects.filter(o=>o.key.startsWith(prefix)); const results=await Promise.all(items.map(o=>api.s3DeleteObject(this.browserId,o.key))); if(results.some(r=>!r.success))toast("Some objects could not be deleted","error"); await this.refreshBrowser(); },
   async uploadFiles() { const p=await api.openFileDialog({properties:["openFile","openDirectory","multiSelections"]}); if(p?.length) await this.uploadPaths(p); },
   async uploadFolder() { const p=await api.openFileDialog({properties:["openDirectory","multiSelections"]}); if(p?.length) await this.uploadPaths(p); },
-  async dropUpload(event, zone) { event.preventDefault(); zone.classList.remove("drag-over"); const items=[...(event.dataTransfer?.files||[])].map(f=>f.path).filter(Boolean); if(items.length) await this.uploadPaths(items); },
+  async dropUpload(event, zone) {
+    event.preventDefault();
+    event.stopPropagation();
+    zone.classList.remove("drag-over");
+    const paths = [];
+    const seen = new Set();
+    const add = (file) => {
+      if (!file) return;
+      let path = "";
+      try {
+        if (typeof api.getPathForFile === "function") path = api.getPathForFile(file) || "";
+      } catch (_) {}
+      if (!path) path = file.path || "";
+      path = String(path).trim();
+      if (!path || seen.has(path)) return;
+      seen.add(path);
+      paths.push(path);
+    };
+    const dt = event.dataTransfer;
+    if (dt?.items?.length) {
+      for (let i = 0; i < dt.items.length; i++) {
+        const item = dt.items[i];
+        if (item?.kind === "file") add(item.getAsFile());
+      }
+    }
+    if (!paths.length && dt?.files?.length) {
+      for (let i = 0; i < dt.files.length; i++) add(dt.files[i]);
+    }
+    if (!paths.length) return toast("Could not read dropped files. Try again or use Upload.", "warn");
+    await this.uploadPaths(paths);
+  },
+  _bindS3DropZone(zone) {
+    if (!zone || zone.dataset.s3DropBound === "1") return;
+    zone.dataset.s3DropBound = "1";
+    const stillInside = (e) => {
+      const related = e.relatedTarget;
+      if (related && zone.contains(related)) return true;
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      return !!(under && zone.contains(under));
+    };
+    zone.addEventListener("dragenter", (e) => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      e.preventDefault();
+      zone.classList.add("drag-over");
+    });
+    zone.addEventListener("dragover", (e) => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      zone.classList.add("drag-over");
+    });
+    zone.addEventListener("dragleave", (e) => {
+      if (stillInside(e)) return;
+      zone.classList.remove("drag-over");
+    });
+    zone.addEventListener("drop", (e) => this.dropUpload(e, zone));
+  },
+  initDropZones() {
+    // Bind the widest targets only — nested .s3-drop-zone is covered by the panel.
+    const zones = [
+      document.querySelector(".s3-upload-panel"),
+      document.getElementById("s3-object-list"),
+      document.querySelector(".s3-drop-zone"),
+    ].filter(Boolean);
+    const seen = new Set();
+    for (const zone of zones) {
+      if (seen.has(zone)) continue;
+      // Skip the dashed box when its parent panel is already a drop target.
+      if (zone.classList.contains("s3-drop-zone") && zone.closest(".s3-upload-panel") && seen.has(zone.closest(".s3-upload-panel"))) {
+        continue;
+      }
+      seen.add(zone);
+      this._bindS3DropZone(zone);
+    }
+  },
   async uploadPaths(items) { const b=this.buckets.find(x=>x.id===this.browserId); this.activeOperation="Upload"; this.progress({done:0,total:0}); try { const r=await api.s3UploadPaths(this.browserId,items,{concurrency:b?.concurrency}); this.uploadLog.unshift(`${new Date().toLocaleTimeString()}  Uploaded ${r.count||0} files`); this.renderUploadLog(); toast(`Uploaded ${r.count||0} files`,"success"); await this.refreshBrowser(); } catch(e) { this.uploadLog.unshift(`${new Date().toLocaleTimeString()}  ERROR: ${e.message}`); this.renderUploadLog(); toast(e.message,"error"); } finally { this.activeOperation=""; } },
   renderUploadLog() { const el=document.getElementById("s3-upload-log"); if(el)el.innerHTML=this.uploadLog.slice(0,30).map(x=>`<div>${this.esc(x)}</div>`).join(""); },
   async downloadObject(i) { const o=this.visibleObjects[i]; const p=await api.openFileDialog({properties:["openDirectory"]}); if(!p)return; const r=await api.s3DownloadObject(this.browserId,o.key,`${p}/${o.key.split("/").pop()}`); toast(r.success?"Downloaded":"Download failed",r.success?"success":"error"); },

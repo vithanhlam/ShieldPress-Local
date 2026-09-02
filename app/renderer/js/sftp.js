@@ -3,6 +3,7 @@
 window.SFTP = {
   _connections: [],
   _connStatus: {}, // { connId: "connected" | "disconnected" }
+  _statusFilter: "", // "" | "connected" | "disconnected"
   _currentPath: "/",
   _listening: false,
   _vault: { configured: false, unlocked: false },
@@ -186,13 +187,18 @@ window.SFTP = {
   filter() {
     const q = (document.getElementById("sftp-search-box")?.value || "").toLowerCase().trim();
     const type = document.getElementById("sftp-filter-type")?.value || "";
+    const status = this._statusFilter || "";
     const filtered = this._connections.filter((c) => {
       const matchQ = !q ||
         c.name.toLowerCase().includes(q) ||
         c.host.toLowerCase().includes(q) ||
         (c.username || "").toLowerCase().includes(q);
       const matchType = !type || c.type === type;
-      return matchQ && matchType;
+      const live = this._connStatus[c.id] === "connected";
+      const matchStatus = !status
+        || (status === "connected" && live)
+        || (status === "disconnected" && !live);
+      return matchQ && matchType && matchStatus;
     });
     filtered.sort((a, b) => {
       const sa = a.starred ? 1 : 0;
@@ -201,6 +207,21 @@ window.SFTP = {
       return String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" });
     });
     this._render(filtered);
+    this._syncStatusFilterUi();
+  },
+
+  filterByStatus(status) {
+    this._statusFilter = this._statusFilter === status ? "" : status;
+    this.filter();
+  },
+
+  _syncStatusFilterUi() {
+    const status = this._statusFilter || "";
+    document.querySelectorAll("[data-sftp-status-filter]").forEach((btn) => {
+      const active = btn.getAttribute("data-sftp-status-filter") === status && !!status;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    });
   },
 
   _render(list) {
@@ -247,10 +268,10 @@ window.SFTP = {
       </div>
     </div>
     <div class="proj-right">
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <button type="button" class="sftp-status-chip ${isConn ? "is-connected" : "is-disconnected"}" onclick="SFTP.filterByStatus('${isConn ? "connected" : "disconnected"}')" title="Show ${isConn ? "connected" : "disconnected"} connections">
         <i class="fas ${statusIcon}" style="font-size:8px;color:${statusColor}"></i>
         <span style="font-size:13px;font-weight:600;color:${statusColor}">${statusText}</span>
-      </div>
+      </button>
       <button class="proj-star ${c.starred ? "starred" : ""}" onclick="SFTP.toggleStar('${c.id}')" title="${c.starred ? "Unpin from top" : "Pin to top"}">
         <i class="fas fa-star"></i>
       </button>
@@ -549,36 +570,47 @@ window.SFTP = {
   _bindFileDropZone(zone, onPaths) {
     if (!zone || zone.dataset.fileDropBound === "1") return;
     zone.dataset.fileDropBound = "1";
-    let depth = 0;
 
     // Needed so Chromium/Electron actually accepts the drop (otherwise drop is often ignored).
     if (!document.documentElement.dataset.dropGuardBound) {
       document.documentElement.dataset.dropGuardBound = "1";
       document.addEventListener("dragover", (e) => {
-        if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+        if (e.dataTransfer?.types?.includes("Files")) {
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        }
       });
       document.addEventListener("drop", (e) => {
         if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
       });
     }
 
+    const isFileDrag = (e) => !!e.dataTransfer?.types?.includes("Files");
+    const stillInside = (e) => {
+      // relatedTarget is often null on Linux; elementFromPoint is reliable.
+      const related = e.relatedTarget;
+      if (related && zone.contains(related)) return true;
+      const x = e.clientX;
+      const y = e.clientY;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+      if (x <= 0 && y <= 0) return false;
+      const under = document.elementFromPoint(x, y);
+      return !!(under && zone.contains(under));
+    };
     const paint = (active) => {
       zone.classList.toggle("is-drop-target", !!active);
     };
-    const reset = () => {
-      depth = 0;
-      paint(false);
-    };
 
     zone.addEventListener("dragenter", (e) => {
+      if (!isFileDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
-      depth += 1;
       paint(true);
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
     });
 
     zone.addEventListener("dragover", (e) => {
+      if (!isFileDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
@@ -586,19 +618,18 @@ window.SFTP = {
     });
 
     zone.addEventListener("dragleave", (e) => {
+      if (!isFileDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
-      // Ignore leave events that stay inside this zone (child <-> child)
-      const related = e.relatedTarget;
-      if (related && zone.contains(related)) return;
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) paint(false);
+      if (stillInside(e)) return;
+      paint(false);
     });
 
     zone.addEventListener("drop", async (e) => {
+      if (!isFileDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
-      reset();
+      paint(false);
       const paths = this._extractDropPaths(e);
       if (!paths.length) {
         toast("Could not read dropped files. Try again or use Upload.", "warn");
@@ -2225,8 +2256,10 @@ window.SFTP = {
   termCreateDir() { this.openRemoteCreate("terminal", "folder"); },
 
   _setupTermDragDrop() {
+    // Prefer the whole terminal pane so drops near the console also upload.
     const zone =
-      document.querySelector('[data-drop-zone="terminal"]')
+      document.getElementById("remote-terminal-pane")
+      || document.querySelector('[data-drop-zone="terminal"]')
       || document.getElementById("sftp-term-files")?.closest("aside")
       || document.getElementById("sftp-term-files");
     if (!zone) return;
