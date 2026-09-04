@@ -198,12 +198,12 @@
     </div>
 
     <!-- Action bar -->
-    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+    <div class="sftp-browser-actions" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFromDialog()"><i class="fas fa-upload"></i> Upload File</button>
       <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadFolderDialog()"><i class="fas fa-folder-open"></i> Upload Folder</button>
       <button class="btn btn-ghost btn-sm" onclick="SFTP.uploadZipDialog()"><i class="fas fa-file-archive"></i> Upload ZIP & Extract</button>
       <button class="btn btn-ghost btn-sm" onclick="SFTP.createDirPrompt()"><i class="fas fa-folder-plus"></i> New Folder</button>
-      <div data-remote-selection-toolbar="browser" style="display:none;gap:8px;align-items:center;margin-left:auto">
+      <div class="sftp-selection-toolbar" data-remote-selection-toolbar="browser" style="display:none;gap:8px;align-items:center;margin-left:auto">
         <span data-selection-count style="font-size:12px;color:var(--text2)"></span>
         <button class="btn btn-ghost btn-sm" onclick="SFTP.downloadSelected('browser')"><i class="fas fa-download"></i> Download selected</button>
         <button class="btn btn-danger btn-sm" onclick="SFTP.deleteSelected('browser')"><i class="fas fa-trash"></i> Delete selected</button>

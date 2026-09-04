@@ -734,15 +734,18 @@ window.SFTP = {
   <th style="padding:8px 10px;width:150px;text-align:right">Actions</th>
 </tr></thead>
 <tbody>${items.map((item) => {
-  const fullPath = curPath.replace(/\/+$/, "") + "/" + item.name;
-  const encodedPath = encodeURIComponent(fullPath);
+      const linkPath = curPath.replace(/\/+$/, "") + "/" + item.name;
+      const fullPath = item.isLink && item.targetPath ? item.targetPath : linkPath;
+      const operationPath = item.isLink && item.linkPath ? item.linkPath : linkPath;
+      const encodedPath = encodeURIComponent(fullPath);
+      const encodedOperationPath = encodeURIComponent(operationPath);
   const encodedName = encodeURIComponent(item.name);
   const isDir = this._isDir(item);
   const isEditable = !isDir && this._isEditableRemoteFile(item.name);
   const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
   const color = isDir ? "var(--yellow)" : "var(--text3)";
   return `
-<tr style="border-top:1px solid var(--border)" data-remote-path="${encodedPath}" data-remote-name="${encodedName}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${isEditable}">
+<tr style="border-top:1px solid var(--border)" data-remote-path="${encodedPath}" data-remote-operation-path="${encodedOperationPath}" data-remote-name="${encodedName}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${isEditable}" title="${this._esc(fullPath)}">
   <td style="padding:8px 10px;cursor:${isDir ? "pointer" : "default"};color:${isDir ? "var(--accent)" : "inherit"}">
     <i class="fas ${icon}" style="color:${color};margin-right:8px"></i>
     ${this._esc(item.name)}${item.isLink ? ' <span style="font-size:10px;color:var(--text3)">link</span>' : ""}
@@ -755,8 +758,8 @@ window.SFTP = {
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Edit inline" onclick="SFTP.editFile(decodeURIComponent('${encodedPath}'))"><i class="fas fa-edit"></i></button>` : ""}
     ${isEditable ? `<button class="btn btn-ghost btn-xs" title="Open in Editor (VS Code, Notepad++...)" onclick="SFTP.openExternal(decodeURIComponent('${encodedPath}'))"><i class="fas fa-external-link-alt"></i></button>` : ""}
     ${!isDir ? `<button class="btn btn-ghost btn-xs" title="Open With..." onclick="SFTP.contextOpenWith('${encodedPath}')"><i class="fas fa-folder-open"></i></button>` : ""}
-    <button class="btn btn-ghost btn-xs" title="Rename (F2)" onclick="SFTP.renameItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-i-cursor"></i></button>
-    <button class="btn btn-ghost btn-xs" title="Delete" style="color:var(--red)" onclick="SFTP.deleteItem(decodeURIComponent('${encodedPath}'), ${isDir})"><i class="fas fa-trash"></i></button>
+    <button class="btn btn-ghost btn-xs" title="Rename (F2)" onclick="SFTP.renameItem(decodeURIComponent('${encodedOperationPath}'), ${isDir})"><i class="fas fa-i-cursor"></i></button>
+    <button class="btn btn-ghost btn-xs" title="Delete" style="color:var(--red)" onclick="SFTP.deleteItem(decodeURIComponent('${encodedOperationPath}'), ${isDir})"><i class="fas fa-trash"></i></button>
   </td>
 </tr>`;
 }).join("")}</tbody></table>`;
@@ -770,7 +773,9 @@ window.SFTP = {
 
   enterDir(name) {
     this._clearRemoteSelection();
-    this._currentPath = this._currentPath.replace(/\/+$/, "") + "/" + name;
+    this._currentPath = String(name || "").startsWith("/")
+      ? String(name).replace(/\/{2,}/g, "/")
+      : this._currentPath.replace(/\/+$/, "") + "/" + name;
     this._saveCurrentPath();
     this._loadDir();
   },
@@ -1341,7 +1346,7 @@ window.SFTP = {
       if (!row || !zone.contains(row) || row.dataset.remoteType !== "directory") return;
       e.preventDefault();
       if (scope === "terminal") this.termEnterPath(row.dataset.remotePath);
-      else this.enterDir(decodeURIComponent(row.dataset.remoteName));
+      else this.enterDir(decodeURIComponent(row.dataset.remotePath));
     });
   },
 
@@ -1546,6 +1551,7 @@ window.SFTP = {
       currentPath,
       item: {
         path: decodeURIComponent(row.dataset.remotePath),
+        operationPath: decodeURIComponent(row.dataset.remoteOperationPath || row.dataset.remotePath),
         name: decodeURIComponent(row.dataset.remoteName),
         type: row.dataset.remoteType,
         editable: row.dataset.remoteEditable === "true",
@@ -1965,6 +1971,16 @@ window.SFTP = {
     this.loadTermFiles();
   },
 
+  async copyRemoteIp(ip) {
+    if (!ip || ip === "--") return toast("VPS IP chưa sẵn sàng", "warn");
+    try {
+      await navigator.clipboard.writeText(ip);
+      toast("VPS IP copied", "success");
+    } catch {
+      toast("Could not copy VPS IP", "error");
+    }
+  },
+
   async copyRemotePath(remotePath) {
     try {
       await navigator.clipboard.writeText(remotePath);
@@ -2194,6 +2210,7 @@ window.SFTP = {
     const diskTitle = stats?.diskTotalKb
       ? `Disk ${this._formatSizeKb(stats.diskUsedKb)} / ${diskSize}`
       : "Disk usage (/)";
+    const remoteIp = stats?.remoteIp || "--";
     el.innerHTML = `
       <span class="sftp-term-metric" style="color:${cpuColor}" title="CPU usage${cores ? ` · ${cores}` : ""}"><i class="fas fa-microchip"></i> CPU ${this._formatPct(cpu)}${this._metricExtra(cores)}</span>
       <span class="sftp-term-metric" style="color:${ramColor}" title="${ramTitle}"><i class="fas fa-memory"></i> RAM ${this._formatPct(ram)}${this._metricExtra(ramSize)}</span>
@@ -2201,6 +2218,10 @@ window.SFTP = {
       <span class="sftp-term-metric" style="color:var(--accent)" title="Network upload / download">
         <i class="fas fa-arrow-up"></i> ${this._formatRate(stats?.netUp)}
         <i class="fas fa-arrow-down" style="margin-left:6px"></i> ${this._formatRate(stats?.netDown)}
+      </span>
+      <span class="sftp-term-metric sftp-remote-ip" title="VPS IP đang kết nối">
+        <i class="fas fa-globe"></i> ${this._esc(remoteIp)}
+        <button class="btn btn-ghost btn-xs" style="padding:1px 4px;margin-left:3px" onclick="SFTP.copyRemoteIp('${this._esc(remoteIp).replace(/'/g, "\\'")}')" title="Copy VPS IP"><i class="fas fa-copy"></i></button>
       </span>`;
   },
 
@@ -2224,7 +2245,6 @@ window.SFTP = {
     this._metricsConnId = id;
     this._renderRemoteMetrics(null);
     this._refreshRemoteMetrics(id);
-    setTimeout(() => this._refreshRemoteMetrics(id), 800);
     this._metricsTimer = setInterval(() => this._refreshRemoteMetrics(id), 5000);
   },
 

@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.38)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.39)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress Local Setup 2.5.38.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.38_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress Local Setup 2.5.39.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.39_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -109,7 +109,7 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **Transfer Progress** | Upload, download, and folder-delete progress with byte or item count, per-file status, Stop, Retry, and a collapsible bottom panel |
 | **ZIP Upload & Extract** | Upload ZIP and extract on server |
 | **Interactive SSH Terminal** | Persistent SSH PTY powered by Xterm.js with ANSI colors, native Tab completion, interactive programs, a resizable layout, selection, paste, and quick commands |
-| **Remote Resource Meters** | Live CPU, RAM, Disk, and network rates in SSH Terminal, including core count and RAM/disk capacity |
+| **Remote Resource Meters** | Live CPU, RAM, Disk, network rates, and connected VPS IP in SSH Terminal, including core count, RAM/disk capacity, and copy actions |
 | **Terminal File Manager** | Column-based Name, Size, Modified, Permissions, and User/Group details with full right-click file management beside the SSH terminal |
 | **Terminal Autocomplete** | Complete live remote paths with Tab and choose context-aware Linux, npm, Git, Composer, Artisan, and WP-CLI commands with the keyboard |
 | **Linux-Aware Commands** | Detect Ubuntu/Debian, RHEL/Fedora, Alpine, Arch, or SUSE and suggest matching package and service commands |
@@ -183,15 +183,15 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download `ShieldPress Local Setup 2.5.38.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download `ShieldPress Local Setup 2.5.39.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.38_amd64.deb`
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.38_amd64.deb`
+1. Download `shieldpresslocal_2.5.39_amd64.deb`
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.39_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 

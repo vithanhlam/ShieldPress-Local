@@ -812,10 +812,27 @@ function sftpStatFollow(sftp, remotePath) {
   });
 }
 
+function sftpReadlink(sftp, remotePath) {
+  return new Promise((resolve) => {
+    if (typeof sftp.readlink !== "function") return resolve("");
+    sftp.readlink(remotePath, (err, target) => resolve(err ? "" : String(target || "")));
+  });
+}
+
 async function resolveLinkTargets(sftp, remotePath, items) {
   for (const item of items) {
     if (!item.isLink) continue;
-    const stats = await sftpStatFollow(sftp, joinRemotePath(remotePath, item.name));
+    const linkPath = joinRemotePath(remotePath, item.name);
+    const target = await sftpReadlink(sftp, linkPath);
+    // readlink returns a relative target for relative symlinks. Resolve it
+    // against the directory containing the link so the UI never invents a
+    // path from the user's home directory.
+    item.linkPath = linkPath;
+    item.target = target;
+    item.targetPath = target
+      ? (target.startsWith("/") ? path.posix.normalize(target) : path.posix.resolve(remotePath, target))
+      : "";
+    const stats = await sftpStatFollow(sftp, linkPath);
     if (!stats) continue;
     item.isDirectory = !!stats.isDirectory();
     item.type = item.isDirectory ? "directory" : "file";
@@ -1869,6 +1886,7 @@ async function getRemoteStats(id) {
   remoteStatsCache[id] = { cpu: cpuSample, net: { rx, tx }, at: now };
   const ramPct = memTotal > 0 ? Math.round(((memTotal - memAvail) / memTotal) * 100) : null;
   const diskPct = Number.isFinite(diskPctRaw) ? diskPctRaw : (diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : null);
+  const remoteIp = ac.client?._sock?.remoteAddress || ac.client?._sock?.address?.()?.address || "";
   return {
     success: true,
     cpuPct,
@@ -1881,6 +1899,7 @@ async function getRemoteStats(id) {
     diskTotalKb: diskTotal || null,
     netDown,
     netUp,
+    remoteIp,
   };
 }
 

@@ -1312,6 +1312,7 @@ code,
   min-width: 720px;
   min-height: 480px;
   resize: both;
+  overflow: hidden;
 }
 
 #m-sftp-browser .modal-resizable .modal-title,
@@ -1325,7 +1326,29 @@ code,
 
 #sftp-file-list {
   flex: 1;
-  min-height: 240px;
+  min-height: 0;
+}
+
+/* Keep bulk actions in the visible part of the browser when the list is tall
+   or the window is short. The file list is the flexible area and can shrink. */
+.sftp-browser-actions {
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.sftp-selection-toolbar {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .sftp-selection-toolbar {
+    width: 100%;
+    margin-left: 0 !important;
+    justify-content: flex-start;
+  }
 }
 
 #sftp-file-list,

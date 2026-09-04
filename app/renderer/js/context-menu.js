@@ -99,6 +99,7 @@ window.ContextMenu = {
     const item = target.item;
     const heading = item ? item.name : target.currentPath;
     const encoded = item ? encodeURIComponent(item.path) : "";
+    const encodedOperation = item ? encodeURIComponent(item.operationPath || item.path) : "";
     const directory = item?.type === "directory";
     const editable = item?.editable;
     const action = target.scope === "terminal" ? "termContext" : "context";
@@ -116,9 +117,9 @@ window.ContextMenu = {
       ${item && !directory ? `<div class="ctx-item" onclick="SFTP.${action}OpenExternal('${encoded}');ContextMenu.hide()"><i class="fas fa-external-link-alt"></i> Open in Default Editor</div>
         <div class="ctx-item" onclick="SFTP.${action}OpenWith('${encoded}');ContextMenu.hide()"><i class="fas fa-code"></i> Open With...</div>` : ""}
       ${item ? `<div class="ctx-divider"></div>
-        <div class="ctx-item" onclick="SFTP.${action}Rename('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-i-cursor"></i> Rename</div>
-        <div class="ctx-item" onclick="SFTP.${action}Clone('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-clone"></i> Duplicate</div>
-        <div class="ctx-item" onclick="SFTP.${action}Move('${encoded}');ContextMenu.hide()"><i class="fas fa-arrows-alt"></i> Move...</div>` : ""}
+        <div class="ctx-item" onclick="SFTP.${action}Rename('${encodedOperation}',${directory});ContextMenu.hide()"><i class="fas fa-i-cursor"></i> Rename</div>
+        <div class="ctx-item" onclick="SFTP.${action}Clone('${encodedOperation}',${directory});ContextMenu.hide()"><i class="fas fa-clone"></i> Duplicate</div>
+        <div class="ctx-item" onclick="SFTP.${action}Move('${encodedOperation}');ContextMenu.hide()"><i class="fas fa-arrows-alt"></i> Move...</div>` : ""}
       <div class="ctx-divider"></div>
       <div class="ctx-item" onclick="SFTP.${action}NewFile();ContextMenu.hide()"><i class="fas fa-file-medical"></i> New File</div>
       <div class="ctx-item" onclick="SFTP.${action}NewFolder();ContextMenu.hide()"><i class="fas fa-folder-plus"></i> New Folder</div>
@@ -128,7 +129,7 @@ window.ContextMenu = {
         <div class="ctx-item" onclick="navigator.clipboard.writeText('${relativeHint.replace(/'/g, "\\'")}').then(()=>toast('Relative path copied','success'));ContextMenu.hide()"><i class="fas fa-copy"></i> Copy Relative Path</div>
         <div class="ctx-item" onclick="SFTP.${action}Properties('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-info-circle"></i> Properties</div>
         <div class="ctx-divider"></div>
-        <div class="ctx-item ctx-danger" onclick="SFTP.${action}Delete('${encoded}',${directory});ContextMenu.hide()"><i class="fas fa-trash"></i> Delete</div>` : ""}
+        <div class="ctx-item ctx-danger" onclick="SFTP.${action}Delete('${encodedOperation}',${directory});ContextMenu.hide()"><i class="fas fa-trash"></i> Delete</div>` : ""}
     `;
     this._position(x, y);
   },

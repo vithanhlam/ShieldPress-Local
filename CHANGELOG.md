@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.5.39
+
+**SFTP remote monitoring and paths**
+- Shows the connected VPS IP beside the remote CPU, RAM, Disk, and network meters, with a copy button
+- Reduces remote resource polling to once every 5 seconds and keeps the local system monitor at 10 seconds
+- Resolves SFTP symbolic-link targets so Remote Files opens and displays the real target path while file operations remain safe
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.39
+
 ## v2.5.38
 
 **Uploads**
