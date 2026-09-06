@@ -2,6 +2,7 @@
 const fs = require("fs-extra");
 const path = require("path");
 const crypto = require("crypto");
+const { StringDecoder } = require("string_decoder");
 const { spawn } = require("child_process");
 const log = require("./logger");
 const platform = require("./platform");
@@ -290,6 +291,7 @@ async function getConnections() {
           ? "vault"
           : decryptLegacy(c.password) ? "legacy-migratable" : "legacy-unavailable",
       hasKey: !!c.privateKey,
+      hasPassphrase: !!c.passphrase,
       lastBrowsedPath: c.lastBrowsedPath || "",
       lastConnectedAt: c.lastConnectedAt || "",
       starred: !!c.starred,
@@ -318,8 +320,8 @@ async function saveConnection(data) {
   }
 
   const existing = conns.findIndex((c) => c.id === data.id);
-  if (data.password && !vaultKey) {
-    return { success: false, code: "VAULT_LOCKED", message: "Unlock the credential vault before saving a password" };
+  if ((data.password || data.passphrase) && !vaultKey) {
+    return { success: false, code: "VAULT_LOCKED", message: "Unlock the credential vault before saving a password or key passphrase" };
   }
   const conn = {
     id: data.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -331,6 +333,7 @@ async function saveConnection(data) {
     password: data.password ? vaultCrypto.seal(data.password, vaultKey) : (existing >= 0 ? conns[existing].password : ""),
     secure: data.type === "ftp" ? !!data.secure : false,
     privateKey: data.privateKey || "",
+    passphrase: data.passphrase ? vaultCrypto.seal(data.passphrase, vaultKey) : (existing >= 0 ? conns[existing].passphrase : ""),
     remotePath: data.remotePath || "/",
     lastBrowsedPath: data.lastBrowsedPath || (existing >= 0 ? conns[existing].lastBrowsedPath : "") || "",
     lastConnectedAt: existing >= 0 ? (conns[existing].lastConnectedAt || "") : (data.lastConnectedAt || ""),
@@ -370,14 +373,17 @@ async function getRawConnection(id) {
   const conns = JSON.parse(await fs.readFile(file, "utf8"));
   const conn = conns.find((c) => c.id === id);
   if (!conn) return null;
-  if (!conn.password) return { ...conn, password: "" };
+  const passphrase = conn.passphrase && String(conn.passphrase).startsWith("v2:") && vaultKey
+    ? (() => { try { return vaultCrypto.open(conn.passphrase, vaultKey); } catch { return ""; } })()
+    : "";
+  if (!conn.password) return { ...conn, password: "", passphrase };
   if (String(conn.password).startsWith("v2:")) {
-    if (!vaultKey) return { ...conn, password: "", credentialError: "VAULT_LOCKED" };
-    try { return { ...conn, password: vaultCrypto.open(conn.password, vaultKey) }; }
-    catch { return { ...conn, password: "", credentialError: "CREDENTIAL_INVALID" }; }
+    if (!vaultKey) return { ...conn, password: "", passphrase, credentialError: "VAULT_LOCKED" };
+    try { return { ...conn, password: vaultCrypto.open(conn.password, vaultKey), passphrase }; }
+    catch { return { ...conn, password: "", passphrase, credentialError: "CREDENTIAL_INVALID" }; }
   }
   const password = decryptLegacy(conn.password);
-  return { ...conn, password, credentialError: password ? "" : "LEGACY_CREDENTIAL_UNAVAILABLE" };
+  return { ...conn, password, passphrase, credentialError: password ? "" : "LEGACY_CREDENTIAL_UNAVAILABLE" };
 }
 
 // Shared credential helpers for other remote transports (for example S3).
@@ -574,18 +580,51 @@ async function connectSftp(storageKey, conn, progressCb, connectionId = storageK
       host: conn.host,
       port: conn.port,
       username: conn.username,
-      readyTimeout: 15000,
+      readyTimeout: 30000,
       keepaliveInterval: 10000,
       keepaliveCountMax: 3,
+      // Broaden accepted key-exchange / host-key / cipher algorithms so older
+      // devices (legacy CentOS/Debian, NAS boxes, embedded Linux) that only
+      // speak deprecated algorithms can still connect, on top of ssh2's
+      // modern defaults.
+      algorithms: {
+        kex: [
+          "curve25519-sha256@libssh.org", "curve25519-sha256",
+          "ecdh-sha2-nistp256", "ecdh-sha2-nistp384", "ecdh-sha2-nistp521",
+          "diffie-hellman-group-exchange-sha256", "diffie-hellman-group14-sha256",
+          "diffie-hellman-group15-sha512", "diffie-hellman-group16-sha512", "diffie-hellman-group17-sha512", "diffie-hellman-group18-sha512",
+          "diffie-hellman-group-exchange-sha1", "diffie-hellman-group14-sha1", "diffie-hellman-group1-sha1",
+        ],
+        serverHostKey: [
+          "ssh-ed25519", "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521",
+          "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa", "ssh-dss",
+        ],
+        cipher: [
+          "aes128-gcm@openssh.com", "aes256-gcm@openssh.com", "aes128-ctr", "aes192-ctr", "aes256-ctr", "chacha20-poly1305@openssh.com",
+          "aes256-cbc", "aes192-cbc", "aes128-cbc", "3des-cbc",
+        ],
+        hmac: [
+          "hmac-sha2-256-etm@openssh.com", "hmac-sha2-512-etm@openssh.com", "hmac-sha1-etm@openssh.com",
+          "hmac-sha2-256", "hmac-sha2-512", "hmac-sha1", "hmac-md5",
+        ],
+      },
+      // Fall back to keyboard-interactive when the server doesn't accept a
+      // plain password auth method (common on stock Ubuntu/Debian PAM setups).
+      tryKeyboard: true,
     };
 
     if (conn.privateKey && fs.existsSync(conn.privateKey)) {
       connectOpts.privateKey = fs.readFileSync(conn.privateKey);
+      if (conn.passphrase) connectOpts.passphrase = conn.passphrase;
     } else if (conn.password) {
       connectOpts.password = conn.password;
     } else {
       return done({ success: false, message: "No password or private key configured" });
     }
+
+    client.on("keyboard-interactive", (_name, _instructions, _lang, prompts, finish) => {
+      finish(prompts.map(() => conn.password || ""));
+    });
 
     client.on("ready", () => {
       client.sftp((err, sftp) => {
@@ -968,25 +1007,30 @@ function joinRemotePath(base, name) {
   return `${root}/${name}`.replace(/\/{2,}/g, "/");
 }
 
-async function ensureRemoteDir(id, remotePath) {
+// `cache` (a Set, shared across an entire batch) lets many files that share a
+// parent directory skip repeat stat+mkdir round-trips for dirs already
+// confirmed to exist within this batch.
+async function ensureRemoteDir(id, remotePath, cache) {
   if (!remotePath || remotePath === "/") return { success: true };
+  if (cache?.has(remotePath)) return { success: true };
   const exists = await checkRemoteExists(id, remotePath);
   if (exists.exists) {
-    if (exists.isDirectory) return { success: true };
+    if (exists.isDirectory) { cache?.add(remotePath); return { success: true }; }
     return { success: false, message: `A file already exists at ${remotePath}` };
   }
   const parent = path.posix.dirname(remotePath);
   if (parent && parent !== "." && parent !== remotePath) {
-    const parentResult = await ensureRemoteDir(id, parent);
+    const parentResult = await ensureRemoteDir(id, parent, cache);
     if (!parentResult.success) return parentResult;
   }
   try {
     await createRemoteDirOnConnection(activeConnections[id], remotePath);
+    cache?.add(remotePath);
     return { success: true };
   } catch (error) {
     if (/exist/i.test(error.message || "")) {
       const again = await checkRemoteExists(id, remotePath);
-      if (again.exists && again.isDirectory) return { success: true };
+      if (again.exists && again.isDirectory) { cache?.add(remotePath); return { success: true }; }
     }
     return { success: false, message: error.message };
   }
@@ -1064,32 +1108,65 @@ function isDisconnectError(message) {
   return /not connected|epipe|econnreset|enotconn|etimedout|timed out|connection (lost|closed|reset)|socket|ssh connection closed|no response/i.test(String(message || ""));
 }
 
-let uploadCancelled = false;
-let syncCancelled = false;
+// Cancellation is tracked per in-flight job instead of one shared module-level
+// boolean. A shared boolean meant a new upload/sync call silently reset any
+// pending cancel request from a still-running job, and cancelling one job
+// could cancel an unrelated concurrent job on another connection. The UI's
+// cancel buttons don't target a specific job id, so cancel() still cancels
+// every job of that kind currently in flight — but starting a new job never
+// un-cancels an old one, and jobs no longer share mutable state.
+const activeTransferJobs = new Set(); // uploadBatch/downloadBatch
+const activeSyncJobs = new Set(); // syncUpload/syncDownload
 
 function cancelUpload() {
-  uploadCancelled = true;
+  for (const job of activeTransferJobs) job.cancelled = true;
   return { success: true };
 }
 
 function cancelSync() {
-  syncCancelled = true;
+  for (const job of activeSyncJobs) job.cancelled = true;
   return { success: true };
 }
 
-async function runConcurrent(items, concurrency, worker) {
+// Dedupe concurrent reconnect attempts for the same connection id so that
+// several workers hitting a dropped connection at once don't each race to
+// reconnect independently.
+const pendingReconnects = new Map();
+function ensureConnectedShared(id) {
+  if (pendingReconnects.has(id)) return pendingReconnects.get(id);
+  const p = ensureConnected(id).finally(() => { pendingReconnects.delete(id); });
+  pendingReconnects.set(id, p);
+  return p;
+}
+
+// Retries a transfer action after a dropped connection, with a short backoff,
+// instead of giving up after a single retry.
+async function withRetryOnDisconnect(id, job, action) {
+  let result = await action();
+  let attempt = 0;
+  while (!result.success && isDisconnectError(result.message) && !job.cancelled && attempt < 2) {
+    attempt++;
+    await new Promise((r) => setTimeout(r, 500 * attempt));
+    const recon = await ensureConnectedShared(id);
+    if (!recon.success) return { result: { success: false, message: "Connection lost" }, disconnect: true };
+    result = await action();
+  }
+  return { result, disconnect: !result.success && isDisconnectError(result.message) };
+}
+
+async function runConcurrent(items, concurrency, worker, job) {
   const queue = [...items];
   const limit = Math.max(1, Math.min(8, Number(concurrency) || 1));
   let cursor = 0;
   const runners = Array.from({ length: Math.min(limit, queue.length || 1) }, async () => {
-    while (!syncCancelled) {
+    while (!job.cancelled) {
       const index = cursor++;
       if (index >= queue.length) return;
       await worker(queue[index], index);
     }
   });
   await Promise.all(runners);
-  return syncCancelled;
+  return job.cancelled;
 }
 
 function emitRemainingFailed(progressCb, files, startIndex, total, retry, message) {
@@ -1111,318 +1188,301 @@ function emitRemainingFailed(progressCb, files, startIndex, total, retry, messag
 }
 
 async function uploadBatch(id, items, progressCb, opts = {}) {
-  uploadCancelled = false;
-  const retry = !!opts.retry;
-  const connected = await ensureConnected(id);
-  if (!connected.success) return connected;
-  const files = [];
-  for (const item of items || []) {
-    if (!item?.localPath || !fs.existsSync(item.localPath)) {
-      emitUploadProgress(progressCb, {
-        type: "file-done",
-        name: path.basename(item?.localPath || "unknown"),
-        localPath: item?.localPath,
-        remotePath: item?.remotePath,
-        success: false,
-        message: "Local path not found",
-        index: item?.index || 0,
-        total: 0,
-        retry,
-      });
-      continue;
-    }
-    const stat = await fs.stat(item.localPath);
-    if (stat.isDirectory()) {
-      const nested = await collectLocalFiles(item.localPath);
-      const dirOk = await ensureRemoteDir(id, item.remotePath);
-      if (!dirOk.success) return dirOk;
-      for (const file of nested) {
-        files.push({
-          localPath: file.localPath,
-          remotePath: joinRemotePath(item.remotePath, file.relativePath),
-          name: `${path.basename(item.localPath)}/${file.relativePath}`.replace(/\\/g, "/"),
-          size: file.size,
-          index: item.index,
-        });
-      }
-    } else if (stat.isFile()) {
-      files.push({
-        localPath: item.localPath,
-        remotePath: item.remotePath,
-        name: item.name || path.basename(item.localPath),
-        size: stat.size,
-        index: item.index,
-      });
-    }
-  }
-
-  if (!retry) emitUploadProgress(progressCb, { type: "batch-start", total: files.length });
-  let uploaded = 0;
-  let failed = 0;
-  let stopped = false;
-  let disconnect = false;
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const index = retry && file.index ? file.index : i + 1;
-    if (uploadCancelled) {
-      stopped = true;
-      failed += emitRemainingFailed(progressCb, files, i, files.length, retry, "Stopped");
-      break;
-    }
-    emitUploadProgress(progressCb, {
-      type: "file-start",
-      index,
-      total: files.length,
-      name: file.name,
-      path: file.remotePath,
-      localPath: file.localPath,
-      remotePath: file.remotePath,
-      retry,
-      direction: "upload",
-    });
-    const parent = path.posix.dirname(file.remotePath);
-    if (parent && parent !== "." && parent !== file.remotePath) {
-      const dirOk = await ensureRemoteDir(id, parent);
-      if (!dirOk.success) {
-        failed++;
-        emitUploadProgress(progressCb, {
-          type: "file-done",
-          index,
-          total: files.length,
-          name: file.name,
-          localPath: file.localPath,
-          remotePath: file.remotePath,
-          success: false,
-          message: isDisconnectError(dirOk.message) ? "Connection lost" : dirOk.message,
-        });
-        if (isDisconnectError(dirOk.message)) {
-          const recon = await ensureConnected(id);
-          if (!recon.success) {
-            disconnect = true;
-            failed += emitRemainingFailed(progressCb, files, i + 1, files.length, retry, "Connection lost");
-            break;
-          }
-        }
-        continue;
-      }
-    }
-    let result = await putLocalFile(id, file.localPath, file.remotePath, {
-      size: file.size,
-      onStep: (transferred, total) => {
-        emitUploadProgress(progressCb, {
-          type: "file-progress",
-          index,
-          total: files.length,
-          name: file.name,
-          transferred,
-          bytesTotal: total || file.size || 0,
-          direction: "upload",
-        });
-      },
-    });
-    if (!result.success && isDisconnectError(result.message) && !uploadCancelled) {
-      const recon = await ensureConnected(id);
-      if (recon.success) {
-        result = await putLocalFile(id, file.localPath, file.remotePath, {
-          size: file.size,
-          onStep: (transferred, total) => {
-            emitUploadProgress(progressCb, {
-              type: "file-progress",
-              index,
-              total: files.length,
-              name: file.name,
-              transferred,
-              bytesTotal: total || file.size || 0,
-              direction: "upload",
-            });
-          },
-        });
-      }
-      else {
-        disconnect = true;
-        result = { success: false, message: "Connection lost" };
-      }
-    }
-    if (result.success) uploaded++;
-    else failed++;
-    emitUploadProgress(progressCb, {
-      type: "file-done",
-      index,
-      total: files.length,
-      name: file.name,
-      localPath: file.localPath,
-      remotePath: file.remotePath,
-      success: !!result.success,
-      message: result.message,
-      retry,
-      direction: "upload",
-    });
-    if (disconnect && !result.success) {
-      failed += emitRemainingFailed(progressCb, files, i + 1, files.length, retry, "Connection lost");
-      break;
-    }
-  }
-  if (!retry) {
-    emitUploadProgress(progressCb, {
-      type: "batch-end",
-      uploaded,
-      failed,
-      total: files.length,
-      cancelled: stopped,
-      disconnect,
-      direction: "upload",
-    });
-  }
-  return {
-    success: failed === 0 && !stopped,
-    uploaded,
-    failed,
-    total: files.length,
-    cancelled: stopped,
-    disconnect,
-    message: disconnect ? "Connection lost" : (stopped ? "Upload stopped" : (failed ? `${failed} file(s) failed` : undefined)),
-  };
-}
-
-async function downloadBatch(id, items, progressCb, opts = {}) {
-  uploadCancelled = false;
-  const retry = !!opts.retry;
-  const connected = await ensureConnected(id);
-  if (!connected.success) return connected;
-  const files = [];
+  const job = { cancelled: false };
+  activeTransferJobs.add(job);
   try {
+    const retry = !!opts.retry;
+    const connected = await ensureConnected(id);
+    if (!connected.success) return connected;
+    const files = [];
     for (const item of items || []) {
-      if (!item?.remotePath || !item?.localPath) {
+      if (!item?.localPath || !fs.existsSync(item.localPath)) {
         emitUploadProgress(progressCb, {
           type: "file-done",
-          name: path.basename(item?.remotePath || "unknown"),
+          name: path.basename(item?.localPath || "unknown"),
           localPath: item?.localPath,
           remotePath: item?.remotePath,
           success: false,
-          message: "Missing download path",
+          message: "Local path not found",
           index: item?.index || 0,
           total: 0,
           retry,
-          direction: "download",
         });
         continue;
       }
-      if (item.isDirectory) {
-        const collected = await collectRemoteFiles(id, item.remotePath);
-        for (const dir of collected.dirs) {
-          await fs.ensureDir(joinLocalDownloadPath(item.localPath, dir.relativePath));
-        }
-        for (const file of collected.files) {
+      const stat = await fs.stat(item.localPath);
+      if (stat.isDirectory()) {
+        const nested = await collectLocalFiles(item.localPath);
+        const dirOk = await ensureRemoteDir(id, item.remotePath);
+        if (!dirOk.success) return dirOk;
+        for (const file of nested) {
           files.push({
-            remotePath: file.remotePath,
-            localPath: joinLocalDownloadPath(item.localPath, file.relativePath),
+            localPath: file.localPath,
+            remotePath: joinRemotePath(item.remotePath, file.relativePath),
             name: `${path.basename(item.localPath)}/${file.relativePath}`.replace(/\\/g, "/"),
             size: file.size,
             index: item.index,
           });
         }
-      } else {
+      } else if (stat.isFile()) {
         files.push({
-          remotePath: item.remotePath,
           localPath: item.localPath,
-          name: item.name || path.basename(item.remotePath),
-          size: item.size || 0,
+          remotePath: item.remotePath,
+          name: item.name || path.basename(item.localPath),
+          size: stat.size,
           index: item.index,
         });
       }
     }
-  } catch (err) {
-    return { success: false, message: err.message };
-  }
 
-  if (!retry) emitUploadProgress(progressCb, { type: "batch-start", total: files.length, direction: "download" });
-  let downloaded = 0;
-  let failed = 0;
-  let stopped = false;
-  let disconnect = false;
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const index = retry && file.index ? file.index : i + 1;
-    if (uploadCancelled) {
-      stopped = true;
-      failed += emitRemainingFailed(progressCb, files, i, files.length, retry, "Stopped");
-      break;
-    }
-    emitUploadProgress(progressCb, {
-      type: "file-start",
-      index,
-      total: files.length,
-      name: file.name,
-      localPath: file.localPath,
-      remotePath: file.remotePath,
-      size: file.size,
-      retry,
-      direction: "download",
-    });
-    await fs.ensureDir(path.dirname(file.localPath));
-    let result = await downloadFile(id, file.remotePath, file.localPath, null, {
-      size: file.size,
-      onStep: (transferred, total) => {
-        emitUploadProgress(progressCb, {
-          type: "file-progress",
-          index,
-          total: files.length,
-          name: file.name,
-          transferred,
-          bytesTotal: total || file.size || 0,
-          direction: "download",
-        });
-      },
-    });
-    if (!result.success && isDisconnectError(result.message) && !uploadCancelled) {
-      const recon = await ensureConnected(id);
-      if (recon.success) {
-        result = await downloadFile(id, file.remotePath, file.localPath, null, { size: file.size });
-      } else {
-        disconnect = true;
-        result = { success: false, message: "Connection lost" };
+    if (!retry) emitUploadProgress(progressCb, { type: "batch-start", total: files.length });
+    let uploaded = 0;
+    let failed = 0;
+    let disconnect = false;
+    // Directories already confirmed/created in this batch are cached so N
+    // files sharing a parent don't each pay for a stat + mkdir round-trip.
+    const dirCache = new Set();
+
+    const transferOne = async (file, index) => {
+      emitUploadProgress(progressCb, {
+        type: "file-start",
+        index,
+        total: files.length,
+        name: file.name,
+        path: file.remotePath,
+        localPath: file.localPath,
+        remotePath: file.remotePath,
+        retry,
+        direction: "upload",
+      });
+      const parent = path.posix.dirname(file.remotePath);
+      if (parent && parent !== "." && parent !== file.remotePath) {
+        const dirOk = await ensureRemoteDir(id, parent, dirCache);
+        if (!dirOk.success) {
+          const lost = isDisconnectError(dirOk.message);
+          emitUploadProgress(progressCb, {
+            type: "file-done",
+            index,
+            total: files.length,
+            name: file.name,
+            localPath: file.localPath,
+            remotePath: file.remotePath,
+            success: false,
+            message: lost ? "Connection lost" : dirOk.message,
+          });
+          if (lost) {
+            const recon = await ensureConnectedShared(id);
+            if (!recon.success) disconnect = true;
+          }
+          return false;
+        }
+      }
+      const onStep = (transferred, total) => emitUploadProgress(progressCb, {
+        type: "file-progress",
+        index,
+        total: files.length,
+        name: file.name,
+        transferred,
+        bytesTotal: total || file.size || 0,
+        direction: "upload",
+      });
+      const { result, disconnect: lost } = await withRetryOnDisconnect(id, job, () => putLocalFile(id, file.localPath, file.remotePath, { size: file.size, onStep }));
+      if (lost) disconnect = true;
+      emitUploadProgress(progressCb, {
+        type: "file-done",
+        index,
+        total: files.length,
+        name: file.name,
+        localPath: file.localPath,
+        remotePath: file.remotePath,
+        success: !!result.success,
+        message: result.message,
+        retry,
+        direction: "upload",
+      });
+      return !!result.success;
+    };
+
+    const ac = activeConnections[id];
+    const limit = ac?.type === "ftp" ? 1 : Math.max(1, Math.min(8, Number(opts.concurrency) || 4));
+    let cursor = 0;
+    async function worker() {
+      while (!job.cancelled && !disconnect) {
+        const i = cursor++;
+        if (i >= files.length) return;
+        const file = files[i];
+        const index = retry && file.index ? file.index : i + 1;
+        if (await transferOne(file, index)) uploaded++; else failed++;
       }
     }
-    if (result.success) downloaded++;
-    else failed++;
-    emitUploadProgress(progressCb, {
-      type: "file-done",
-      index,
-      total: files.length,
-      name: file.name,
-      localPath: file.localPath,
-      remotePath: file.remotePath,
-      success: !!result.success,
-      message: result.message,
-      retry,
-      direction: "download",
-    });
-    if (disconnect && !result.success) {
-      failed += emitRemainingFailed(progressCb, files, i + 1, files.length, retry, "Connection lost");
-      break;
+    await Promise.all(Array.from({ length: Math.min(limit, Math.max(1, files.length)) }, worker));
+    const stopped = job.cancelled;
+    if (cursor < files.length) {
+      failed += emitRemainingFailed(progressCb, files, cursor, files.length, retry, disconnect ? "Connection lost" : "Stopped");
     }
-  }
-  if (!retry) {
-    emitUploadProgress(progressCb, {
-      type: "batch-end",
-      downloaded,
-      uploaded: downloaded,
+    if (!retry) {
+      emitUploadProgress(progressCb, {
+        type: "batch-end",
+        uploaded,
+        failed,
+        total: files.length,
+        cancelled: stopped,
+        disconnect,
+        direction: "upload",
+      });
+    }
+    return {
+      success: failed === 0 && !stopped,
+      uploaded,
       failed,
       total: files.length,
       cancelled: stopped,
       disconnect,
-      direction: "download",
-    });
+      message: disconnect ? "Connection lost" : (stopped ? "Upload stopped" : (failed ? `${failed} file(s) failed` : undefined)),
+    };
+  } finally {
+    activeTransferJobs.delete(job);
   }
-  return {
-    success: failed === 0 && !stopped,
-    downloaded,
-    failed,
-    total: files.length,
-    cancelled: stopped,
-    disconnect,
-    message: disconnect ? "Connection lost" : (stopped ? "Download stopped" : (failed ? `${failed} file(s) failed` : undefined)),
-  };
+}
+
+async function downloadBatch(id, items, progressCb, opts = {}) {
+  const job = { cancelled: false };
+  activeTransferJobs.add(job);
+  try {
+    const retry = !!opts.retry;
+    const connected = await ensureConnected(id);
+    if (!connected.success) return connected;
+    const files = [];
+    try {
+      for (const item of items || []) {
+        if (!item?.remotePath || !item?.localPath) {
+          emitUploadProgress(progressCb, {
+            type: "file-done",
+            name: path.basename(item?.remotePath || "unknown"),
+            localPath: item?.localPath,
+            remotePath: item?.remotePath,
+            success: false,
+            message: "Missing download path",
+            index: item?.index || 0,
+            total: 0,
+            retry,
+            direction: "download",
+          });
+          continue;
+        }
+        if (item.isDirectory) {
+          const collected = await collectRemoteFiles(id, item.remotePath);
+          for (const dir of collected.dirs) {
+            await fs.ensureDir(joinLocalDownloadPath(item.localPath, dir.relativePath));
+          }
+          for (const file of collected.files) {
+            files.push({
+              remotePath: file.remotePath,
+              localPath: joinLocalDownloadPath(item.localPath, file.relativePath),
+              name: `${path.basename(item.localPath)}/${file.relativePath}`.replace(/\\/g, "/"),
+              size: file.size,
+              index: item.index,
+            });
+          }
+        } else {
+          files.push({
+            remotePath: item.remotePath,
+            localPath: item.localPath,
+            name: item.name || path.basename(item.remotePath),
+            size: item.size || 0,
+            index: item.index,
+          });
+        }
+      }
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+
+    if (!retry) emitUploadProgress(progressCb, { type: "batch-start", total: files.length, direction: "download" });
+    let downloaded = 0;
+    let failed = 0;
+    let disconnect = false;
+
+    const transferOne = async (file, index) => {
+      emitUploadProgress(progressCb, {
+        type: "file-start",
+        index,
+        total: files.length,
+        name: file.name,
+        localPath: file.localPath,
+        remotePath: file.remotePath,
+        size: file.size,
+        retry,
+        direction: "download",
+      });
+      await fs.ensureDir(path.dirname(file.localPath));
+      const onStep = (transferred, total) => emitUploadProgress(progressCb, {
+        type: "file-progress",
+        index,
+        total: files.length,
+        name: file.name,
+        transferred,
+        bytesTotal: total || file.size || 0,
+        direction: "download",
+      });
+      const { result, disconnect: lost } = await withRetryOnDisconnect(id, job, () => downloadFile(id, file.remotePath, file.localPath, null, { size: file.size, onStep }));
+      if (lost) disconnect = true;
+      emitUploadProgress(progressCb, {
+        type: "file-done",
+        index,
+        total: files.length,
+        name: file.name,
+        localPath: file.localPath,
+        remotePath: file.remotePath,
+        success: !!result.success,
+        message: result.message,
+        retry,
+        direction: "download",
+      });
+      return !!result.success;
+    };
+
+    const ac = activeConnections[id];
+    const limit = ac?.type === "ftp" ? 1 : Math.max(1, Math.min(8, Number(opts.concurrency) || 4));
+    let cursor = 0;
+    async function worker() {
+      while (!job.cancelled && !disconnect) {
+        const i = cursor++;
+        if (i >= files.length) return;
+        const file = files[i];
+        const index = retry && file.index ? file.index : i + 1;
+        if (await transferOne(file, index)) downloaded++; else failed++;
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, Math.max(1, files.length)) }, worker));
+    const stopped = job.cancelled;
+    if (cursor < files.length) {
+      failed += emitRemainingFailed(progressCb, files, cursor, files.length, retry, disconnect ? "Connection lost" : "Stopped");
+    }
+    if (!retry) {
+      emitUploadProgress(progressCb, {
+        type: "batch-end",
+        downloaded,
+        uploaded: downloaded,
+        failed,
+        total: files.length,
+        cancelled: stopped,
+        disconnect,
+        direction: "download",
+      });
+    }
+    return {
+      success: failed === 0 && !stopped,
+      downloaded,
+      failed,
+      total: files.length,
+      cancelled: stopped,
+      disconnect,
+      message: disconnect ? "Connection lost" : (stopped ? "Download stopped" : (failed ? `${failed} file(s) failed` : undefined)),
+    };
+  } finally {
+    activeTransferJobs.delete(job);
+  }
 }
 
 async function uploadFile(id, localPath, remotePath, progressCb) {
@@ -1499,9 +1559,12 @@ async function syncUpload(id, progressCb, opts = {}) {
   const ac = activeConnections[id];
   if (ac?.type === "ssh") return { success: false, message: "SFTP is unavailable; sync requires SFTP or FTP" };
 
+  const job = { cancelled: false };
+  activeSyncJobs.add(job);
   const excludes = new Set(conn.excludePaths || []);
   const changedOnly = opts.changedOnly === true;
   const concurrency = ac.type === "ftp" ? 1 : Math.max(1, Math.min(8, Number(opts.concurrency) || 3));
+  const dirCache = new Set();
   let uploaded = 0;
   let skipped = 0;
   let errors = 0;
@@ -1510,7 +1573,7 @@ async function syncUpload(id, progressCb, opts = {}) {
   async function syncDir(localBase, remoteBase) {
     const entries = await fs.readdir(localBase, { withFileTypes: true });
     for (const entry of entries) {
-      if (syncCancelled) return;
+      if (job.cancelled) return;
       if (excludes.has(entry.name)) continue;
 
       const localP = path.join(localBase, entry.name);
@@ -1530,36 +1593,39 @@ async function syncUpload(id, progressCb, opts = {}) {
   }
 
   const modeLabel = changedOnly ? " (changed files only)" : "";
-  syncCancelled = false;
   progressCb && progressCb(`Syncing${modeLabel}: ${localDir} → ${conn.remotePath} (${concurrency} thread${concurrency === 1 ? "" : "s"})...`);
-  await syncDir(localDir, conn.remotePath);
-  const pending = [];
-  for (const file of files) {
-    if (syncCancelled) break;
-    if (changedOnly) {
-      const localStat = await fs.stat(file.localPath);
-      const remoteMtime = await getRemoteMtime(id, file.remotePath);
-      if (remoteMtime !== null && remoteMtime >= localStat.mtimeMs) { skipped++; continue; }
+  try {
+    await syncDir(localDir, conn.remotePath);
+    const pending = [];
+    for (const file of files) {
+      if (job.cancelled) break;
+      if (changedOnly) {
+        const localStat = await fs.stat(file.localPath);
+        const remoteMtime = await getRemoteMtime(id, file.remotePath);
+        if (remoteMtime !== null && remoteMtime >= localStat.mtimeMs) { skipped++; continue; }
+      }
+      pending.push(file);
     }
-    pending.push(file);
+    const cancelled = await runConcurrent(pending, concurrency, async (file) => {
+      if (job.cancelled) return;
+      progressCb && progressCb(`Uploading ${file.name}...`);
+      const parent = path.posix.dirname(file.remotePath);
+      const dirOk = await ensureRemoteDir(id, parent, dirCache);
+      if (!dirOk.success) { errors++; return; }
+      const { result } = await withRetryOnDisconnect(id, job, () => putLocalFile(id, file.localPath, file.remotePath));
+      if (result.success) uploaded++;
+      else errors++;
+    }, job);
+    const stopped = cancelled || job.cancelled;
+    const msg = stopped
+      ? `Sync stopped: ${uploaded} uploaded, ${skipped} skipped, ${errors} errors`
+      : `Sync complete: ${uploaded} uploaded, ${skipped} skipped, ${errors} errors`;
+    progressCb && progressCb(msg);
+    log.ok(msg);
+    return { success: !stopped, uploaded, skipped, errors, cancelled: stopped, message: stopped ? "Sync stopped" : undefined };
+  } finally {
+    activeSyncJobs.delete(job);
   }
-  const cancelled = await runConcurrent(pending, concurrency, async (file) => {
-    if (syncCancelled) return;
-    progressCb && progressCb(`Uploading ${file.name}...`);
-    const parent = path.posix.dirname(file.remotePath);
-    const dirOk = await ensureRemoteDir(id, parent);
-    if (!dirOk.success) { errors++; return; }
-    const r = await putLocalFile(id, file.localPath, file.remotePath);
-    if (r.success) uploaded++;
-    else errors++;
-  });
-  const stopped = cancelled || syncCancelled;
-  const msg = stopped
-    ? `Sync stopped: ${uploaded} uploaded, ${skipped} skipped, ${errors} errors`
-    : `Sync complete: ${uploaded} uploaded, ${skipped} skipped, ${errors} errors`;
-  progressCb && progressCb(msg);
-  log.ok(msg);
-  return { success: !stopped, uploaded, skipped, errors, cancelled: stopped, message: stopped ? "Sync stopped" : undefined };
 }
 
 async function syncDownload(id, progressCb, opts = {}) {
@@ -1580,6 +1646,8 @@ async function syncDownload(id, progressCb, opts = {}) {
   const ac = activeConnections[id];
   if (ac?.type === "ssh") return { success: false, message: "SFTP is unavailable; sync requires SFTP or FTP" };
 
+  const job = { cancelled: false };
+  activeSyncJobs.add(job);
   const excludes = new Set(conn.excludePaths || []);
   const changedOnly = opts.changedOnly === true;
   const concurrency = ac.type === "ftp" ? 1 : Math.max(1, Math.min(8, Number(opts.concurrency) || 3));
@@ -1593,7 +1661,7 @@ async function syncDownload(id, progressCb, opts = {}) {
     if (!listResult.success) return;
 
     for (const item of listResult.items) {
-      if (syncCancelled) return;
+      if (job.cancelled) return;
       if (excludes.has(item.name)) continue;
 
       const remoteP = remoteBase + "/" + item.name;
@@ -1609,35 +1677,38 @@ async function syncDownload(id, progressCb, opts = {}) {
   }
 
   const modeLabel = changedOnly ? " (changed files only)" : "";
-  syncCancelled = false;
   progressCb && progressCb(`Syncing${modeLabel}: ${conn.remotePath} → ${localDir} (${concurrency} thread${concurrency === 1 ? "" : "s"})...`);
-  await syncDir(conn.remotePath, localDir);
-  const pending = [];
-  for (const file of files) {
-    if (syncCancelled) break;
-    if (changedOnly && fs.existsSync(file.localPath)) {
-      const localStat = await fs.stat(file.localPath);
-      const remoteMtime = file.modified ? new Date(file.modified).getTime() : null;
-      if (remoteMtime !== null && remoteMtime <= localStat.mtimeMs) { skipped++; continue; }
+  try {
+    await syncDir(conn.remotePath, localDir);
+    const pending = [];
+    for (const file of files) {
+      if (job.cancelled) break;
+      if (changedOnly && fs.existsSync(file.localPath)) {
+        const localStat = await fs.stat(file.localPath);
+        const remoteMtime = file.modified ? new Date(file.modified).getTime() : null;
+        if (remoteMtime !== null && remoteMtime <= localStat.mtimeMs) { skipped++; continue; }
+      }
+      pending.push(file);
     }
-    pending.push(file);
+    const cancelled = await runConcurrent(pending, concurrency, async (file) => {
+      if (job.cancelled) return;
+      try {
+        progressCb && progressCb(`Downloading ${file.name}...`);
+        const { result } = await withRetryOnDisconnect(id, job, () => downloadFile(id, file.remotePath, file.localPath, progressCb));
+        if (result.success) downloaded++;
+        else errors++;
+      } catch { errors++; }
+    }, job);
+    const stopped = cancelled || job.cancelled;
+    const msg = stopped
+      ? `Sync stopped: ${downloaded} downloaded, ${skipped} skipped, ${errors} errors`
+      : `Sync complete: ${downloaded} downloaded, ${skipped} skipped, ${errors} errors`;
+    progressCb && progressCb(msg);
+    log.ok(msg);
+    return { success: !stopped, downloaded, skipped, errors, cancelled: stopped, message: stopped ? "Sync stopped" : undefined };
+  } finally {
+    activeSyncJobs.delete(job);
   }
-  const cancelled = await runConcurrent(pending, concurrency, async (file) => {
-    if (syncCancelled) return;
-    try {
-      progressCb && progressCb(`Downloading ${file.name}...`);
-      const r = await downloadFile(id, file.remotePath, file.localPath, progressCb);
-      if (r.success) downloaded++;
-      else errors++;
-    } catch { errors++; }
-  });
-  const stopped = cancelled || syncCancelled;
-  const msg = stopped
-    ? `Sync stopped: ${downloaded} downloaded, ${skipped} skipped, ${errors} errors`
-    : `Sync complete: ${downloaded} downloaded, ${skipped} skipped, ${errors} errors`;
-  progressCb && progressCb(msg);
-  log.ok(msg);
-  return { success: !stopped, downloaded, skipped, errors, cancelled: stopped, message: stopped ? "Sync stopped" : undefined };
 }
 
 // ─── Terminal (SSH interactive shell) ────────────────────────────────────────
@@ -1719,6 +1790,12 @@ async function startShell(id, cols = 100, rows = 30, opts = {}) {
   return new Promise((resolve) => {
     ac.client.shell({ term: "xterm-256color", cols, rows }, (error, stream) => {
       if (error) return resolve({ success: false, message: error.message });
+      // TCP chunk boundaries don't align with multi-byte UTF-8 character
+      // boundaries (common with Vietnamese/accented output). StringDecoder
+      // buffers any trailing incomplete byte sequence until the next chunk
+      // completes it, instead of decoding each chunk in isolation.
+      const stdoutDecoder = new StringDecoder("utf8");
+      const stderrDecoder = new StringDecoder("utf8");
       activeShells[sessionId] = {
         stream,
         connectionId,
@@ -1727,10 +1804,10 @@ async function startShell(id, cols = 100, rows = 30, opts = {}) {
       };
       sinkStreamErrors(stream);
       stream.on("data", (data) => {
-        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data: data.toString("utf8") });
+        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data: stdoutDecoder.write(data) });
       });
       stream.stderr?.on("data", (data) => {
-        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data: data.toString("utf8") });
+        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data: stderrDecoder.write(data) });
       });
       stream.on("close", () => {
         if (activeShells[sessionId]?.stream === stream) delete activeShells[sessionId];

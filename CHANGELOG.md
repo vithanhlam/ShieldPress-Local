@@ -1,5 +1,32 @@
 # Changelog
 
+## v2.5.40
+
+**SFTP / SSH connectivity**
+- Adds keyboard-interactive authentication fallback so servers that require PAM-style prompts (common on stock Ubuntu/Debian) no longer fail to log in with a correct password
+- Broadens accepted key-exchange, host-key, cipher, and HMAC algorithms so older or embedded servers (legacy CentOS/Debian, NAS devices) can still connect
+- Adds a Key Passphrase field for encrypted private keys
+- Raises the SSH connect timeout for slow or distant VPS connections
+
+**Terminal**
+- Fixes garbled output for Vietnamese and other multi-byte UTF-8 text when a character was split across two network packets
+
+**SFTP / FTP transfers**
+- Uploads and downloads from the file manager now run with real concurrency instead of one file at a time
+- Reduces redundant remote directory checks when many files share the same folder
+- Retries a dropped connection with backoff instead of failing after a single attempt
+- Fixes upload/download cancel so it no longer affects an unrelated transfer running at the same time
+
+**S3 Bucket Manager**
+- Adds multipart upload for files larger than 8 MB, so large backups no longer need to be held entirely in memory and a failed part can be retried on its own
+- Streams downloads directly to disk instead of buffering the whole object in memory
+- Retries transient network errors and server throttling with backoff
+- A failed file no longer aborts the rest of a multi-file upload or download batch
+- Fixes Cancel so it no longer affects an unrelated transfer running at the same time
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.40
+
 ## v2.5.39
 
 **SFTP remote monitoring and paths**

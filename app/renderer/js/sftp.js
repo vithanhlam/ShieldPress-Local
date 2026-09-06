@@ -345,6 +345,7 @@ window.SFTP = {
     document.getElementById("sftp-user").value = "";
     document.getElementById("sftp-pass").value = "";
     document.getElementById("sftp-key").value = "";
+    document.getElementById("sftp-key-passphrase").value = "";
     document.getElementById("sftp-remote-path").value = "/";
     document.getElementById("sftp-excludes").value = [
       "node_modules", ".git", "vendor", ".DS_Store", "Thumbs.db",
@@ -372,6 +373,8 @@ window.SFTP = {
     document.getElementById("sftp-user").value = conn.username;
     document.getElementById("sftp-pass").value = "";
     document.getElementById("sftp-key").value = conn.privateKey || "";
+    document.getElementById("sftp-key-passphrase").value = "";
+    document.getElementById("sftp-key-passphrase").placeholder = conn.hasPassphrase ? "•••••••• (unchanged, leave blank to keep)" : "Leave blank if the key has no passphrase";
     document.getElementById("sftp-remote-path").value = conn.remotePath || "/";
     document.getElementById("sftp-excludes").value = (conn.excludePaths || []).join("\n");
     await this._populateProjects(conn.projectId || "");
@@ -424,14 +427,15 @@ window.SFTP = {
       password: document.getElementById("sftp-pass").value || undefined,
       secure: document.getElementById("sftp-secure").checked,
       privateKey: document.getElementById("sftp-key").value.trim(),
+      passphrase: document.getElementById("sftp-key-passphrase").value || undefined,
       remotePath: document.getElementById("sftp-remote-path").value.trim() || "/",
       projectId: document.getElementById("sftp-project").value,
       excludePaths: document.getElementById("sftp-excludes").value
         .split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
     };
 
-    if (data.password && !this._vault.unlocked) {
-      toast("Unlock or create the credential vault before saving a password", "warn");
+    if ((data.password || data.passphrase) && !this._vault.unlocked) {
+      toast("Unlock or create the credential vault before saving a password or key passphrase", "warn");
       await this.openVault();
       return;
     }
