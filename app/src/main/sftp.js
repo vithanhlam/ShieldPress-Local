@@ -566,6 +566,32 @@ async function getConnectionStatus(id) {
   return { success: true, connected: true, state: "connected", transport: ac.type };
 }
 
+// ssh2 only accepts an `algorithms.*` array if every entry is present in its
+// own runtime-computed "supported" list — which itself depends on what the
+// current Node/OpenSSL build actually implements (e.g. chacha20-poly1305 is
+// silently dropped when unsupported). Hardcoding algorithm names here is
+// fragile: a name valid on one Node build can be rejected as "Unsupported
+// algorithm" on another (this is exactly what broke Electron's bundled
+// runtime). Pulling ssh2's own SUPPORTED_* lists guarantees every name we
+// pass is one ssh2 itself already validated for this runtime, while still
+// getting the legacy algorithms (group1-sha1, ssh-dss, 3des-cbc, etc.) that
+// aren't in its DEFAULT_* lists. Falls back to ssh2's own defaults if this
+// internal module ever changes shape in a future ssh2 upgrade.
+function getBroadSshAlgorithms() {
+  try {
+    const c = require("ssh2/lib/protocol/constants.js");
+    if (!c.SUPPORTED_KEX || !c.SUPPORTED_SERVER_HOST_KEY || !c.SUPPORTED_CIPHER || !c.SUPPORTED_MAC) return null;
+    return {
+      kex: c.SUPPORTED_KEX,
+      serverHostKey: c.SUPPORTED_SERVER_HOST_KEY,
+      cipher: c.SUPPORTED_CIPHER,
+      hmac: c.SUPPORTED_MAC,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function connectSftp(storageKey, conn, progressCb, connectionId = storageKey) {
   const { Client } = require("ssh2");
   return new Promise((resolve) => {
@@ -583,35 +609,17 @@ async function connectSftp(storageKey, conn, progressCb, connectionId = storageK
       readyTimeout: 30000,
       keepaliveInterval: 10000,
       keepaliveCountMax: 3,
-      // Broaden accepted key-exchange / host-key / cipher algorithms so older
-      // devices (legacy CentOS/Debian, NAS boxes, embedded Linux) that only
-      // speak deprecated algorithms can still connect, on top of ssh2's
-      // modern defaults.
-      algorithms: {
-        kex: [
-          "curve25519-sha256@libssh.org", "curve25519-sha256",
-          "ecdh-sha2-nistp256", "ecdh-sha2-nistp384", "ecdh-sha2-nistp521",
-          "diffie-hellman-group-exchange-sha256", "diffie-hellman-group14-sha256",
-          "diffie-hellman-group15-sha512", "diffie-hellman-group16-sha512", "diffie-hellman-group17-sha512", "diffie-hellman-group18-sha512",
-          "diffie-hellman-group-exchange-sha1", "diffie-hellman-group14-sha1", "diffie-hellman-group1-sha1",
-        ],
-        serverHostKey: [
-          "ssh-ed25519", "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521",
-          "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa", "ssh-dss",
-        ],
-        cipher: [
-          "aes128-gcm@openssh.com", "aes256-gcm@openssh.com", "aes128-ctr", "aes192-ctr", "aes256-ctr", "chacha20-poly1305@openssh.com",
-          "aes256-cbc", "aes192-cbc", "aes128-cbc", "3des-cbc",
-        ],
-        hmac: [
-          "hmac-sha2-256-etm@openssh.com", "hmac-sha2-512-etm@openssh.com", "hmac-sha1-etm@openssh.com",
-          "hmac-sha2-256", "hmac-sha2-512", "hmac-sha1", "hmac-md5",
-        ],
-      },
       // Fall back to keyboard-interactive when the server doesn't accept a
       // plain password auth method (common on stock Ubuntu/Debian PAM setups).
       tryKeyboard: true,
     };
+    // Broaden accepted key-exchange / host-key / cipher / MAC algorithms so
+    // older devices (legacy CentOS/Debian, NAS boxes, embedded Linux) that
+    // only speak deprecated algorithms can still connect. Omitted entirely
+    // (falls back to ssh2's own modern defaults) if the runtime algorithm
+    // list can't be determined.
+    const broadAlgorithms = getBroadSshAlgorithms();
+    if (broadAlgorithms) connectOpts.algorithms = broadAlgorithms;
 
     if (conn.privateKey && fs.existsSync(conn.privateKey)) {
       connectOpts.privateKey = fs.readFileSync(conn.privateKey);
