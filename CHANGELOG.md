@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.5.41
+
+**SFTP / SSH connectivity**
+- Fixes SSH, SFTP, and Terminal connections failing with "Unsupported algorithm: chacha20-poly1305@openssh.com" on the packaged app, introduced in v2.5.40's broadened algorithm support
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.41
+
 ## v2.5.40
 
 **SFTP / SSH connectivity**
