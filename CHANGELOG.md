@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.5.42
+
+**SFTP / FTP uploads**
+- Adds English conflict actions when an uploaded file or folder already exists on the server: `Skip`, `Skip All`, `Overwrite`, `Overwrite All`, and `Cancel`
+- Applies the same conflict handling to file picker, drag-and-drop, folder uploads, and Terminal remote-file uploads
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.42
+
 ## v2.5.41
 
 **SFTP / SSH connectivity**

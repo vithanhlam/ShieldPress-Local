@@ -910,6 +910,7 @@ window.SFTP = {
     if (this._xferBusy) return toast("A transfer is already in progress", "warn");
     this._xferDirection = "upload";
     const jobs = [];
+    let conflictMode = null;
     this._xferReset();
     this._xferShow(true);
     this._xferSetMeta("Checking files...", "0 / 0", 0);
@@ -932,10 +933,15 @@ window.SFTP = {
           this._xferAddRow("skip-" + name, name, "fail", "Cannot overwrite a file with a folder");
           continue;
         }
-        const message = info.isDirectory
-          ? `"${name}" folder already exists on the server.\n\nMerge contents? Existing files inside will be overwritten.`
-          : `"${name}" already exists on server (${this._fmtSize(exists.size)}).\n\nOverwrite?`;
-        if (!confirm(message)) {
+        const decision = conflictMode || await this._askUploadConflict(name, info.isDirectory, exists.size);
+        if (decision === "cancel") {
+          this._xferSetMeta("Upload cancelled", "0 / 0", 0);
+          return;
+        }
+        if (decision === "overwriteAll" || decision === "skipAll") {
+          conflictMode = decision;
+        }
+        if (decision === "skip" || decision === "skipAll") {
           this._xferAddRow("skip-" + name, name, "skip", "Skipped");
           continue;
         }
@@ -967,6 +973,30 @@ window.SFTP = {
       this._xferBusy = false;
       this._xferSetBusy(false);
     }
+  },
+
+  _askUploadConflict(name, isDirectory, size) {
+    const modal = document.getElementById("m-sftp-upload-conflict");
+    if (!modal) return Promise.resolve("cancel");
+    const nameEl = document.getElementById("sftp-conflict-name");
+    const messageEl = document.getElementById("sftp-conflict-message");
+    if (nameEl) nameEl.textContent = name;
+    if (messageEl) {
+      messageEl.textContent = isDirectory
+        ? "This folder already exists on the server. Existing files inside may be overwritten."
+        : `This file already exists on the server${size ? ` (${this._fmtSize(size)})` : ""}.`;
+    }
+    openModal("m-sftp-upload-conflict");
+    return new Promise((resolve) => {
+      this._uploadConflictResolver = resolve;
+    });
+  },
+
+  resolveUploadConflict(decision) {
+    closeModal("m-sftp-upload-conflict");
+    const resolve = this._uploadConflictResolver;
+    this._uploadConflictResolver = null;
+    if (resolve) resolve(decision);
   },
 
   async stopUpload() {
