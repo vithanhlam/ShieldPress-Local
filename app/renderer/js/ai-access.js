@@ -1,0 +1,205 @@
+window.AIAccess = {
+  policy: null,
+  resources: [],
+  capabilities: ["read", "create", "edit", "delete", "execute"],
+  currentTab: "source",
+
+  async init() {
+    if (api.onAiApprovalRequest && !this._approvalListener) {
+      this._approvalListener = true;
+      api.onAiApprovalRequest((request) => this.showApproval(request));
+      api.onAiApprovalResult?.((result) => this.showApprovalResult(result));
+    }
+    await this.reload();
+    await this.loadAudit();
+    await this.loadPending();
+  },
+
+  async reload() {
+    try {
+      const [policy, result] = await Promise.all([api.aiAccessGetPolicy(), api.aiAccessGetResources()]);
+      this.policy = policy;
+      this.resources = result.resources || [];
+      document.getElementById("ai-enabled").checked = !!policy.enabled;
+      document.getElementById("ai-require-approval").checked = true;
+      document.getElementById("ai-session-approval").checked = !!policy.sessionApproval;
+      document.getElementById("ai-backup-before-write").checked = policy.backupBeforeWrite !== false;
+      document.getElementById("ai-redact-secrets").checked = true;
+      document.getElementById("ai-session-minutes").value = String(policy.sessionMinutes || 60);
+      this.render();
+      const reqnora = await api.aiAccessGetReqnora?.();
+      const keyInput = document.getElementById("reqnora-api-key");
+      if (keyInput && reqnora?.apiKeyPresent) keyInput.placeholder = "API key saved in credential vault (enter to replace)";
+    } catch (error) {
+      toast("Could not load AI Access: " + error.message, "error");
+    }
+  },
+
+  key(type, id) { return `${type}:${id}`; },
+
+  savedFor(resource) {
+    return (this.policy?.resources || []).find((item) => item.type === resource.type && String(item.id) === String(resource.id));
+  },
+
+  escape(value) {
+    return String(value || "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[char]);
+  },
+
+  render() {
+    const root = document.getElementById("ai-resource-list");
+    if (!root) return;
+    const labels = { source: "Project", database: "Database", config: "Config", vps: "VPS / SFTP / FTP", s3: "S3" };
+    const icons = { source: "fa-code", database: "fa-database", config: "fa-cogs", vps: "fa-server", s3: "fa-cloud" };
+    if (!this.resources.length) {
+      root.innerHTML = '<div class="empty-state"><i class="fas fa-folder-open"></i><p>No projects, databases, VPS connections, or S3 buckets found.</p></div>';
+      return;
+    }
+    root.innerHTML = this.resources.map((resource) => {
+      const saved = this.savedFor(resource);
+      const key = this.escape(this.key(resource.type, resource.id));
+      const permissions = saved?.permissions || {};
+      const enabled = !!saved;
+      return `<div class="ai-resource-card" data-type="${this.escape(resource.type)}" data-id="${this.escape(resource.id)}" data-name="${this.escape(resource.name)}" data-scope="${this.escape(saved?.scope || resource.scope)}">
+        <div class="ai-resource-main">
+          <label class="ai-resource-check"><input type="checkbox" class="ai-resource-enabled" ${enabled ? "checked" : ""} onchange="AIAccess.toggleCard(this)"/><i class="fas ${icons[resource.type]}"></i></label>
+          <div class="ai-resource-info"><div><span class="ai-type">${labels[resource.type]}</span><strong>${this.escape(resource.name)}</strong></div><input class="fi ai-scope" value="${this.escape(saved?.scope || resource.scope)}" placeholder="Allowed path, schema, or prefix" ${enabled ? "" : "disabled"}/></div>
+        </div>
+        <div class="ai-permissions ${enabled ? "" : "disabled"}" aria-label="Permissions for ${key}">
+          ${this.capabilities.map((cap) => `<label class="ai-permission ai-${cap}"><input type="checkbox" data-cap="${cap}" ${permissions[cap] ? "checked" : ""} ${enabled ? "" : "disabled"}/><span>${cap.charAt(0).toUpperCase() + cap.slice(1)}</span></label>`).join("")}
+        </div>
+      </div>`;
+    }).join("");
+    this.updateTabCounts();
+    this.tab(this.currentTab);
+  },
+
+  updateTabCounts() {
+    document.querySelectorAll("[data-ai-tab]").forEach((button) => {
+      const count = this.resources.filter((resource) => resource.type === button.dataset.aiTab).length;
+      const badge = button.querySelector("span");
+      if (badge) badge.textContent = String(count);
+    });
+  },
+
+  tab(type) {
+    this.currentTab = type;
+    const debug = type === "debug";
+    document.querySelectorAll(".ai-resource-tabs ~ #ai-resource-list, .ai-resource-list, .ai-section-head").forEach((el) => { el.style.display = debug ? "none" : ""; });
+    const debugPanel = document.getElementById("ai-debug-panel");
+    if (debugPanel) debugPanel.style.display = debug ? "block" : "none";
+    document.querySelectorAll("[data-ai-tab]").forEach((button) => button.classList.toggle("active", button.dataset.aiTab === type));
+    if (debug) return;
+    document.querySelectorAll(".ai-resource-card").forEach((card) => { card.style.display = card.dataset.type === type ? "grid" : "none"; });
+    const visible = this.resources.some((resource) => resource.type === type);
+    let empty = document.getElementById("ai-tab-empty");
+    if (!visible && !empty) {
+      empty = document.createElement("div"); empty.id = "ai-tab-empty"; empty.className = "empty-state";
+      document.getElementById("ai-resource-list")?.appendChild(empty);
+    }
+    if (empty) { empty.style.display = visible ? "none" : "block"; empty.innerHTML = '<i class="fas fa-folder-open"></i><p>No resources configured in this tab.</p>'; }
+  },
+
+  toggleCard(input) {
+    const card = input.closest(".ai-resource-card");
+    card.querySelector(".ai-scope").disabled = !input.checked;
+    card.querySelector(".ai-permissions").classList.toggle("disabled", !input.checked);
+    card.querySelectorAll(".ai-permissions input").forEach((el) => { el.disabled = !input.checked; });
+  },
+
+  collect() {
+    const resources = [...document.querySelectorAll(".ai-resource-card")].filter((card) => card.querySelector(".ai-resource-enabled").checked).map((card) => {
+      const permissions = {};
+      card.querySelectorAll("[data-cap]").forEach((input) => { permissions[input.dataset.cap] = input.checked; });
+      return { type: card.dataset.type, id: card.dataset.id, name: card.dataset.name, scope: card.querySelector(".ai-scope").value.trim(), permissions };
+    });
+    return {
+      enabled: document.getElementById("ai-enabled").checked,
+      requireApproval: true,
+      sessionApproval: document.getElementById("ai-session-approval").checked,
+      backupBeforeWrite: document.getElementById("ai-backup-before-write").checked,
+      redactSecrets: true,
+      sessionMinutes: Number(document.getElementById("ai-session-minutes").value),
+      resources,
+    };
+  },
+
+  async save() {
+    const policy = this.collect();
+    if (policy.enabled && !policy.resources.length) return toast("Select at least one resource before enabling AI Access", "warn");
+    const result = await api.aiAccessSavePolicy(policy);
+    if (!result.success) return toast(result.message || "Could not save AI Access policy", "error");
+    this.policy = result.policy;
+    const keyInput = document.getElementById("reqnora-api-key");
+    const webhookInput = document.getElementById("reqnora-webhook-secret");
+    const apiUrlInput = document.getElementById("reqnora-api-url");
+    if (keyInput?.value.trim() || webhookInput?.value.trim()) {
+      const reqnora = await api.aiAccessSaveReqnora?.({ apiKey: keyInput.value.trim(), webhookSecret: webhookInput?.value.trim(), apiUrl: apiUrlInput?.value.trim() });
+      if (!reqnora?.success) return toast(reqnora?.message || "Could not save Reqnora API key", "error");
+      keyInput.value = "";
+      if (webhookInput) webhookInput.value = "";
+    }
+    toast("AI Access policy saved", "success");
+    await this.loadAudit();
+  },
+
+  async copySkill() {
+    const result = await api.aiAccessCopySkill();
+    toast(result.success ? "Safety SKILL copied" : "Could not copy SKILL", result.success ? "success" : "error");
+    await this.loadAudit();
+  },
+
+  async previewSkill() {
+    const preview = document.getElementById("ai-skill-preview");
+    if (preview.style.display !== "none") { preview.style.display = "none"; return; }
+    const result = await api.aiAccessGetSkill();
+    preview.textContent = result.content || "";
+    preview.style.display = "block";
+  },
+
+  async loadAudit() {
+    const result = await api.aiAccessGetAudit(20);
+    const root = document.getElementById("ai-audit-list");
+    if (!root) return;
+    const entries = result.entries || [];
+    root.innerHTML = entries.length ? entries.map((entry) => `<div class="ai-audit-item"><span>${this.escape(new Date(entry.at).toLocaleString())}</span><strong>${this.escape(entry.event)}</strong><small>${this.escape(entry.detail)}</small></div>`).join("") : '<span class="ai-muted">No AI Access activity yet.</span>';
+  },
+
+  async loadPending() {
+    const result = await api.aiAccessListPending?.();
+    (result?.requests || []).forEach((request) => this.showApproval(request));
+  },
+
+  showApproval(request) {
+    const card = document.getElementById("ai-pending-requests");
+    const list = document.getElementById("ai-pending-list");
+    if (!card || !list) return toast(`AI asks to ${request.operation}: ${request.summary}`, "warn", 9000);
+    if (request.id && list.querySelector(`[data-request-id="${this.escape(request.id)}"]`)) return;
+    card.style.display = "block";
+    const item = document.createElement("div");
+    item.className = "ai-pending-item";
+    item.dataset.requestId = request.id;
+    item.innerHTML = `<strong>${this.escape(request.operation)}</strong><span>${this.escape(request.summary)}</span><small>${this.escape(request.resourceId)}${request.path ? ` — ${this.escape(request.path)}` : ""}</small><span class="ai-pending-actions"><button class="btn btn-primary btn-xs" onclick="AIAccess.resolve('${this.escape(request.id)}', true)">Approve</button><button class="btn btn-ghost btn-xs" onclick="AIAccess.resolve('${this.escape(request.id)}', false)">Deny</button></span>`;
+    list.prepend(item);
+  },
+
+  async resolve(id, approved) {
+    const result = await api.aiAccessResolvePending(id, approved);
+    const item = document.querySelector(`[data-request-id="${this.escape(id)}"]`);
+    if (item) item.remove();
+    toast(result.message || (approved ? "Request approved" : "Request denied"), result.success ? "success" : "error");
+    if (!result.success) await this.loadPending();
+    await this.loadAudit();
+  },
+
+  showApprovalResult(result) {
+    const item = result?.id ? document.querySelector(`[data-request-id="${this.escape(result.id)}"]`) : null;
+    if (item) item.remove();
+    const list = document.getElementById("ai-pending-list");
+    const card = document.getElementById("ai-pending-requests");
+    if (list && card && !list.children.length) card.style.display = "none";
+    toast(result.result?.success ? "Approved VPS operation completed" : `Approved operation: ${result.result?.message || "failed"}`, result.result?.success ? "success" : "error", 8000);
+    this.loadAudit();
+  },
+};

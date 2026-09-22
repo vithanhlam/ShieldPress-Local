@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.5.50
+
+**AI Access / Reqnora**
+- Adds Debug Logs for AI Access audit events, approvals, command execution, and remote diagnostics
+- Adds time-limited “Approve all for this session” mode with automatic expiry and audit logging
+- Adds encrypted Reqnora API URL, API key, and webhook-secret settings
+- Sends interactive Reqnora approval requests and notifications; polls request status so Mobile approval continues the ShieldPress operation without a second approval
+- Supports Reqnora webhook callbacks with timestamp and HMAC signature verification
+- Removes the local Pending request when a request is approved or rejected from Reqnora Mobile
+
+**VPS / MCP**
+- Adds safe remote command execution behind the explicit Execute capability
+- Keeps credentials inside the ShieldPress Credential Vault and never returns them to the AI client
+
+**Release**
+- Updates the Windows and Ubuntu installers to version 2.5.50
+
 ## v2.5.42
 
 **SFTP / FTP uploads**

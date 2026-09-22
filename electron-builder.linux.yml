@@ -11,9 +11,12 @@ directories:
   output: dist
 files:
   - app/**
+  - scripts/shieldpress-mcp.js
   - assets/**
   - package.json
 extraResources:
+  - from: scripts/shieldpress-mcp.js
+    to: shieldpress-mcp.js
   - from: assets/phpmyadmin-shieldpress.php
     to: phpmyadmin-shieldpress.php
   - from: .build-runtime/linux/php

@@ -17,6 +17,8 @@ const git     = require("./git");
 const gd      = require("./google-drive");
 const platform = require("./platform");
 const workspace = require("./workspace");
+const aiAccess = require("./ai-access");
+const aiGateway = require("./ai-gateway");
 
 function register(ipcMain, shell, dialog) {
   global.__shieldpressCloseRemoteSession = (sessionId) => {
@@ -131,6 +133,23 @@ function register(ipcMain, shell, dialog) {
     const content = await fs.readFile(htmlPath, "utf8");
     return { success: true, content };
   });
+
+  // ── AI Access policy (credentials are never exposed through these APIs) ──
+  ipcMain.handle("ai-access-get-policy", () => aiAccess.getPolicy());
+  ipcMain.handle("ai-access-save-policy", (_e, policy) => aiAccess.savePolicy(policy));
+  ipcMain.handle("ai-access-get-resources", () => aiAccess.getResources());
+  ipcMain.handle("ai-access-get-skill", () => aiAccess.getSkill());
+  ipcMain.handle("ai-access-get-audit", (_e, limit) => aiAccess.getAudit(limit));
+  ipcMain.handle("ai-access-get-reqnora", () => aiAccess.getReqnora());
+  ipcMain.handle("ai-access-save-reqnora", (_e, apiKey) => aiAccess.saveReqnora(apiKey));
+  ipcMain.handle("ai-access-copy-skill", async () => {
+    const result = await aiAccess.getSkill();
+    require("electron").clipboard.writeText(result.content);
+    await aiAccess.appendAudit({ event: "skill-copied", detail: "Safety skill copied to clipboard" });
+    return { success: true };
+  });
+  ipcMain.handle("ai-access-list-pending", () => aiGateway.listPending());
+  ipcMain.handle("ai-access-resolve-pending", (_e, data) => aiGateway.resolveApproval(data?.id, data?.approved === true));
 
   ipcMain.handle("open-file-dialog", async (e, opts) => {
     const { mainWindow } = global.STATE;

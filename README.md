@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.42)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.50)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress Local Setup 2.5.42.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.42_amd64.deb` | Ubuntu/Debian installer |
+| `ShieldPress Local Setup 2.5.50.exe` | Windows NSIS installer |
+| `shieldpresslocal_2.5.50_amd64.deb` | Ubuntu/Debian installer |
 
 ---
 
@@ -146,6 +146,40 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **Email Testing** | Configure SMTP with SSL/TLS/STARTTLS — PHP `mail()` works out of the box |
 | **Cache Management** | OPcache config, WP cache flush, project cleanup, Nginx log clear |
 | **System Monitor** | Real-time CPU, RAM, Disk usage in titlebar |
+
+### AI Access and MCP
+
+AI Access provides a local MCP bridge for authorized projects, databases, configuration files, VPS/SFTP/FTP connections, and S3 buckets. Credentials remain in the ShieldPress Credential Vault; the MCP client receives only the data and operations allowed by policy.
+
+#### Enable access safely
+
+1. Open **AI Access** and enable the master switch.
+2. Select a resource tab: **Projects**, **Database**, **Config**, **VPS / SFTP / FTP**, or **S3**.
+3. Grant only the required capabilities: **Read**, **Create**, **Edit**, **Delete**, and, only when needed, **Execute**.
+4. Keep **Require approval** enabled for normal operation. **Approve all for this session** is time-limited and should only be enabled for a trusted maintenance window.
+5. Use **Debug Logs** to review every request, approval, command, and result.
+
+The MCP client command is:
+
+```bash
+codex mcp add shieldpress -- node /opt/ShieldPressLocal/resources/shieldpress-mcp.js
+```
+
+The installed client connects only to the local ShieldPress gateway. It does not read SSH passwords or call `sshpass` directly.
+
+#### Reqnora approval workflow
+
+Reqnora can be used to approve an AI request from the mobile app. In **AI Access → Reqnora**, enter:
+
+- API URL: `https://app.reqnora.com`
+- Project API key: `ak_live_...`
+- Optional webhook signing secret from the Reqnora project settings
+
+ShieldPress sends interactive requests to `POST /api/v1/requests` and polls the request status for up to 15 minutes. Approving on Mobile automatically resolves the matching Pending request in ShieldPress; no second approval is required. Notifications are sent to `POST /api/v1/notifications`.
+
+For webhook mode, configure the public HTTPS endpoint `/reqnora/webhook` in the Reqnora project and enter its signing secret in ShieldPress. The webhook must include `X-Reqnora-Timestamp` and `X-Reqnora-Signature`; ShieldPress rejects stale or invalid HMAC signatures. If ShieldPress is only running on a private desktop, polling works without exposing a local port.
+
+See the [Reqnora API documentation](https://reqnora.com/docs) for project keys, request actions, and webhook configuration.
 
 ---
 

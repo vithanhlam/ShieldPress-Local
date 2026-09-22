@@ -109,6 +109,7 @@ global.STATE = {
 const setup = require("./src/main/setup");
 const services = require("./src/main/services");
 const ipc = require("./src/main/ipc");
+const aiGateway = require("./src/main/ai-gateway");
 
 // ssh2 / child-process writes to a closed socket throw EPIPE as an uncaught
 // exception. Without this handler Electron shows "A JavaScript error occurred
@@ -339,12 +340,14 @@ app.whenReady().then(async () => {
   ipc.register(ipcMain, shell, dialog);
   createWindow();
   createTray();
+  await aiGateway.start();
 });
 
 app.on("before-quit", async (e) => {
   if (isQuitting) return;
   isQuitting = true;
   e.preventDefault();
+  await aiGateway.stop();
 
   const runningIds = Object.keys(global.STATE.runningProjects);
 

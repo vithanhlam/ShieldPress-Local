@@ -1,7 +1,7 @@
 {
   "name": "shieldpresslocal",
   "productName": "ShieldPress Local",
-  "version": "2.5.42",
+  "version": "2.5.50",
   "description": "ShieldPress Local Development Environment Manager",
   "main": "app/main.js",
   "author": {
@@ -47,12 +47,17 @@
     },
     "files": [
       "app/**",
+      "scripts/shieldpress-mcp.js",
       "assets/**",
       "package.json",
       "node_modules/monaco-editor/min/**",
       "node_modules/@xterm/**"
     ],
     "extraResources": [
+      {
+        "from": "scripts/shieldpress-mcp.js",
+        "to": "shieldpress-mcp.js"
+      },
       {
         "from": "bin",
         "to": "bin"

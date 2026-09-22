@@ -1,0 +1,57 @@
+<div class="page-header">
+  <div>
+    <h1><i class="fas fa-robot" style="color:var(--accent)"></i> AI Access</h1>
+    <p>Grant AI access per resource and operation. Credentials always remain inside ShieldPress Local.</p>
+  </div>
+  <button class="btn btn-primary" onclick="AIAccess.save()"><i class="fas fa-save"></i> Save policy</button>
+</div>
+
+<div class="ai-notice">
+  <i class="fas fa-shield-alt"></i>
+  <div><strong>Ask first, act second.</strong><br/>AI must name the project, database, configuration, VPS/SFTP/FTP, or S3 target and receive your approval before access. Create, edit, delete, database writes, file transfers, and remote state changes require fresh confirmation. <strong>Execute command</strong> is a separate high-risk permission and is off by default.</div>
+</div>
+
+<div class="settings-card ai-settings-grid">
+  <label class="ai-toggle-row"><span><strong>Enable AI Access</strong><small>Master switch for all authorized resources</small></span><input id="ai-enabled" type="checkbox"/></label>
+  <label class="ai-toggle-row"><span><strong>Require approval</strong><small>Ask before every sensitive operation</small></span><input id="ai-require-approval" type="checkbox" checked disabled/></label>
+  <label class="ai-toggle-row ai-session-approval-row"><span><strong>Approve all for this session</strong><small>Auto-approve authorized requests until the session expires; execute remains fully audited</small></span><input id="ai-session-approval" type="checkbox"/></label>
+  <label class="ai-toggle-row"><span><strong>Backup before write</strong><small>Require a recoverable backup before edit/delete</small></span><input id="ai-backup-before-write" type="checkbox" checked/></label>
+  <label class="ai-toggle-row"><span><strong>Redact secrets</strong><small>Hide passwords, tokens, keys, cookies, and connection strings</small></span><input id="ai-redact-secrets" type="checkbox" checked disabled/></label>
+  <label class="ai-session-row"><span><strong>Session lifetime</strong><small>Access expires when the approved session ends</small></span>
+    <select class="fi" id="ai-session-minutes"><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="480">8 hours</option></select>
+  </label>
+</div>
+
+<div id="ai-pending-requests" class="settings-card ai-pending-card" style="display:none"><h2><i class="fas fa-user-check"></i> Pending AI requests</h2><p class="ai-muted">Review these requests before allowing the AI to continue.</p><div id="ai-pending-list"></div></div>
+
+<div id="ai-debug-panel" class="settings-card ai-debug-panel" style="display:none">
+  <div class="ai-audit-head"><div><h2><i class="fas fa-bug"></i> Debug Logs</h2><p class="ai-muted">AI Access audit events, approvals, command results, and connection diagnostics.</p></div><button class="btn btn-ghost btn-xs" onclick="AIAccess.loadAudit()"><i class="fas fa-sync-alt"></i> Refresh</button></div>
+  <div id="ai-audit-list" class="ai-audit-list"><span class="ai-muted">No AI Access activity yet.</span></div>
+</div>
+
+<div class="ai-section-head">
+  <div><h2>Authorized resources</h2><p>Select a resource first, then grant only the operations AI needs.</p></div>
+  <button class="btn btn-ghost" onclick="AIAccess.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
+</div>
+<div class="ai-resource-tabs" role="tablist" aria-label="AI resource types">
+  <button class="btn btn-ghost active" data-ai-tab="source" onclick="AIAccess.tab('source')"><i class="fas fa-code"></i> Projects <span></span></button>
+  <button class="btn btn-ghost" data-ai-tab="database" onclick="AIAccess.tab('database')"><i class="fas fa-database"></i> Database <span></span></button>
+  <button class="btn btn-ghost" data-ai-tab="config" onclick="AIAccess.tab('config')"><i class="fas fa-cogs"></i> Config <span></span></button>
+  <button class="btn btn-ghost" data-ai-tab="vps" onclick="AIAccess.tab('vps')"><i class="fas fa-server"></i> VPS / SFTP / FTP <span></span></button>
+  <button class="btn btn-ghost" data-ai-tab="s3" onclick="AIAccess.tab('s3')"><i class="fas fa-cloud"></i> S3 <span></span></button>
+  <button class="btn btn-ghost" data-ai-tab="debug" onclick="AIAccess.tab('debug')"><i class="fas fa-bug"></i> Debug Logs</button>
+</div>
+<div id="ai-resource-list" class="ai-resource-list"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading resources...</p></div></div>
+
+<div class="ai-bottom-grid">
+  <div class="settings-card">
+    <h2><i class="fas fa-scroll"></i> Safety SKILL</h2>
+    <p class="ai-muted">Install this SKILL in your AI client so it follows the same authorization rules.</p>
+    <div class="ai-skill-actions">
+      <button class="btn btn-primary" onclick="AIAccess.copySkill()"><i class="fas fa-copy"></i> Copy SKILL</button>
+      <button class="btn btn-ghost" onclick="AIAccess.previewSkill()"><i class="fas fa-eye"></i> Preview</button>
+    </div>
+    <pre id="ai-skill-preview" class="ai-code-preview" style="display:none"></pre>
+  </div>
+  <div class="settings-card"><h2><i class="fas fa-key"></i> Reqnora</h2><p class="ai-muted">Send approval requests and result notifications without exposing the key to AI.</p><label class="ai-field-label" for="reqnora-api-url">API URL</label><input id="reqnora-api-url" class="fi" type="url" value="https://app.reqnora.com"/><label class="ai-field-label" for="reqnora-api-key">API Key</label><input id="reqnora-api-key" class="fi" type="password" autocomplete="off" placeholder="ak_live_..."/><label class="ai-field-label" for="reqnora-webhook-secret">Webhook signing secret</label><input id="reqnora-webhook-secret" class="fi" type="password" autocomplete="off" placeholder="Optional: verify X-Reqnora-Signature"/><small class="ai-muted">Docs: <a href="https://reqnora.com/docs" target="_blank">reqnora.com/docs</a></small></div>
+</div>

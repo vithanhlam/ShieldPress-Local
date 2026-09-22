@@ -414,6 +414,16 @@ function getActive(id) {
   return activeConnections[id] || null;
 }
 
+// A remote window uses a session id as its transport key, while the main
+// connection list and AI gateway use the saved connection id. Resolve either
+// form to the live transport so inspection/read tools see an open SSH session.
+function resolveActiveConnectionId(id) {
+  if (activeConnections[id]) return id;
+  const wanted = String(id || "");
+  const found = Object.entries(activeConnections).find(([key, value]) => connectionIdOf(key, value) === wanted);
+  return found ? found[0] : null;
+}
+
 function isPipeError(err) {
   const code = err && err.code;
   return code === "EPIPE" || code === "ECONNRESET" || code === "ERR_STREAM_DESTROYED" || code === "ENOTCONN";
@@ -1865,7 +1875,8 @@ function stopShell(sessionId) {
 
 async function getRemoteSystemInfo(id) {
   if (remoteSystemCache[id]) return { success: true, ...remoteSystemCache[id] };
-  const ac = activeConnections[id];
+  const activeId = resolveActiveConnectionId(id);
+  const ac = activeId ? activeConnections[activeId] : null;
   if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
   const command = "printf '__OS__\\n'; cat /etc/os-release 2>/dev/null; printf '__TOOLS__\\n'; for c in apt apt-get dnf yum apk pacman zypper systemctl service; do command -v $c >/dev/null 2>&1 && printf '%s\\n' $c; done; printf '__SHELL__\\n'; printf '%s\\n' \"$SHELL\"";
   return new Promise((resolve) => {
@@ -1926,7 +1937,8 @@ function parseCpuLine(line) {
 }
 
 async function getRemoteStats(id) {
-  const ac = activeConnections[id];
+  const activeId = resolveActiveConnectionId(id);
+  const ac = activeId ? activeConnections[activeId] : null;
   if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
   const command = [
     "printf '__CPU__\\n'",
@@ -2763,6 +2775,7 @@ module.exports = {
   connect,
   connectSession,
   getConnectionStatus,
+  resolveActiveConnectionId,
   disconnect,
   disconnectAll,
   closeSession,

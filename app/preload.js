@@ -114,6 +114,17 @@ contextBridge.exposeInMainWorld("api", {
 
   // Page
   readPage: (name) => ipcRenderer.invoke("read-page", name),
+  aiAccessGetPolicy: () => ipcRenderer.invoke("ai-access-get-policy"),
+  aiAccessSavePolicy: (policy) => ipcRenderer.invoke("ai-access-save-policy", policy),
+  aiAccessGetResources: () => ipcRenderer.invoke("ai-access-get-resources"),
+  aiAccessGetSkill: () => ipcRenderer.invoke("ai-access-get-skill"),
+  aiAccessGetAudit: (limit) => ipcRenderer.invoke("ai-access-get-audit", limit),
+  aiAccessGetReqnora: () => ipcRenderer.invoke("ai-access-get-reqnora"),
+  aiAccessSaveReqnora: (apiKey) => ipcRenderer.invoke("ai-access-save-reqnora", apiKey),
+  aiAccessCopySkill: () => ipcRenderer.invoke("ai-access-copy-skill"),
+  aiAccessListPending: () => ipcRenderer.invoke("ai-access-list-pending"),
+  aiAccessResolvePending: (id, approved) => ipcRenderer.invoke("ai-access-resolve-pending", { id, approved }),
+  onAiApprovalResult: (cb) => ipcRenderer.on("ai-access-approval-result", (_e, result) => cb(result)),
 
   // Window
   openHostsFile: () => ipcRenderer.invoke("open-hosts-file"),
@@ -206,6 +217,7 @@ contextBridge.exposeInMainWorld("api", {
   s3Cancel: () => ipcRenderer.invoke("s3-cancel"),
   onS3Progress: (cb) => ipcRenderer.on("s3-progress", (_e, msg) => cb(msg)),
   onS3TestProgress: (cb) => ipcRenderer.on("s3-test-progress", (_e, msg) => cb(msg)),
+  onAiApprovalRequest: (cb) => ipcRenderer.on("ai-access-approval-request", (_e, request) => cb(request)),
   onSftpProgress: (cb) => ipcRenderer.on("sftp-progress", (_e, msg) => cb(msg)),
   onSftpUploadProgress: (cb) => ipcRenderer.on("sftp-upload-progress", (_e, msg) => cb(msg)),
   onSftpExternalSave: (cb) => ipcRenderer.on("sftp-external-save", (_e, data) => cb(data)),
