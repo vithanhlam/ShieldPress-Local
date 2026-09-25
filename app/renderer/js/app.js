@@ -118,6 +118,16 @@ window.toast = function (msg, type = "info", duration = 3500) {
   }, duration);
 };
 
+// Keep long-running live-log views bounded. Without this, repeatedly appending
+// to textContent makes the renderer retain the complete log history.
+window.appendBoundedText = function (el, text, maxChars = 200000) {
+  if (!el) return;
+  el.textContent += String(text);
+  if (el.textContent.length > maxChars) {
+    el.textContent = el.textContent.slice(-maxChars);
+  }
+};
+
 // ── Modal helpers ─────────────────────────────────────────────────────────────
 window.openModal = (id) => document.getElementById(id)?.classList.add("open");
 window.closeModal = (id) =>
@@ -376,7 +386,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (App.currentPage !== "debug") return;
     const el = document.getElementById("debug-log");
     if (el) {
-      el.textContent += line + "\n";
+      appendBoundedText(el, line + "\n");
       el.scrollTop = el.scrollHeight;
     }
   });

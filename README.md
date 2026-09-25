@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.50)](https://github.com/vithanhlam/shieldpress-local/releases/latest)**
+**[⬇ Download Latest Version (v2.5.52)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.52)**
 
 | File | Description |
 | ---- | ----------- |
-| `ShieldPress Local Setup 2.5.50.exe` | Windows NSIS installer |
-| `shieldpresslocal_2.5.50_amd64.deb` | Ubuntu/Debian installer |
+| [ShieldPress Local Setup 2.5.52.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/ShieldPress%20Local%20Setup%202.5.52.exe) | Windows NSIS installer |
+| [shieldpresslocal_2.5.52_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/shieldpresslocal_2.5.52_amd64.deb) | Ubuntu/Debian installer |
 
 ---
 
@@ -217,14 +217,14 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download `ShieldPress Local Setup 2.5.42.exe` from [Releases](https://github.com/vithanhlam/shieldpress-local/releases)
+1. Download [ShieldPress Local Setup 2.5.52.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/ShieldPress%20Local%20Setup%202.5.52.exe)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download `shieldpresslocal_2.5.42_amd64.deb`
+1. Download [shieldpresslocal_2.5.52_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/shieldpresslocal_2.5.52_amd64.deb)
 2. Install it with `sudo apt install ./shieldpresslocal_2.5.42_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically

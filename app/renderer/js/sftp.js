@@ -30,7 +30,7 @@ window.SFTP = {
       api.onSftpProgress((msg) => {
         const syncOut = document.getElementById("sftp-sync-output");
         if (syncOut && document.getElementById("m-sftp-sync")?.classList.contains("open") && typeof msg === "string") {
-          syncOut.textContent += msg + "\n";
+          this._appendBoundedText(syncOut, msg + "\n");
           syncOut.scrollTop = syncOut.scrollHeight;
         }
       });
@@ -53,6 +53,12 @@ window.SFTP = {
     await this.refreshVaultStatus();
     this._bindTerminalSplitter();
     await this.load();
+  },
+
+  _appendBoundedText(el, text, maxChars = 200000) {
+    if (!el) return;
+    el.textContent += String(text);
+    if (el.textContent.length > maxChars) el.textContent = el.textContent.slice(-maxChars);
   },
 
   async refreshVaultStatus() {
@@ -1986,8 +1992,13 @@ window.SFTP = {
   termEnterPath(encodedPath) {
     this._clearRemoteSelection();
     this._termPath = decodeURIComponent(encodedPath);
-    api.sftpSaveLastPath(document.getElementById("sftp-term-conn-id").value, this._termPath);
+    this._saveTermPath();
     this.loadTermFiles();
+  },
+
+  _saveTermPath() {
+    const id = document.getElementById("sftp-term-conn-id")?.value;
+    if (id) api.sftpSaveLastPath(id, this._termPath);
   },
 
   termBrowseUp() {
@@ -1995,6 +2006,7 @@ window.SFTP = {
     const parts = this._termPath.split("/").filter(Boolean);
     parts.pop();
     this._termPath = "/" + parts.join("/");
+    this._saveTermPath();
     this.loadTermFiles();
   },
 
@@ -2002,6 +2014,7 @@ window.SFTP = {
     const value = document.getElementById("sftp-term-path").value.trim();
     if (!value.startsWith("/")) return toast("Remote path must start with /", "warn");
     this._termPath = value.replace(/\/{2,}/g, "/") || "/";
+    this._saveTermPath();
     this.loadTermFiles();
   },
 
@@ -2269,9 +2282,17 @@ window.SFTP = {
 
   async _refreshRemoteMetrics(id) {
     if (id !== this._metricsConnId) return;
-    const stats = await api.sftpRemoteStats(id);
-    if (id !== this._metricsConnId) return;
-    if (stats?.success) this._renderRemoteMetrics(stats);
+    if (this._metricsRefreshInFlight) return;
+    this._metricsRefreshInFlight = true;
+    try {
+      const stats = await api.sftpRemoteStats(id);
+      if (id !== this._metricsConnId) return;
+      if (stats?.success) this._renderRemoteMetrics(stats);
+    } catch (_) {
+      // The next scheduled refresh can recover after a transient SSH failure.
+    } finally {
+      this._metricsRefreshInFlight = false;
+    }
   },
 
   _startRemoteMetrics(id) {
@@ -2500,6 +2521,7 @@ window.SFTP = {
     // Save to history
     if (!this._cmdHistory.length || this._cmdHistory[this._cmdHistory.length - 1] !== cmd) {
       this._cmdHistory.push(cmd);
+      if (this._cmdHistory.length > 200) this._cmdHistory.splice(0, this._cmdHistory.length - 200);
     }
     this._historyIdx = -1;
     cmdEl.value = "";
@@ -2513,13 +2535,13 @@ window.SFTP = {
 
     const out = document.getElementById("sftp-term-output");
     const prompt = document.getElementById("sftp-term-prompt").textContent;
-    out.textContent += prompt + " " + cmd + "\n";
+    this._appendBoundedText(out, prompt + " " + cmd + "\n");
 
     const r = await api.sftpExec(id, cmd);
-    if (r.output) out.textContent += r.output;
-    if (r.error && r.error !== r.output) out.textContent += r.error;
-    if (!r.success && !r.output && !r.error && r.message) out.textContent += "[ERROR] " + r.message;
-    out.textContent += "\n";
+    if (r.output) this._appendBoundedText(out, r.output);
+    if (r.error && r.error !== r.output) this._appendBoundedText(out, r.error);
+    if (!r.success && !r.output && !r.error && r.message) this._appendBoundedText(out, "[ERROR] " + r.message);
+    this._appendBoundedText(out, "\n");
     out.scrollTop = out.scrollHeight;
 
     // Update prompt with cwd

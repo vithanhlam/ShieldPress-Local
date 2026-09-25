@@ -449,6 +449,15 @@ function safeCloseSsh(client) {
 function dropActiveConnection(id) {
   const ac = activeConnections[id];
   stopShellsForKey(id);
+  closeFileWatchersForKey(id);
+  // Runtime state is keyed by the active storage key. For remote-window
+  // sessions that key is `terminal:<connection>:<uuid>`, not connectionId.
+  // Leaving these entries behind retained data for every closed terminal.
+  delete remoteSystemCache[id];
+  delete remoteStatsCache[id];
+  delete terminalCwd[id];
+  connectionPings.delete(id);
+  remoteStatsRequests.delete(id);
   if (!ac) return;
   delete activeConnections[id];
   const connId = connectionIdOf(id, ac);
@@ -469,6 +478,16 @@ function dropActiveConnection(id) {
 }
 
 async function pingConnection(id) {
+  const pending = connectionPings.get(id);
+  if (pending) return pending;
+  const request = pingConnectionOnce(id).finally(() => {
+    if (connectionPings.get(id) === request) connectionPings.delete(id);
+  });
+  connectionPings.set(id, request);
+  return request;
+}
+
+async function pingConnectionOnce(id) {
   const ac = getActive(id);
   if (!ac) return false;
   try {
@@ -483,19 +502,7 @@ async function pingConnection(id) {
         }
       });
     } else if (ac.type === "ssh") {
-      return await new Promise((resolve) => {
-        const timer = setTimeout(() => resolve(false), 5000);
-        try {
-          ac.client.exec("true", (err, stream) => {
-            if (err) { clearTimeout(timer); return resolve(false); }
-            stream.on("close", () => { clearTimeout(timer); resolve(true); });
-            stream.on("error", () => { clearTimeout(timer); resolve(false); });
-          });
-        } catch {
-          clearTimeout(timer);
-          resolve(false);
-        }
-      });
+      return (await sshExecText(ac, "true", 5000)).success;
     } else if (ac.type === "ftp") {
       await ac.client.pwd();
       return true;
@@ -568,6 +575,15 @@ async function ensureConnected(id) {
 async function getConnectionStatus(id) {
   const ac = getActive(id);
   if (!ac) return { success: true, connected: false, state: "disconnected" };
+  // A terminal already has ssh2 keepalives enabled. Probing SFTP every four
+  // seconds is both unnecessary and unsafe: a single slow `stat("/")` used
+  // to make the UI destroy an otherwise healthy interactive shell.
+  if (ac.type === "sftp" || ac.type === "ssh") {
+    const socket = ac.client?._sock;
+    const connected = !socket || socket.destroyed !== true;
+    if (!connected) dropActiveConnection(id);
+    return { success: true, connected, state: connected ? "connected" : "disconnected", transport: ac.type };
+  }
   const connected = await pingConnection(id);
   if (!connected) {
     dropActiveConnection(id);
@@ -1734,6 +1750,11 @@ async function syncDownload(id, progressCb, opts = {}) {
 const terminalCwd = {};
 const remoteSystemCache = {};
 const remoteStatsCache = {};
+// Status polling and metrics run frequently while a terminal window is open.
+// Keep only one request of each type per connection: a slow SSH server must not
+// leave a growing queue of channels behind every 4–5 seconds.
+const connectionPings = new Map();
+const remoteStatsRequests = new Map();
 /** @type {Record<string, { stream: any, connectionId: string, webContentsId: number|null }>} */
 const activeShells = {};
 
@@ -1911,21 +1932,40 @@ async function getRemoteSystemInfo(id) {
 
 function sshExecText(ac, command, timeoutMs = 8000) {
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve({ success: false, message: "timeout" }), timeoutMs);
-    ac.client.exec(command, (error, stream) => {
-      if (error) {
-        clearTimeout(timer);
-        return resolve({ success: false, message: error.message });
+    let settled = false;
+    let stream = null;
+    const finish = (result, destroyStream = false) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (destroyStream && stream) {
+        try { stream.removeAllListeners?.(); } catch {}
+        try { stream.stderr?.removeAllListeners?.(); } catch {}
+        try { stream.destroy?.(); } catch {}
       }
+      resolve(result);
+    };
+    const timer = setTimeout(() => finish({ success: false, message: "timeout" }, true), timeoutMs);
+    try { ac.client.exec(command, (error, openedStream) => {
+      if (error) {
+        return finish({ success: false, message: error.message });
+      }
+      stream = openedStream;
       sinkStreamErrors(stream);
       let output = "";
-      stream.on("data", (chunk) => { output += chunk.toString(); });
+      stream.on("data", (chunk) => {
+        // Metrics and probes are intentionally tiny. A broken server must not
+        // turn one probe into an unbounded renderer payload.
+        if (output.length < 65536) output += chunk.toString().slice(0, 65536 - output.length);
+      });
       stream.stderr.on("data", () => {});
       stream.on("close", () => {
-        clearTimeout(timer);
-        resolve({ success: true, output });
+        finish({ success: true, output });
       });
-    });
+      stream.on("error", (err) => finish({ success: false, message: err.message || "SSH stream error" }));
+    }); } catch (err) {
+      finish({ success: false, message: err.message || "SSH request failed" });
+    }
   });
 }
 
@@ -1937,6 +1977,16 @@ function parseCpuLine(line) {
 }
 
 async function getRemoteStats(id) {
+  const pending = remoteStatsRequests.get(id);
+  if (pending) return pending;
+  const request = getRemoteStatsOnce(id).finally(() => {
+    if (remoteStatsRequests.get(id) === request) remoteStatsRequests.delete(id);
+  });
+  remoteStatsRequests.set(id, request);
+  return request;
+}
+
+async function getRemoteStatsOnce(id) {
   const activeId = resolveActiveConnectionId(id);
   const ac = activeId ? activeConnections[activeId] : null;
   if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
@@ -2181,21 +2231,47 @@ async function readRemoteFile(id, remotePath) {
   const ac = activeConnections[id];
   if (!ac) return { success: false, message: "Not connected" };
 
+  // Monaco and the duplicate textarea both keep the full document in memory.
+  // Refuse very large remote files before they can exhaust the Electron main
+  // and renderer processes; users can still download them or open externally.
+  const MAX_EDIT_BYTES = 10 * 1024 * 1024;
+
   try {
     if (ac.type === "sftp") {
       return new Promise((resolve) => {
         const chunks = [];
+        let bytes = 0;
+        let settled = false;
+        const finish = (result) => {
+          if (settled) return;
+          settled = true;
+          resolve(result);
+        };
         const stream = ac.sftp.createReadStream(remotePath, { encoding: "utf8" });
-        stream.on("data", (chunk) => chunks.push(chunk));
-        stream.on("end", () => resolve({ success: true, content: chunks.join("") }));
-        stream.on("error", (err) => resolve({ success: false, message: err.message }));
+        stream.on("data", (chunk) => {
+          bytes += Buffer.byteLength(chunk, "utf8");
+          if (bytes > MAX_EDIT_BYTES) {
+            stream.destroy();
+            finish({ success: false, message: "File is larger than 10 MB and cannot be loaded in the editor. Download it or open it externally instead." });
+            return;
+          }
+          chunks.push(chunk);
+        });
+        stream.on("end", () => finish({ success: true, content: chunks.join("") }));
+        stream.on("error", (err) => finish({ success: false, message: err.message }));
       });
     } else if (ac.type === "ftp") {
       const tempFile = path.join(require("os").tmpdir(), "shieldpress_ftp_edit_" + Date.now());
-      await ac.client.downloadTo(tempFile, remotePath);
-      const content = await fs.readFile(tempFile, "utf8");
-      await fs.remove(tempFile);
-      return { success: true, content };
+      try {
+        await ac.client.downloadTo(tempFile, remotePath);
+        const stat = await fs.stat(tempFile);
+        if (stat.size > MAX_EDIT_BYTES) {
+          return { success: false, message: "File is larger than 10 MB and cannot be loaded in the editor. Download it or open it externally instead." };
+        }
+        return { success: true, content: await fs.readFile(tempFile, "utf8") };
+      } finally {
+        await fs.remove(tempFile).catch(() => {});
+      }
     }
   } catch (err) {
     return { success: false, message: err.message };
@@ -2538,6 +2614,15 @@ async function moveRemote(id, sourcePath, destinationPath) {
 // Tracks active file watchers so we can clean up
 const fileWatchers = {};
 
+function closeFileWatchersForKey(id) {
+  const prefix = `${id}:`;
+  for (const [watchKey, watcher] of Object.entries(fileWatchers)) {
+    if (!watchKey.startsWith(prefix)) continue;
+    try { watcher.close(); } catch {}
+    delete fileWatchers[watchKey];
+  }
+}
+
 async function openInExternalEditor(id, remotePath, progressCb, editorPath) {
   const ac = activeConnections[id];
   if (!ac) return { success: false, message: "Not connected" };
@@ -2709,15 +2794,25 @@ async function toggleStar(id) {
 
 async function updateLastBrowsedPath(id, browsedPath) {
   const file = getConnectionsFile();
-  if (!fs.existsSync(file)) return;
+  const connectionId = connectionIdOf(id);
+  const value = String(browsedPath || "").trim();
+  // The browser only works with absolute POSIX paths. Never persist an
+  // incomplete/relative path that would later open a different FTP directory.
+  if (!connectionId || !value.startsWith("/")) return { success: false, message: "Invalid remote path" };
+  const normalizedPath = path.posix.normalize(value).replace(/\/$/, "") || "/";
+  if (!fs.existsSync(file)) return { success: false, message: "Connection not found" };
   try {
     const conns = JSON.parse(await fs.readFile(file, "utf8"));
-    const conn = conns.find((c) => c.id === id);
+    const conn = conns.find((c) => c.id === connectionId);
     if (conn) {
-      conn.lastBrowsedPath = browsedPath;
+      conn.lastBrowsedPath = normalizedPath;
       await fs.writeFile(file, JSON.stringify(conns, null, 2), "utf8");
+      return { success: true, path: normalizedPath };
     }
-  } catch {}
+    return { success: false, message: "Connection not found" };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
 }
 
 // ─── Check if remote file exists ─────────────────────────────────────────────
@@ -2828,5 +2923,6 @@ module.exports = {
     detectEditorLanguage,
     isSensitiveRemotePath,
     validateFileContent,
+    sshExecText,
   },
 };

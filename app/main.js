@@ -62,6 +62,9 @@ global.CONST = {
   APP_VERSION,
   APP_AUTHOR,
   BASE_DIR,
+  MCP_SCRIPT_PATH: isDev
+    ? path.join(BASE_DIR, "scripts", "shieldpress-mcp.js")
+    : path.join(process.resourcesPath, "shieldpress-mcp.js"),
   WORKSPACE_DIR,
   DATA_DIR,
   BIN_DIR,

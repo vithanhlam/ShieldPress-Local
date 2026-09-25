@@ -126,7 +126,7 @@ window.CacheManager = {
     log.style.display = "block";
     log.textContent = "Cleaning cache directories...\n";
     const r = await api.invoke("cache-clean-project", id);
-    log.textContent += r.output || (r.success ? "Done!" : "Failed: " + r.message);
+    appendBoundedText(log, r.output || (r.success ? "Done!" : "Failed: " + r.message));
     toast(r.success ? `Cleaned ${r.freedMB || 0} MB` : "Failed: " + r.message, r.success ? "success" : "error");
   },
 
@@ -138,7 +138,7 @@ window.CacheManager = {
     log.style.display = "block";
     log.textContent = "Deleting node_modules...\n";
     const r = await api.invoke("cache-clean-dir", { id, dir: "node_modules" });
-    log.textContent += r.success ? `Deleted! Freed ${r.freedMB || 0} MB` : "Failed: " + r.message;
+    appendBoundedText(log, r.success ? `Deleted! Freed ${r.freedMB || 0} MB` : "Failed: " + r.message);
     toast(r.success ? `Freed ${r.freedMB || 0} MB` : "Failed", r.success ? "success" : "error");
   },
 
@@ -150,7 +150,7 @@ window.CacheManager = {
     log.style.display = "block";
     log.textContent = "Deleting vendor...\n";
     const r = await api.invoke("cache-clean-dir", { id, dir: "vendor" });
-    log.textContent += r.success ? `Deleted! Freed ${r.freedMB || 0} MB` : "Failed: " + r.message;
+    appendBoundedText(log, r.success ? `Deleted! Freed ${r.freedMB || 0} MB` : "Failed: " + r.message);
     toast(r.success ? `Freed ${r.freedMB || 0} MB` : "Failed", r.success ? "success" : "error");
   },
 
@@ -175,6 +175,7 @@ window.CacheManager = {
 
 // ── Redis Manager ─────────────────────────────────────────────────────────────
 window.RedisManager = {
+  _progressListening: false,
   async init() {
     const info    = await api.getRedisInfo();
     const badge   = document.getElementById("redis-status-badge");
@@ -223,11 +224,15 @@ window.RedisManager = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...'; }
     if (log) { log.style.display = ""; log.textContent = ""; }
 
-    api.onRedisDownloadProgress((msg) => {
-      if (!log) return;
-      log.textContent += msg + "\n";
-      log.scrollTop = log.scrollHeight;
-    });
+    if (!this._progressListening) {
+      api.onRedisDownloadProgress((msg) => {
+        const currentLog = document.getElementById("redis-download-log");
+        if (!currentLog) return;
+        appendBoundedText(currentLog, msg + "\n", 100000);
+        currentLog.scrollTop = currentLog.scrollHeight;
+      });
+      this._progressListening = true;
+    }
 
     const r = await api.downloadRedis();
 

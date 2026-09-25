@@ -4,6 +4,8 @@ const fs = require("fs-extra");
 const path = require("path");
 const log = require("./logger");
 const platform = require("./platform");
+const MAX_SQL_OUTPUT_BYTES = 8 * 1024 * 1024;
+const MAX_SQL_ERROR_CHARS = 64 * 1024;
 
 function mysqlBin() {
   return platform.executable("mysql");
@@ -36,15 +38,29 @@ function mysqlExec(sql) {
     if (!binary) return reject(new Error("MariaDB client not found"));
     const proc = require("child_process").spawn(binary, [...connectionArgs(), "-e", sql], { windowsHide: true });
     let stdout = "", stderr = "";
+    let stdoutBytes = 0;
+    let outputTooLarge = false;
     const timer = setTimeout(() => {
       try { proc.kill(); } catch {}
       reject(new Error("MariaDB client timed out"));
     }, 20000);
-    proc.stdout.on("data", (data) => { stdout += data; });
-    proc.stderr.on("data", (data) => { stderr += data; });
+    proc.stdout.on("data", (data) => {
+      if (outputTooLarge) return;
+      if (stdoutBytes + data.length > MAX_SQL_OUTPUT_BYTES) {
+        outputTooLarge = true;
+        try { proc.kill(); } catch {}
+        return;
+      }
+      stdoutBytes += data.length;
+      stdout += data.toString();
+    });
+    proc.stderr.on("data", (data) => {
+      stderr = (stderr + data.toString()).slice(-MAX_SQL_ERROR_CHARS);
+    });
     proc.on("error", (error) => { clearTimeout(timer); reject(error); });
     proc.on("close", (code) => {
       clearTimeout(timer);
+      if (outputTooLarge) return reject(new Error("SQL result exceeds the 8 MB output limit"));
       code === 0 ? resolve(stdout) : reject(stderr || `MariaDB client exited ${code}`);
     });
   });
@@ -153,7 +169,7 @@ async function exportDatabase({ dbName }, onProgress = () => {}) {
         onProgress({ operation: "export", dbName, status: "running", processed, total: estimatedTotal, percent });
       }
     }, 400);
-    proc.stderr.on("data", (data) => { stderr += data; });
+    proc.stderr.on("data", (data) => { stderr = (stderr + data.toString()).slice(-MAX_SQL_ERROR_CHARS); });
     proc.on("error", (error) => {
       clearInterval(timer);
       resolve({ success: false, message: error.message });
@@ -197,7 +213,7 @@ async function importDatabase({ dbName, filePath }, onProgress = () => {}) {
 
       let err = "";
       mysqlProc.stderr.on("data", (d) => {
-        err += d.toString();
+        err = (err + d.toString()).slice(-MAX_SQL_ERROR_CHARS);
         log.warn("mysql: " + d.toString().trim());
       });
       mysqlProc.stdout.on("data", (d) =>

@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("fs");
 const path = require("path");
 const platform = require("../app/src/main/platform");
 
@@ -38,14 +39,24 @@ test("Terminator-style terminals use interactive bash so nvm/npm resolve", () =>
   assert.ok(!args.includes("--") || args.indexOf("--") > args.indexOf("-e"));
 });
 
-test("x-terminal-emulator args stay Debian-compatible (no leading --)", () => {
+test("x-terminal-emulator aliases use their target's argument syntax", () => {
   const cwd = "/tmp/www";
   const args = platform.linuxTerminalArgs("/usr/bin/x-terminal-emulator", cwd, "npm run dev");
-  assert.equal(args[0], `--working-directory=${cwd}`);
-  assert.equal(args[1], "-e");
-  assert.notEqual(args[0], "--");
-  assert.notEqual(args[1], "--");
-  assert.equal(args[3], "-ic");
+  let target = "x-terminal-emulator";
+  try { target = path.basename(fs.realpathSync("/usr/bin/x-terminal-emulator")).toLowerCase(); } catch {}
+  if (target.includes("ptyxis")) {
+    assert.deepEqual(args.slice(0, 2), ["--new-window", `--working-directory=${cwd}`]);
+    assert.ok(args.includes("--"));
+    assert.equal(args[args.indexOf("--") + 2], "-ic");
+  } else if (target.includes("gnome-terminal") || target === "kgx" || target === "gnome-console") {
+    assert.equal(args[0], `--working-directory=${cwd}`);
+    assert.equal(args[1], "--");
+    assert.equal(args[3], "-ic");
+  } else {
+    assert.equal(args[0], `--working-directory=${cwd}`);
+    assert.equal(args[1], "-e");
+    assert.equal(args[3], "-ic");
+  }
 });
 
 test("Ptyxis and gnome-terminal keep gnome-style -- command separator", () => {

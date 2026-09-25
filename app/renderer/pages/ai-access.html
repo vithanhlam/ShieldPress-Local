@@ -44,6 +44,12 @@
 <div id="ai-resource-list" class="ai-resource-list"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading resources...</p></div></div>
 
 <div class="ai-bottom-grid">
+  <div class="settings-card ai-connect-card">
+    <div class="ai-connect-head"><div><h2><i class="fas fa-plug"></i> AI Connect</h2><p class="ai-muted">Add ShieldPress once in your AI client's MCP settings. Every new Codex project and chat can then reuse it.</p></div><span id="ai-connect-status" class="ai-connect-status">Checking gateway…</span></div>
+    <ol class="ai-connect-steps"><li>Keep ShieldPress Local open and save your AI Access policy.</li><li>Copy this token-free MCP configuration into your AI client's global MCP settings.</li><li>Start a new chat after saving the MCP settings, then ask AI to list ShieldPress resources.</li></ol>
+    <pre id="ai-connect-config" class="ai-code-preview ai-connect-config">Loading…</pre>
+    <div class="ai-skill-actions"><button class="btn btn-primary" onclick="AIAccess.copyConnectConfig()"><i class="fas fa-copy"></i> Copy MCP config</button><button class="btn btn-ghost" onclick="AIAccess.testConnect()"><i class="fas fa-heartbeat"></i> Test gateway</button></div>
+  </div>
   <div class="settings-card">
     <h2><i class="fas fa-scroll"></i> Safety SKILL</h2>
     <p class="ai-muted">Install this SKILL in your AI client so it follows the same authorization rules.</p>

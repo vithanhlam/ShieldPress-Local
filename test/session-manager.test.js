@@ -23,6 +23,27 @@ test("parseSessionId rejects non-session connection ids", () => {
   assert.equal(sessionManager.isSessionId("ftp:host1:11111111-1111-1111-1111-111111111111"), true);
 });
 
+test("remote session paths resolve back to their saved connection", async () => {
+  const fs = require("fs-extra");
+  const os = require("os");
+  const path = require("path");
+  const previousDataDir = global.CONST.DATA_DIR;
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "shieldpress-last-path-"));
+  global.CONST.DATA_DIR = dataDir;
+  try {
+    const remoteDir = path.join(dataDir, "remote-connections");
+    await fs.ensureDir(remoteDir);
+    await fs.writeJson(path.join(remoteDir, "connections.json"), [{ id: "server-one", lastBrowsedPath: "/old" }]);
+    const saved = await require("../app/src/main/sftp").updateLastBrowsedPath("ftp:server-one:11111111-1111-1111-1111-111111111111", "/var/www/../app/");
+    const connections = await fs.readJson(path.join(remoteDir, "connections.json"));
+    assert.equal(saved.success, true);
+    assert.equal(connections[0].lastBrowsedPath, "/var/app");
+  } finally {
+    global.CONST.DATA_DIR = previousDataDir;
+    await fs.remove(dataDir);
+  }
+});
+
 test("detectEditorLanguage maps common extensions", () => {
   assert.equal(__test.detectEditorLanguage("/var/www/wp-config.php"), "php");
   assert.equal(__test.detectEditorLanguage("/etc/nginx/nginx.conf"), "nginx");

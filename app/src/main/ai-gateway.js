@@ -8,6 +8,7 @@ let server = null;
 let gatewayToken = null;
 const pendingRequests = new Map();
 const reqnoraWatchers = new Map();
+const MAX_PENDING_REQUESTS = 100;
 async function notifyReqnora(payload) {
   try {
     const result = await require("./reqnora").sendNotification(payload);
@@ -51,6 +52,26 @@ function watchReqnora(request) {
 
 function tokenFile() { return path.join(global.CONST.DATA_DIR, "ai-access-gateway.json"); }
 function pendingFile() { return path.join(global.CONST.DATA_DIR, "ai-access-pending.json"); }
+function getConnectInfo() {
+  const scriptPath = global.CONST.MCP_SCRIPT_PATH || path.join(global.CONST.BASE_DIR || process.cwd(), "scripts", "shieldpress-mcp.js");
+  const running = !!server && !!server.address();
+  return {
+    running,
+    dataDir: global.CONST.DATA_DIR,
+    scriptPath,
+    // This is deliberately token-free. The bridge reads the short-lived token
+    // locally from DATA_DIR, so a copied client configuration never exposes it.
+    mcpConfig: {
+      mcpServers: {
+        shieldpress: {
+          command: "node",
+          args: [scriptPath],
+          env: { SHIELDPRESS_DATA_DIR: global.CONST.DATA_DIR },
+        },
+      },
+    },
+  };
+}
 async function loadPending() {
   try {
     const entries = await fs.readJson(pendingFile());
@@ -59,7 +80,16 @@ async function loadPending() {
 }
 async function savePending() {
   await fs.ensureDir(global.CONST.DATA_DIR);
-  await fs.writeJson(pendingFile(), [...pendingRequests.values()].slice(-100), { spaces: 2, mode: 0o600 });
+  // Keep the in-memory registry bounded as well as the persisted history.
+  // Previously only the JSON file was sliced, so every resolved request stayed
+  // reachable from this Map for the lifetime of the main process.
+  if (pendingRequests.size > MAX_PENDING_REQUESTS) {
+    for (const [id, request] of pendingRequests) {
+      if (pendingRequests.size <= MAX_PENDING_REQUESTS) break;
+      if (request.status !== "pending") pendingRequests.delete(id);
+    }
+  }
+  await fs.writeJson(pendingFile(), [...pendingRequests.values()].slice(-MAX_PENDING_REQUESTS), { spaces: 2, mode: 0o600 });
 }
 function tools() {
   return [
@@ -284,4 +314,4 @@ async function start() {
   return { port: server.address().port, token: gatewayToken };
 }
 async function stop() { if (!server) return; await new Promise((resolve) => server.close(resolve)); server = null; gatewayToken = null; try { await fs.remove(tokenFile()); } catch {} }
-module.exports = { start, stop, listPending, resolveApproval };
+module.exports = { start, stop, getConnectInfo, listPending, resolveApproval };

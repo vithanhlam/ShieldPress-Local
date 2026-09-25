@@ -283,24 +283,25 @@ window.DbTerminal = {
     // Save history
     if (!this._history.length || this._history[this._history.length - 1] !== sql) {
       this._history.push(sql);
+      if (this._history.length > 200) this._history.splice(0, this._history.length - 200);
     }
     this._historyIdx = -1;
     cmdEl.value = "";
 
     const out = document.getElementById("db-term-output");
-    out.textContent += "mysql> " + sql + "\n";
+    appendBoundedText(out, "mysql> " + sql + "\n");
 
     if (!App.serviceStatus.mariadb) {
-      out.textContent += "ERROR: MariaDB is not running. Start MariaDB first.\n\n";
+      appendBoundedText(out, "ERROR: MariaDB is not running. Start MariaDB first.\n\n");
       out.scrollTop = out.scrollHeight;
       return;
     }
 
     const r = await api.execRawSql(sql);
     if (r.success) {
-      out.textContent += (r.output || "(OK)") + "\n\n";
+      appendBoundedText(out, (r.output || "(OK)") + "\n\n");
     } else {
-      out.textContent += "ERROR: " + r.message + "\n\n";
+      appendBoundedText(out, "ERROR: " + r.message + "\n\n");
     }
     out.scrollTop = out.scrollHeight;
     cmdEl.focus();

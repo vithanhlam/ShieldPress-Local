@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.5.52
+
+- Bounds long-running renderer logs and command history to reduce retained memory
+- Limits SQL result output and remote editor files to prevent large reads from exhausting memory
+- Cleans up SFTP session state and avoids overlapping SSH status and metrics requests
+- Publishes Windows and Ubuntu installers for the 2.5.52 test release
+
 ## v2.5.50
 
 **AI Access / Reqnora**

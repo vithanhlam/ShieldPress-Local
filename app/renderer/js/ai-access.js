@@ -1,6 +1,7 @@
 window.AIAccess = {
   policy: null,
   resources: [],
+  connectInfo: null,
   capabilities: ["read", "create", "edit", "delete", "execute"],
   currentTab: "source",
 
@@ -11,8 +12,45 @@ window.AIAccess = {
       api.onAiApprovalResult?.((result) => this.showApprovalResult(result));
     }
     await this.reload();
+    await this.loadConnectInfo();
     await this.loadAudit();
     await this.loadPending();
+  },
+
+  async loadConnectInfo() {
+    const status = document.getElementById("ai-connect-status");
+    const config = document.getElementById("ai-connect-config");
+    if (!status || !config || !api.aiAccessGetConnectInfo) return;
+    try {
+      const info = await api.aiAccessGetConnectInfo();
+      this.connectInfo = info;
+      status.textContent = info.running ? "Gateway running" : "Gateway unavailable";
+      status.classList.toggle("ok", !!info.running);
+      status.classList.toggle("error", !info.running);
+      config.textContent = JSON.stringify(info.mcpConfig || {}, null, 2);
+    } catch (error) {
+      status.textContent = "Gateway check failed";
+      status.classList.remove("ok");
+      status.classList.add("error");
+      config.textContent = "Could not load MCP configuration.";
+    }
+  },
+
+  async copyConnectConfig() {
+    if (!this.connectInfo) await this.loadConnectInfo();
+    const text = JSON.stringify(this.connectInfo?.mcpConfig || {}, null, 2);
+    if (!text || text === "{}") return toast("MCP configuration is not available", "error");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("MCP configuration copied", "success");
+    } catch {
+      toast("Could not copy MCP configuration", "error");
+    }
+  },
+
+  async testConnect() {
+    await this.loadConnectInfo();
+    toast(this.connectInfo?.running ? "ShieldPress gateway is running" : "Open ShieldPress Local, then try again", this.connectInfo?.running ? "success" : "warn");
   },
 
   async reload() {

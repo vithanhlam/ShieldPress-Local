@@ -11,7 +11,7 @@ window.Extensions = {
         const pre = document.getElementById("ext-ioncube-progress");
         if (!pre) return;
         pre.style.display = "";
-        pre.textContent += msg + "\n";
+        appendBoundedText(pre, msg + "\n");
         pre.scrollTop = pre.scrollHeight;
       });
       this._listening = true;
@@ -324,7 +324,7 @@ window.Extensions = {
       await this.load();
     } else {
       toast("Install failed: " + r.message, "error");
-      pre.textContent += "\n[ERROR] " + r.message;
+      appendBoundedText(pre, "\n[ERROR] " + r.message);
     }
   },
 };

@@ -114,7 +114,13 @@ window.S3 = { buckets: [], busy: false, pageSize: 20, currentPage: 1, currentPre
     }
   },
   async uploadPaths(items) { const b=this.buckets.find(x=>x.id===this.browserId); this.activeOperation="Upload"; this.progress({done:0,total:0}); try { const r=await api.s3UploadPaths(this.browserId,items,{concurrency:b?.concurrency}); this.uploadLog.unshift(`${new Date().toLocaleTimeString()}  Uploaded ${r.count||0} files`); this.renderUploadLog(); toast(`Uploaded ${r.count||0} files`,"success"); await this.refreshBrowser(); } catch(e) { this.uploadLog.unshift(`${new Date().toLocaleTimeString()}  ERROR: ${e.message}`); this.renderUploadLog(); toast(e.message,"error"); } finally { this.activeOperation=""; } },
-  renderUploadLog() { const el=document.getElementById("s3-upload-log"); if(el)el.innerHTML=this.uploadLog.slice(0,30).map(x=>`<div>${this.esc(x)}</div>`).join(""); },
+  renderUploadLog() {
+    // The UI only shows the latest 30 entries; discard older entries too so
+    // repeated transfers cannot grow this array for the lifetime of the page.
+    if (this.uploadLog.length > 100) this.uploadLog.splice(100);
+    const el=document.getElementById("s3-upload-log");
+    if(el)el.innerHTML=this.uploadLog.slice(0,30).map(x=>`<div>${this.esc(x)}</div>`).join("");
+  },
   async downloadObject(i) { const o=this.visibleObjects[i]; const p=await api.openFileDialog({properties:["openDirectory"]}); if(!p)return; const r=await api.s3DownloadObject(this.browserId,o.key,`${p}/${o.key.split("/").pop()}`); toast(r.success?"Downloaded":"Download failed",r.success?"success":"error"); },
   async deleteObject(i) { const o=this.visibleObjects[i]; if(prompt(`This permanently deletes ${o.key}. Type DELETE to confirm:`)!=="DELETE")return; const r=await api.s3DeleteObject(this.browserId,o.key); if(!r.success)return toast(r.message,"error"); await this.refreshBrowser(); },
   infoObject(i) { const o=this.visibleObjects[i]; alert(`Key: ${o.key}\nSize: ${fmtBytes(o.size)}\nPrefix: ${this.currentPrefix||"/"}`); },

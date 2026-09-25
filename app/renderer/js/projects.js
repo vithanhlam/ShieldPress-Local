@@ -560,7 +560,7 @@ window.Laravel = {
         const pre = document.getElementById("lv-progress");
         if (!pre) return;
         pre.style.display = "";
-        pre.textContent += msg + "\n";
+        appendBoundedText(pre, msg + "\n");
         pre.scrollTop = pre.scrollHeight;
       });
       this._listening = true;
@@ -589,7 +589,7 @@ window.Laravel = {
       await Projects.load();
     } else {
       toast("Install failed: " + r.message, "error");
-      pre.textContent += "\n[ERROR] " + r.message;
+      appendBoundedText(pre, "\n[ERROR] " + r.message);
     }
   },
 
@@ -666,7 +666,7 @@ window.GitPush = {
         const log = document.getElementById("git-push-log");
         if (log) {
           log.style.display = "block";
-          log.textContent += msg + "\n";
+          appendBoundedText(log, msg + "\n");
           log.scrollTop = log.scrollHeight;
         }
       });
@@ -772,12 +772,12 @@ window.GitPush = {
 
     if (r.success) {
       toast(r.message || "Push complete!", "success");
-      log.textContent += "\n" + (r.message || "Done!");
+      appendBoundedText(log, "\n" + (r.message || "Done!"));
       document.getElementById("git-commit-msg").value = "";
       await this.refreshStatus();
     } else {
       toast("Push failed: " + r.message, "error");
-      log.textContent += "\nERROR: " + r.message;
+      appendBoundedText(log, "\nERROR: " + r.message);
     }
   },
 
@@ -798,11 +798,11 @@ window.GitPush = {
 
     if (r.success) {
       toast(r.message || "Pull complete!", "success");
-      log.textContent += r.output || r.message || "Done!";
+      appendBoundedText(log, r.output || r.message || "Done!");
       await this.refreshStatus();
     } else {
       toast("Pull failed: " + r.message, "error");
-      log.textContent += "ERROR: " + r.message;
+      appendBoundedText(log, "ERROR: " + r.message);
     }
   },
 
@@ -810,13 +810,13 @@ window.GitPush = {
     const id = this._projId;
     const log = document.getElementById("git-push-log");
     log.style.display = "block";
-    log.textContent += `\n> git ${gitCmd}\n`;
+    appendBoundedText(log, `\n> git ${gitCmd}\n`);
 
     const r = await api.gitExec(id, gitCmd);
-    if (r.output) log.textContent += r.output;
-    if (r.error && r.error !== r.output) log.textContent += r.error;
-    if (!r.success && !r.output && !r.error) log.textContent += "ERROR: " + (r.message || "Command failed");
-    log.textContent += "\n";
+    if (r.output) appendBoundedText(log, r.output);
+    if (r.error && r.error !== r.output) appendBoundedText(log, r.error);
+    if (!r.success && !r.output && !r.error) appendBoundedText(log, "ERROR: " + (r.message || "Command failed"));
+    appendBoundedText(log, "\n");
     log.scrollTop = log.scrollHeight;
   },
 };
@@ -924,7 +924,7 @@ window.GDriveBackup = {
       api.onGdriveProgress((msg) => {
         const log = document.getElementById("gd-sync-log");
         if (!log) return;
-        log.textContent += msg + "\n";
+        appendBoundedText(log, msg + "\n");
         log.scrollTop = log.scrollHeight;
         document.getElementById("gd-sync-progress").style.display = "";
       });
@@ -1005,7 +1005,7 @@ window.GDriveBackup = {
 
     if (r.success) {
       toast("Backup uploaded to Google Drive!", "success");
-      if (r.results) log.textContent += "\n" + r.results.join("\n");
+      if (r.results) appendBoundedText(log, "\n" + r.results.join("\n"));
     } else {
       toast("Backup failed: " + (r.message || "Unknown error"), "error");
     }
