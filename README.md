@@ -23,7 +23,7 @@
 
 | File | Description |
 | ---- | ----------- |
-| [ShieldPress Local Setup 2.5.52.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/ShieldPress%20Local%20Setup%202.5.52.exe) | Windows NSIS installer |
+| [ShieldPress.Local.Setup.2.5.52.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/ShieldPress.Local.Setup.2.5.52.exe) | Windows NSIS installer |
 | [shieldpresslocal_2.5.52_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/shieldpresslocal_2.5.52_amd64.deb) | Ubuntu/Debian installer |
 
 ---
@@ -217,7 +217,7 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download [ShieldPress Local Setup 2.5.52.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/ShieldPress%20Local%20Setup%202.5.52.exe)
+1. Download [ShieldPress.Local.Setup.2.5.52.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/ShieldPress.Local.Setup.2.5.52.exe)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
