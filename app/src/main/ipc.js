@@ -659,6 +659,7 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-shell-write", (_e, { id, data }) => sftp.writeShell(id, data));
   ipcMain.handle("sftp-shell-resize", (_e, { id, cols, rows }) => sftp.resizeShell(id, cols, rows));
   ipcMain.handle("sftp-shell-stop", (_e, id) => sftp.stopShell(id));
+  ipcMain.on("sftp-shell-ack", (e, id) => sftp.ackShellOutput(id, e.sender.id));
   ipcMain.handle("sftp-delete", (e, { id, remotePath, isDirectory }) =>
     sftp.deleteRemote(id, remotePath, isDirectory, (msg) => {
       try { e.sender.send("sftp-upload-progress", msg); } catch {}

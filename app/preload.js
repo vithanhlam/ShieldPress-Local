@@ -185,6 +185,7 @@ contextBridge.exposeInMainWorld("api", {
   sftpShellWrite: (id, data) => ipcRenderer.invoke("sftp-shell-write", { id, data }),
   sftpShellResize: (id, cols, rows) => ipcRenderer.invoke("sftp-shell-resize", { id, cols, rows }),
   sftpShellStop: (id) => ipcRenderer.invoke("sftp-shell-stop", id),
+  sftpShellAck: (id) => ipcRenderer.send("sftp-shell-ack", id),
   onSftpShellData: (cb) => ipcRenderer.on("sftp-shell-data", (_e, payload) => cb(payload)),
   onSftpShellExit: (cb) => ipcRenderer.on("sftp-shell-exit", (_e, payload) => cb(payload)),
   sftpDelete: (id, remotePath, isDirectory) => ipcRenderer.invoke("sftp-delete", { id, remotePath, isDirectory }),

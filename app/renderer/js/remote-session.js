@@ -27,7 +27,11 @@
     api.onSftpUploadProgress((msg) => SFTP._onUploadProgress(msg));
     api.onSftpExternalSave((data) => toast(`${data.file} saved to server!`, "success"));
     api.onSftpShellData(({ id, data }) => {
-      if (id === SFTP._activeShellId) SFTP._xterm?.write(data);
+      if (id === SFTP._activeShellId && SFTP._xterm) {
+        SFTP._xterm.write(data, () => api.sftpShellAck(id));
+      } else {
+        api.sftpShellAck(id);
+      }
     });
     api.onSftpShellExit(({ id }) => {
       if (id === SFTP._activeShellId) {

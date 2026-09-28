@@ -1803,6 +1803,21 @@ function stopShellsForKey(id) {
   }
 }
 
+function pauseShellOutput(entry) {
+  entry.outputPending++;
+  entry.stream.pause();
+  entry.stream.stderr?.pause?.();
+}
+
+function ackShellOutputEntry(entry) {
+  if (entry.outputPending <= 0) return;
+  entry.outputPending--;
+  if (entry.outputPending === 0 && !entry.stream.destroyed) {
+    entry.stream.resume();
+    entry.stream.stderr?.resume?.();
+  }
+}
+
 /**
  * Start an interactive SSH shell. Always creates a NEW session id — never reuses.
  * @returns {{ success: boolean, sessionId?: string, message?: string }}
@@ -1840,13 +1855,22 @@ async function startShell(id, cols = 100, rows = 30, opts = {}) {
         connectionId,
         storageKey,
         webContentsId,
+        outputPending: 0,
       };
       sinkStreamErrors(stream);
+      const forwardOutput = (data) => {
+        const entry = activeShells[sessionId];
+        if (!entry || entry.stream !== stream) return;
+        // ssh2 can produce data faster than xterm can render it. Pause both
+        // channels until the renderer confirms that all sent chunks were drawn.
+        pauseShellOutput(entry);
+        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data });
+      };
       stream.on("data", (data) => {
-        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data: stdoutDecoder.write(data) });
+        forwardOutput(stdoutDecoder.write(data));
       });
       stream.stderr?.on("data", (data) => {
-        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data: stderrDecoder.write(data) });
+        forwardOutput(stderrDecoder.write(data));
       });
       stream.on("close", () => {
         if (activeShells[sessionId]?.stream === stream) delete activeShells[sessionId];
@@ -1881,6 +1905,16 @@ function writeShell(sessionId, data) {
   } catch (err) {
     return { success: false, message: err.message };
   }
+}
+
+function ackShellOutput(sessionId, webContentsId) {
+  const entry = activeShells[sessionId];
+  if (!entry || entry.webContentsId !== webContentsId) return;
+  ackShellOutputEntry(entry);
+}
+
+function getActiveShellCount() {
+  return Object.keys(activeShells).length;
 }
 
 function resizeShell(sessionId, cols, rows) {
@@ -2146,7 +2180,11 @@ async function deleteRemote(id, remotePath, isDirectory, progressCb) {
 
   try {
     if (ac.type === "sftp") {
-      if (isDirectory) {
+      const attrs = await new Promise((resolve, reject) => {
+        ac.sftp.lstat(remotePath, (err, stats) => err ? reject(err) : resolve(stats));
+      });
+      const isLink = attrs?.isSymbolicLink?.() || (attrs?.mode & S_IFMT) === S_IFLNK;
+      if (isDirectory && !isLink) {
         await deleteDirRecursiveSftp(ac.sftp, remotePath, progressCb);
       } else {
         await new Promise((resolve, reject) => {
@@ -2175,8 +2213,9 @@ async function deleteDirRecursiveSftp(sftp, dirPath, progressCb, state = { delet
   for (const item of list) {
     if (item.filename === "." || item.filename === "..") continue;
     const fullPath = joinRemotePath(dirPath, item.filename);
-    const followed = await sftpStatFollow(sftp, fullPath);
-    const isDir = followed ? followed.isDirectory() : (item.longname || "").startsWith("d");
+    const isLink = (item.attrs?.mode & S_IFMT) === S_IFLNK || (item.longname || "").startsWith("l");
+    const followed = isLink ? null : await sftpStatFollow(sftp, fullPath);
+    const isDir = !isLink && (followed ? followed.isDirectory() : (item.longname || "").startsWith("d"));
     if (isDir) {
       await deleteDirRecursiveSftp(sftp, fullPath, progressCb, state);
     } else {
@@ -2888,6 +2927,8 @@ module.exports = {
   getRemoteStats,
   startShell,
   writeShell,
+  ackShellOutput,
+  getActiveShellCount,
   resizeShell,
   stopShell,
   execFtpCommand,
@@ -2924,5 +2965,7 @@ module.exports = {
     isSensitiveRemotePath,
     validateFileContent,
     sshExecText,
+    pauseShellOutput,
+    ackShellOutputEntry,
   },
 };

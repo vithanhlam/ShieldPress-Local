@@ -141,9 +141,10 @@ async function getResources() {
       })),
       ...configResources,
       ...connections.map((connection) => ({
-        // Never expose the saved host/IP as an AI resource label. The gateway
-        // uses the connection id internally and keeps credentials in Vault.
+        // Host is display metadata for the local settings UI. It is not part
+        // of the saved authorization policy or the AI resource label.
         type: "vps", id: String(connection.id), name: `${String(connection.type || "sftp").toUpperCase()} — ${connection.name || "Saved connection"}`,
+        host: String(connection.host || ""),
         scope: connection.remotePath || "/",
       })),
       ...buckets.map((bucket) => ({

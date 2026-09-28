@@ -36,3 +36,27 @@ test("SSH probe resolves normally when its channel closes", async () => {
   assert.deepEqual(await request, { success: true, output: "ok" });
   assert.equal(stream.destroyed, false);
 });
+
+test("terminal output waits for every renderer acknowledgment before resuming SSH", () => {
+  const calls = [];
+  const entry = {
+    outputPending: 0,
+    stream: {
+      destroyed: false,
+      pause: () => calls.push("pause stdout"),
+      resume: () => calls.push("resume stdout"),
+      stderr: {
+        pause: () => calls.push("pause stderr"),
+        resume: () => calls.push("resume stderr"),
+      },
+    },
+  };
+  __test.pauseShellOutput(entry);
+  __test.pauseShellOutput(entry);
+  __test.ackShellOutputEntry(entry);
+  assert.equal(entry.outputPending, 1);
+  assert.equal(calls.includes("resume stdout"), false);
+  __test.ackShellOutputEntry(entry);
+  assert.equal(entry.outputPending, 0);
+  assert.deepEqual(calls.slice(-2), ["resume stdout", "resume stderr"]);
+});

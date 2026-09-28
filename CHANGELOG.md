@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.5.53
+
+**SSH Terminal and Remote Files**
+- Applies backpressure to SSH terminal output so a busy remote command cannot queue unbounded data in Electron; logs process memory while terminals are open for crash diagnosis
+- Opens directory links in Remote Files at their resolved destination, including links to `/`, while rename and delete continue to act on the link itself
+- Prevents recursive SFTP deletion from following directory links
+
+**AI Access**
+- Counts only selected resources in each tab and moves selected resources to the top
+- Adds search by resource name, VPS host/IP, or allowed path
+- Shows VPS host/IP and adds copy buttons for resource names and host/IP
+
+**Release**
+- Publishes Windows and Ubuntu installers for version 2.5.53
+
 ## v2.5.52
 
 - Bounds long-running renderer logs and command history to reduce retained memory

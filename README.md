@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.52)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.52)**
+**[⬇ Download Latest Version (v2.5.53)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.53)**
 
 | File | Description |
 | ---- | ----------- |
-| [ShieldPress.Local.Setup.2.5.52.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/ShieldPress.Local.Setup.2.5.52.exe) | Windows NSIS installer |
-| [shieldpresslocal_2.5.52_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/shieldpresslocal_2.5.52_amd64.deb) | Ubuntu/Debian installer |
+| [ShieldPress.Local.Setup.2.5.53.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.53/ShieldPress.Local.Setup.2.5.53.exe) | Windows NSIS installer |
+| [shieldpresslocal_2.5.53_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.53/shieldpresslocal_2.5.53_amd64.deb) | Ubuntu/Debian installer |
 
 ---
 
@@ -111,6 +111,7 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 | **Interactive SSH Terminal** | Persistent SSH PTY powered by Xterm.js with ANSI colors, native Tab completion, interactive programs, a resizable layout, selection, paste, and quick commands |
 | **Remote Resource Meters** | Live CPU, RAM, Disk, network rates, and connected VPS IP in SSH Terminal, including core count, RAM/disk capacity, and copy actions |
 | **Terminal File Manager** | Column-based Name, Size, Modified, Permissions, and User/Group details with full right-click file management beside the SSH terminal |
+| **Directory links** | Open Remote Files folder links at their target directory while keeping rename and delete on the link itself |
 | **Terminal Autocomplete** | Complete live remote paths with Tab and choose context-aware Linux, npm, Git, Composer, Artisan, and WP-CLI commands with the keyboard |
 | **Linux-Aware Commands** | Detect Ubuntu/Debian, RHEL/Fedora, Alpine, Arch, or SUSE and suggest matching package and service commands |
 | **ShieldPress VPS Command** | Suggest the `shieldpress` command for opening the ShieldPress VPS management menu |
@@ -150,6 +151,8 @@ It provides everything you need: **Nginx**, **MariaDB**, **phpMyAdmin**, and mul
 ### AI Access and MCP
 
 AI Access provides a local MCP bridge for authorized projects, databases, configuration files, VPS/SFTP/FTP connections, and S3 buckets. Credentials remain in the ShieldPress Credential Vault; the MCP client receives only the data and operations allowed by policy.
+
+Each resource tab counts only checked resources and lists them first. Search by name, VPS IP/host, or allowed path; VPS rows show the IP/host with copy buttons for both the name and IP/host.
 
 #### Enable access safely
 
@@ -217,15 +220,15 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download [ShieldPress.Local.Setup.2.5.52.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/ShieldPress.Local.Setup.2.5.52.exe)
+1. Download [ShieldPress.Local.Setup.2.5.53.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.53/ShieldPress.Local.Setup.2.5.53.exe)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download [shieldpresslocal_2.5.52_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.52/shieldpresslocal_2.5.52_amd64.deb)
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.42_amd64.deb`
+1. Download [shieldpresslocal_2.5.53_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.53/shieldpresslocal_2.5.53_amd64.deb)
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.53_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 

@@ -344,6 +344,19 @@ app.whenReady().then(async () => {
   createWindow();
   createTray();
   await aiGateway.start();
+  // A native Electron/V8 OOM does not leave a JavaScript stack. Keep a small
+  // periodic sample in the journal while SSH terminals are open, so a later
+  // crash can be tied to the process whose memory was growing.
+  setInterval(() => {
+    const shellCount = require("./src/main/sftp").getActiveShellCount();
+    if (!shellCount) return;
+    const mb = (bytes) => Math.round(bytes / 1024 / 1024);
+    const main = process.memoryUsage();
+    const children = app.getAppMetrics().map((metric) =>
+      `${metric.type}:${metric.pid}:${Math.round(metric.memory?.workingSetSize / 1024) || 0}MB`,
+    );
+    console.log(`[terminal-memory] shells=${shellCount} mainRSS=${mb(main.rss)}MB heap=${mb(main.heapUsed)}MB external=${mb(main.external)}MB processes=${children.join(",")}`);
+  }, 60000).unref?.();
 });
 
 app.on("before-quit", async (e) => {

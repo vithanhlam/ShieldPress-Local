@@ -39,7 +39,11 @@ window.SFTP = {
         toast(`${data.file} saved to server!`, "success");
       });
       api.onSftpShellData(({ id, data }) => {
-        if (id === this._activeShellId) this._xterm?.write(data);
+        if (id === this._activeShellId && this._xterm) {
+          this._xterm.write(data, () => api.sftpShellAck(id));
+        } else {
+          api.sftpShellAck(id);
+        }
       });
       api.onSftpShellExit(({ id }) => {
         if (id === this._activeShellId) {
@@ -755,7 +759,7 @@ window.SFTP = {
   const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
   const color = isDir ? "var(--yellow)" : "var(--text3)";
   return `
-<tr style="border-top:1px solid var(--border)" data-remote-path="${encodedPath}" data-remote-operation-path="${encodedOperationPath}" data-remote-name="${encodedName}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${isEditable}" title="${this._esc(fullPath)}">
+<tr style="border-top:1px solid var(--border)" data-remote-path="${encodedPath}" data-remote-operation-path="${encodedOperationPath}" data-remote-link="${!!item.isLink}" data-remote-name="${encodedName}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${isEditable}" title="${this._esc(fullPath)}">
   <td style="padding:8px 10px;cursor:${isDir ? "pointer" : "default"};color:${isDir ? "var(--accent)" : "inherit"}">
     <i class="fas ${icon}" style="color:${color};margin-right:8px"></i>
     ${this._esc(item.name)}${item.isLink ? ' <span style="font-size:10px;color:var(--text3)">link</span>' : ""}
@@ -874,7 +878,7 @@ window.SFTP = {
     if (!localDir) return;
     const jobs = [];
     for (const item of selected) {
-      const name = item.path.split("/").pop();
+      const name = (item.operationPath || item.path).split("/").pop();
       const dest = localDir.replace(/[\\/]+$/, "") + "/" + name;
       const localInfo = await api.sftpStatLocal(dest);
       if (localInfo.exists && !confirm(`"${name}" already exists locally.\n\nOverwrite or merge it?`)) continue;
@@ -1266,15 +1270,16 @@ window.SFTP = {
     const id = document.getElementById(scope === "terminal" ? "sftp-term-conn-id" : "sftp-browser-conn-id")?.value;
     const selected = this._remoteSelections.filter((item) => item.scope === scope);
     if (!id || !selected.length) return toast("Select at least one file or folder", "warn");
-    const names = selected.map((item) => item.path.split("/").pop());
+    const names = selected.map((item) => (item.operationPath || item.path).split("/").pop());
     const summary = names.length === 1 ? `Delete "${names[0]}"?` : `Delete these ${names.length} items?\n\n${names.join("\n")}`;
     if (!confirm(`${summary}\n\nThis action cannot be undone.`)) return;
     if (this._deleteBusy) return toast("A delete operation is already in progress", "warn");
     this._deleteBusy = true;
     try {
       for (const item of selected) {
-        const result = await api.sftpDelete(id, item.path, item.isDirectory);
-        if (!result.success) toast(`Delete failed: ${item.path.split("/").pop()} — ${result.message}`, "error");
+        const operationPath = item.operationPath || item.path;
+        const result = await api.sftpDelete(id, operationPath, item.isDirectory && !item.isLink);
+        if (!result.success) toast(`Delete failed: ${operationPath.split("/").pop()} — ${result.message}`, "error");
       }
       this._clearRemoteSelection();
       if (scope === "terminal") await this.loadTermFiles();
@@ -1321,7 +1326,9 @@ window.SFTP = {
     const clicked = {
       scope,
       path: decodeURIComponent(row.dataset.remotePath),
+      operationPath: decodeURIComponent(row.dataset.remoteOperationPath || row.dataset.remotePath),
       isDirectory: row.dataset.remoteType === "directory",
+      isLink: row.dataset.remoteLink === "true",
     };
     const current = this._remoteSelections.filter((item) => item.scope === scope);
     if (event?.shiftKey && current.length) {
@@ -1330,7 +1337,11 @@ window.SFTP = {
       if (anchor >= 0 && end >= 0) {
         const [from, to] = anchor < end ? [anchor, end] : [end, anchor];
         this._remoteSelections = rows.slice(from, to + 1).map((item) => ({
-          scope, path: decodeURIComponent(item.dataset.remotePath), isDirectory: item.dataset.remoteType === "directory",
+          scope,
+          path: decodeURIComponent(item.dataset.remotePath),
+          operationPath: decodeURIComponent(item.dataset.remoteOperationPath || item.dataset.remotePath),
+          isDirectory: item.dataset.remoteType === "directory",
+          isLink: item.dataset.remoteLink === "true",
         }));
       }
     } else if (event?.ctrlKey || event?.metaKey) {
@@ -1935,8 +1946,10 @@ window.SFTP = {
     const th = (key, label, align = "left") =>
       `<th style="padding:7px 6px;text-align:${align};cursor:pointer;user-select:none" onclick="SFTP.sortTermFiles('${key}')">${label}${this._termSortMarker(key)}</th>`;
     const rows = items.map((item) => {
-      const fullPath = base.replace(/\/+$/, "") + "/" + item.name;
+      const linkPath = base.replace(/\/+$/, "") + "/" + item.name;
+      const fullPath = item.isLink && item.targetPath ? item.targetPath : linkPath;
       const encoded = encodeURIComponent(fullPath);
+      const encodedOperationPath = encodeURIComponent(item.isLink && item.linkPath ? item.linkPath : linkPath);
       const isDir = item.isDirectory || item.type === "directory";
       const editable = !isDir && this._isEditableRemoteFile(item.name);
       const icon = isDir ? (item.isLink ? "fa-link" : "fa-folder") : (item.isLink ? "fa-link" : "fa-file");
@@ -1947,7 +1960,7 @@ window.SFTP = {
       const action = isDir
         ? `SFTP.termEnterPath('${encoded}')`
         : editable ? `SFTP.termEditFile('${encoded}')` : `SFTP.copyRemotePath(decodeURIComponent('${encoded}'))`;
-      return `<tr style="border-bottom:1px solid var(--border)" title="${this._esc(fullPath)}" data-remote-path="${encoded}" data-remote-name="${encodeURIComponent(item.name)}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${editable}">
+      return `<tr style="border-bottom:1px solid var(--border)" title="${this._esc(fullPath)}" data-remote-path="${encoded}" data-remote-operation-path="${encodedOperationPath}" data-remote-link="${!!item.isLink}" data-remote-name="${encodeURIComponent(item.name)}" data-remote-type="${isDir ? "directory" : "file"}" data-remote-editable="${editable}">
         <td style="padding:6px 8px;overflow:hidden">
           <button class="btn btn-ghost btn-xs" style="width:100%;min-width:0;justify-content:flex-start;overflow:hidden" onclick="${action}">
             <i class="fas ${icon}" style="color:${isDir ? "var(--yellow)" : "var(--text3)"};flex-shrink:0"></i>
@@ -1963,8 +1976,8 @@ window.SFTP = {
           <button class="btn btn-ghost btn-xs" onclick="SFTP.termContextDownload('${encoded}',${isDir})" title="Download"><i class="fas fa-download"></i></button>
           ${editable ? `<button class="btn btn-ghost btn-xs" onclick="SFTP.termEditFile('${encoded}')" title="Edit"><i class="fas fa-edit"></i></button>` : ""}
           ${!isDir ? `<button class="btn btn-ghost btn-xs" onclick="SFTP.termContextOpenWith('${encoded}')" title="Open With..."><i class="fas fa-external-link-alt"></i></button>` : ""}
-          <button class="btn btn-ghost btn-xs" onclick="SFTP.termRenameItem('${encoded}',${isDir})" title="Rename (F2)"><i class="fas fa-i-cursor"></i></button>
-          <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="SFTP.termDeleteItem('${encoded}',${isDir})" title="Delete"><i class="fas fa-trash"></i></button>
+          <button class="btn btn-ghost btn-xs" onclick="SFTP.termRenameItem('${encodedOperationPath}',${isDir})" title="Rename (F2)"><i class="fas fa-i-cursor"></i></button>
+          <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="SFTP.termDeleteItem('${encodedOperationPath}',${isDir && !item.isLink})" title="Delete"><i class="fas fa-trash"></i></button>
         </td>
       </tr>`;
     }).join("");

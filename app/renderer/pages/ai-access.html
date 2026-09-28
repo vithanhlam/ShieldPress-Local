@@ -41,6 +41,10 @@
   <button class="btn btn-ghost" data-ai-tab="s3" onclick="AIAccess.tab('s3')"><i class="fas fa-cloud"></i> S3 <span></span></button>
   <button class="btn btn-ghost" data-ai-tab="debug" onclick="AIAccess.tab('debug')"><i class="fas fa-bug"></i> Debug Logs</button>
 </div>
+<div class="ai-resource-search" id="ai-resource-search-wrap">
+  <i class="fas fa-search" aria-hidden="true"></i>
+  <input id="ai-resource-search" class="fi" type="search" placeholder="Search name, IP, or path" aria-label="Search authorized resources" oninput="AIAccess.filterCards()"/>
+</div>
 <div id="ai-resource-list" class="ai-resource-list"><div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading resources...</p></div></div>
 
 <div class="ai-bottom-grid">

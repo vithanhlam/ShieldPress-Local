@@ -92,30 +92,46 @@ window.AIAccess = {
     const icons = { source: "fa-code", database: "fa-database", config: "fa-cogs", vps: "fa-server", s3: "fa-cloud" };
     if (!this.resources.length) {
       root.innerHTML = '<div class="empty-state"><i class="fas fa-folder-open"></i><p>No projects, databases, VPS connections, or S3 buckets found.</p></div>';
+      this.updateTabCounts();
       return;
     }
-    root.innerHTML = this.resources.map((resource) => {
+    root.innerHTML = this.resources.map((resource, index) => {
       const saved = this.savedFor(resource);
       const key = this.escape(this.key(resource.type, resource.id));
       const permissions = saved?.permissions || {};
       const enabled = !!saved;
-      return `<div class="ai-resource-card" data-type="${this.escape(resource.type)}" data-id="${this.escape(resource.id)}" data-name="${this.escape(resource.name)}" data-scope="${this.escape(saved?.scope || resource.scope)}">
+      const host = resource.type === "vps" ? String(resource.host || "") : "";
+      return `<div class="ai-resource-card" data-type="${this.escape(resource.type)}" data-id="${this.escape(resource.id)}" data-name="${this.escape(resource.name)}" data-host="${this.escape(host)}" data-order="${index}" data-scope="${this.escape(saved?.scope || resource.scope)}">
         <div class="ai-resource-main">
           <label class="ai-resource-check"><input type="checkbox" class="ai-resource-enabled" ${enabled ? "checked" : ""} onchange="AIAccess.toggleCard(this)"/><i class="fas ${icons[resource.type]}"></i></label>
-          <div class="ai-resource-info"><div><span class="ai-type">${labels[resource.type]}</span><strong>${this.escape(resource.name)}</strong></div><input class="fi ai-scope" value="${this.escape(saved?.scope || resource.scope)}" placeholder="Allowed path, schema, or prefix" ${enabled ? "" : "disabled"}/></div>
+          <div class="ai-resource-info">
+            <div class="ai-resource-title"><span class="ai-type">${labels[resource.type]}</span><strong title="${this.escape(resource.name)}">${this.escape(resource.name)}</strong><button class="btn btn-ghost btn-xs ai-copy" type="button" title="Copy name" aria-label="Copy name" onclick="AIAccess.copyResource(this, 'name')"><i class="fas fa-copy"></i></button></div>
+            ${host ? `<div class="ai-resource-host"><span>IP / Host: ${this.escape(host)}</span><button class="btn btn-ghost btn-xs ai-copy" type="button" title="Copy IP / Host" aria-label="Copy IP / Host" onclick="AIAccess.copyResource(this, 'host')"><i class="fas fa-copy"></i></button></div>` : ""}
+            <input class="fi ai-scope" value="${this.escape(saved?.scope || resource.scope)}" placeholder="Allowed path, schema, or prefix" ${enabled ? "" : "disabled"}/>
+          </div>
         </div>
         <div class="ai-permissions ${enabled ? "" : "disabled"}" aria-label="Permissions for ${key}">
           ${this.capabilities.map((cap) => `<label class="ai-permission ai-${cap}"><input type="checkbox" data-cap="${cap}" ${permissions[cap] ? "checked" : ""} ${enabled ? "" : "disabled"}/><span>${cap.charAt(0).toUpperCase() + cap.slice(1)}</span></label>`).join("")}
         </div>
       </div>`;
     }).join("");
+    this.sortCards();
     this.updateTabCounts();
     this.tab(this.currentTab);
   },
 
+  sortCards() {
+    const root = document.getElementById("ai-resource-list");
+    if (!root) return;
+    const cards = [...root.querySelectorAll(".ai-resource-card")];
+    cards.sort((a, b) => Number(b.querySelector(".ai-resource-enabled").checked) - Number(a.querySelector(".ai-resource-enabled").checked)
+      || Number(a.dataset.order) - Number(b.dataset.order));
+    cards.forEach((card) => root.appendChild(card));
+  },
+
   updateTabCounts() {
     document.querySelectorAll("[data-ai-tab]").forEach((button) => {
-      const count = this.resources.filter((resource) => resource.type === button.dataset.aiTab).length;
+      const count = [...document.querySelectorAll(".ai-resource-card")].filter((card) => card.dataset.type === button.dataset.aiTab && card.querySelector(".ai-resource-enabled").checked).length;
       const badge = button.querySelector("span");
       if (badge) badge.textContent = String(count);
     });
@@ -125,18 +141,35 @@ window.AIAccess = {
     this.currentTab = type;
     const debug = type === "debug";
     document.querySelectorAll(".ai-resource-tabs ~ #ai-resource-list, .ai-resource-list, .ai-section-head").forEach((el) => { el.style.display = debug ? "none" : ""; });
+    const search = document.getElementById("ai-resource-search-wrap");
+    if (search) search.style.display = debug ? "none" : "";
     const debugPanel = document.getElementById("ai-debug-panel");
     if (debugPanel) debugPanel.style.display = debug ? "block" : "none";
     document.querySelectorAll("[data-ai-tab]").forEach((button) => button.classList.toggle("active", button.dataset.aiTab === type));
     if (debug) return;
-    document.querySelectorAll(".ai-resource-card").forEach((card) => { card.style.display = card.dataset.type === type ? "grid" : "none"; });
-    const visible = this.resources.some((resource) => resource.type === type);
+    this.filterCards();
+  },
+
+  filterCards() {
+    const query = document.getElementById("ai-resource-search")?.value.trim().toLocaleLowerCase() || "";
+    let visible = 0;
+    document.querySelectorAll(".ai-resource-card").forEach((card) => {
+      const matches = card.dataset.type === this.currentTab && [card.dataset.name, card.dataset.host, card.querySelector(".ai-scope")?.value]
+        .some((value) => String(value || "").toLocaleLowerCase().includes(query));
+      card.style.display = matches ? "grid" : "none";
+      if (matches) visible++;
+    });
     let empty = document.getElementById("ai-tab-empty");
     if (!visible && !empty) {
       empty = document.createElement("div"); empty.id = "ai-tab-empty"; empty.className = "empty-state";
       document.getElementById("ai-resource-list")?.appendChild(empty);
     }
-    if (empty) { empty.style.display = visible ? "none" : "block"; empty.innerHTML = '<i class="fas fa-folder-open"></i><p>No resources configured in this tab.</p>'; }
+    if (empty) {
+      empty.style.display = visible ? "none" : "block";
+      empty.innerHTML = query
+        ? '<i class="fas fa-search"></i><p>No matching resources.</p>'
+        : '<i class="fas fa-folder-open"></i><p>No resources configured in this tab.</p>';
+    }
   },
 
   toggleCard(input) {
@@ -144,6 +177,20 @@ window.AIAccess = {
     card.querySelector(".ai-scope").disabled = !input.checked;
     card.querySelector(".ai-permissions").classList.toggle("disabled", !input.checked);
     card.querySelectorAll(".ai-permissions input").forEach((el) => { el.disabled = !input.checked; });
+    this.sortCards();
+    this.updateTabCounts();
+    this.filterCards();
+  },
+
+  async copyResource(button, field) {
+    const value = button.closest(".ai-resource-card")?.dataset[field];
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast(field === "host" ? "IP / Host copied" : "Name copied", "success");
+    } catch {
+      toast("Could not copy to clipboard", "error");
+    }
   },
 
   collect() {
