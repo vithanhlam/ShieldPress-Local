@@ -19,6 +19,7 @@ const platform = require("./platform");
 const workspace = require("./workspace");
 const aiAccess = require("./ai-access");
 const aiGateway = require("./ai-gateway");
+const installedBuild = require("./installed-build");
 
 function register(ipcMain, shell, dialog) {
   global.__shieldpressCloseRemoteSession = (sessionId) => {
@@ -567,6 +568,10 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("sftp-disconnect-all", () => sftp.disconnectAll());
   ipcMain.handle("sftp-close-session", (_e, sessionId) => sftp.closeSession(sessionId));
   ipcMain.handle("sftp-open-window", async (_e, { kind, connectionId }) => {
+    if (installedBuild.wasReplaced()) {
+      log.warn("Installed app changed while this process was running; reopen ShieldPress Local before opening a remote window");
+      return { success: false, message: "ShieldPress Local was updated while open. Close and reopen the app before opening a remote window." };
+    }
     const remoteWindows = require("./remote-windows");
     const sessionManager = require("./session-manager");
     const conns = await sftp.getConnections();
@@ -586,6 +591,11 @@ function register(ipcMain, shell, dialog) {
     if (!linked.success) {
       sessionManager.remove(session.id);
       return linked;
+    }
+    if (installedBuild.wasReplaced()) {
+      sftp.closeSession(session.id);
+      log.warn("Installed app changed during remote connection; reopen ShieldPress Local before opening a remote window");
+      return { success: false, message: "ShieldPress Local was updated while open. Close and reopen the app before opening a remote window." };
     }
     return remoteWindows.openRemoteWindow({
       kind: wanted,

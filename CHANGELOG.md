@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.5.54
+
+**Crash diagnosis and update safety**
+- Detects when the installed app archive changes during a running session and asks for a restart before opening another remote window
+- Saves native Electron crash dumps locally without uploading them, and logs remote window creation steps for diagnosis
+
+**Release**
+- Publishes Windows and Ubuntu installers for version 2.5.54
+
 ## v2.5.53
 
 **SSH Terminal and Remote Files**

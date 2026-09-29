@@ -7,10 +7,24 @@ const {
   Tray,
   Menu,
   nativeImage,
+  crashReporter,
 } = require("electron");
 const path = require("path");
 const fs = require("fs-extra");
 const workspace = require("./src/main/workspace");
+
+// Keep native crash dumps locally so an Electron/Chromium trap can be diagnosed.
+// Nothing is uploaded automatically.
+if (app.isPackaged) {
+  try {
+    const dumps = path.join(app.getPath("userData"), "CrashDumps");
+    fs.ensureDirSync(dumps);
+    app.setPath("crashDumps", dumps);
+    crashReporter.start({ uploadToServer: false });
+  } catch (error) {
+    console.error("Could not initialize crash reports:", error);
+  }
+}
 
 // Electron's Vulkan probe is unreliable on some Ubuntu/NVIDIA hybrid setups.
 // This dashboard does not need GPU acceleration, so prefer stable software rendering.

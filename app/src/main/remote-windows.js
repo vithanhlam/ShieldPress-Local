@@ -3,6 +3,7 @@
 const path = require("path");
 const { BrowserWindow } = require("electron");
 const sessionManager = require("./session-manager");
+const log = require("./logger");
 
 const openWindows = new Map(); // sessionId -> BrowserWindow
 
@@ -44,6 +45,7 @@ function openRemoteWindow({ kind, connectionId, connectionName, host, sessionId 
     sessionManager.update(session.id, { title });
   }
 
+  log.info(`Creating ${kind} window for session ${session.id}`);
   const win = new BrowserWindow({
     width: kind === "terminal" ? 1280 : 1180,
     height: kind === "terminal" ? 860 : 780,
@@ -60,6 +62,7 @@ function openRemoteWindow({ kind, connectionId, connectionName, host, sessionId 
       preload: preloadPath(),
     },
   });
+  log.info(`Created ${kind} window ${win.id} for session ${session.id}`);
 
   sessionManager.update(session.id, {
     windowId: win.id,
@@ -77,6 +80,7 @@ function openRemoteWindow({ kind, connectionId, connectionName, host, sessionId 
   win.loadFile(path.join(__dirname, "..", "..", "renderer", "remote-session.html"), {
     search: query.toString(),
   });
+  log.info(`Loading ${kind} window ${win.id} for session ${session.id}`);
   win.once("ready-to-show", () => win.show());
 
   win.on("closed", () => {
