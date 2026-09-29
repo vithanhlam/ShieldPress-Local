@@ -1,6 +1,8 @@
 "use strict";
 
-const fs = require("fs");
+// Electron's patched fs treats app.asar as a virtual directory and returns
+// synthetic stat metadata. Inspect the archive on disk instead.
+const fs = require("original-fs");
 const path = require("path");
 const { app } = require("electron");
 
