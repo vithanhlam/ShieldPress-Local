@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.5.55
+
+**SFTP & SSH Terminal**
+- Fixes false "updated while open" warnings that blocked SFTP and Terminal windows after restarting the app
+- Checks the actual `app.asar` file on disk instead of Electron's synthetic ASAR `fs.stat` metadata
+
+**Release**
+- Publishes updated Windows and Ubuntu installers for version 2.5.55
+
 ## v2.5.54
 
 **Crash diagnosis and update safety**
