@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.55)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.55)**
+**[⬇ Download Latest Version (v2.5.56)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.56)**
 
 | File | Description |
 | ---- | ----------- |
-| [ShieldPress.Local.Setup.2.5.55.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.55/ShieldPress.Local.Setup.2.5.55.exe) | Windows NSIS installer |
-| [shieldpresslocal_2.5.55_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.55/shieldpresslocal_2.5.55_amd64.deb) | Ubuntu/Debian installer |
+| [ShieldPress.Local.Setup.2.5.56.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.56/ShieldPress.Local.Setup.2.5.56.exe) | Windows NSIS installer |
+| [shieldpresslocal_2.5.56_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.56/shieldpresslocal_2.5.56_amd64.deb) | Ubuntu/Debian installer |
 
 ---
 
@@ -220,15 +220,15 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download [ShieldPress.Local.Setup.2.5.55.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.55/ShieldPress.Local.Setup.2.5.55.exe)
+1. Download [ShieldPress.Local.Setup.2.5.56.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.56/ShieldPress.Local.Setup.2.5.56.exe)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download [shieldpresslocal_2.5.55_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.55/shieldpresslocal_2.5.55_amd64.deb)
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.55_amd64.deb`
+1. Download [shieldpresslocal_2.5.56_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.56/shieldpresslocal_2.5.56_amd64.deb)
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.56_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 

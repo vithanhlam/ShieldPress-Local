@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.5.56
+
+**Local services**
+- Reconnects to the Nginx process from the same runtime after an unexpected app exit, then reloads its configuration instead of failing on ports already in use
+- Prevents repeated Start Nginx actions from launching another copy while Nginx is running
+
+**Release**
+- Publishes updated Windows and Ubuntu installers for version 2.5.56
+
 ## v2.5.55
 
 **SFTP & SSH Terminal**

@@ -46,6 +46,7 @@ const platform = require("./platform");
 let mariadbProc = null;
 let phpProcs = {};    // { "8.3": [proc, proc, ...], "8.4": [...] }
 let nginxProc = null;
+let adoptedNginxPid = null;
 let redisProc = null;
 let nginxStartPromise = null;
 const phpStartPromises = {};
@@ -130,6 +131,21 @@ function killProc(proc) {
 }
 
 // ─── Nginx ───────────────────────────────────────────────────────────────────
+function getRuntimeNginxPid() {
+  if (!platform.isLinux) return null;
+  const { NGINX_DIR } = global.CONST;
+  try {
+    const pid = Number(fs.readFileSync(path.join(NGINX_DIR, "logs", "nginx.pid"), "utf8").trim());
+    if (!Number.isSafeInteger(pid) || pid <= 1) return null;
+    process.kill(pid, 0);
+    const cmdline = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8").replace(/\0/g, " ");
+    if (!cmdline.includes("nginx: master process") || !cmdline.includes(NGINX_DIR)) return null;
+    return pid;
+  } catch {
+    return null;
+  }
+}
+
 async function startNginxUnlocked() {
   const { NGINX_DIR } = global.CONST;
   const nginxExe = platform.executable("nginx");
@@ -137,6 +153,16 @@ async function startNginxUnlocked() {
     log.err("Nginx not found");
     return { success: false, message: "Nginx not found. Install the nginx package." };
   }
+
+  if (nginxProc && nginxProc.exitCode === null) {
+    global.STATE.isNginxRunning = true;
+    return { success: true, message: "Already running" };
+  }
+  if (adoptedNginxPid && getRuntimeNginxPid() === adoptedNginxPid) {
+    global.STATE.isNginxRunning = true;
+    return { success: true, message: "Already running" };
+  }
+  adoptedNginxPid = null;
 
   if (platform.isWindows) {
     await windowsTaskkill("nginx.exe");
@@ -149,6 +175,16 @@ async function startNginxUnlocked() {
     log.err("Nginx config test failed:\n" + configTest.message);
     global.STATE.isNginxRunning = false;
     return { success: false, message: configTest.message || "Nginx config test failed" };
+  }
+
+  const existingPid = getRuntimeNginxPid();
+  if (existingPid) {
+    const reload = await spawnResult(nginxExe, ["-s", "reload", "-p", NGINX_DIR, "-c", masterConf], { timeoutMs: 10000 });
+    if (!reload.ok) return { success: false, message: reload.message || "Could not reload existing Nginx" };
+    adoptedNginxPid = existingPid;
+    global.STATE.isNginxRunning = true;
+    log.ok(`Reconnected to existing Nginx (PID ${existingPid})`);
+    return { success: true };
   }
 
   nginxProc = spawn(nginxExe, ["-p", NGINX_DIR, "-c", masterConf, "-g", "daemon off;"], {
@@ -200,7 +236,7 @@ async function startNginx() {
 async function stopNginx() {
   const { NGINX_DIR } = global.CONST;
   const nginxExe = platform.executable("nginx");
-  if (nginxExe && nginxProc) {
+  if (nginxExe && (nginxProc || (adoptedNginxPid && getRuntimeNginxPid() === adoptedNginxPid))) {
     const masterConf = path.join(NGINX_DIR, "conf", "nginx.conf");
     await new Promise((resolve) => {
       const proc = spawn(nginxExe, ["-s", "quit", "-p", NGINX_DIR, "-c", masterConf], { stdio: "ignore", ...WIN_SPAWN });
@@ -212,6 +248,7 @@ async function stopNginx() {
   await killProc(nginxProc);
   if (platform.isWindows) await windowsTaskkill("nginx.exe");
   nginxProc = null;
+  adoptedNginxPid = null;
   global.STATE.isNginxRunning = false;
   log.info("Nginx stopped");
   return { success: true };
