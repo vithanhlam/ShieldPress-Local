@@ -1759,18 +1759,19 @@ const remoteStatsRequests = new Map();
 const activeShells = {};
 
 function emitShell(sessionId, webContentsId, channel, payload) {
-  if (sessionManager.send(sessionId, channel, payload)) return;
+  if (sessionManager.send(sessionId, channel, payload)) return true;
   if (webContentsId != null) {
     try {
       const { webContents } = require("electron");
       const wc = webContents.fromId(Number(webContentsId));
       if (wc && !wc.isDestroyed()) {
         wc.send(channel, payload);
-        return;
+        return true;
       }
     } catch {}
   }
-  try { global.STATE.mainWindow?.webContents?.send(channel, payload); } catch {}
+  // A dedicated session must never send orphaned output to the dashboard.
+  return false;
 }
 
 function hardStopShell(sessionId) {
@@ -1824,8 +1825,10 @@ function ackShellOutputEntry(entry) {
  */
 async function startShell(id, cols = 100, rows = 30, opts = {}) {
   const storageKey = id;
+  const owner = sessionManager.get(opts.sessionId || id);
   const connected = await ensureConnected(storageKey);
   if (!connected.success) return connected;
+  if (owner && !sessionManager.get(owner.id)) return { success: false, message: "Remote session was closed" };
   const ac = getActive(storageKey);
   if (!ac || (ac.type !== "sftp" && ac.type !== "ssh")) return { success: false, message: "Not connected via SSH" };
 
@@ -1844,6 +1847,13 @@ async function startShell(id, cols = 100, rows = 30, opts = {}) {
   return new Promise((resolve) => {
     ac.client.shell({ term: "xterm-256color", cols, rows }, (error, stream) => {
       if (error) return resolve({ success: false, message: error.message });
+      // Closing the window can race the SSH server's asynchronous PTY reply.
+      // Do not resurrect a removed session when that reply finally arrives.
+      if (owner && !sessionManager.get(owner.id)) {
+        sinkStreamErrors(stream);
+        stream.destroy();
+        return resolve({ success: false, message: "Remote session was closed" });
+      }
       // TCP chunk boundaries don't align with multi-byte UTF-8 character
       // boundaries (common with Vietnamese/accented output). StringDecoder
       // buffers any trailing incomplete byte sequence until the next chunk
@@ -1864,7 +1874,9 @@ async function startShell(id, cols = 100, rows = 30, opts = {}) {
         // ssh2 can produce data faster than xterm can render it. Pause both
         // channels until the renderer confirms that all sent chunks were drawn.
         pauseShellOutput(entry);
-        emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data });
+        if (!emitShell(sessionId, webContentsId, "sftp-shell-data", { id: sessionId, connectionId, data })) {
+          hardStopShell(sessionId);
+        }
       };
       stream.on("data", (data) => {
         forwardOutput(stdoutDecoder.write(data));

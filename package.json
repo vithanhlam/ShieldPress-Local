@@ -1,7 +1,7 @@
 {
   "name": "shieldpresslocal",
   "productName": "ShieldPress Local",
-  "version": "2.5.56",
+  "version": "2.5.57",
   "description": "ShieldPress Local Development Environment Manager",
   "main": "app/main.js",
   "author": {
@@ -31,7 +31,7 @@
     "tree-kill": "^1.2.2"
   },
   "devDependencies": {
-    "electron": "28.3.3",
+    "electron": "44.5.1",
     "electron-builder": "^24.13.3"
   },
   "build": {

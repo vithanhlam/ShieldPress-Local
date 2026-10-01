@@ -4,6 +4,7 @@ const path = require("path");
 const { BrowserWindow } = require("electron");
 const sessionManager = require("./session-manager");
 const log = require("./logger");
+const { bindRemoteSessionLifecycle } = require("./remote-session-lifecycle");
 
 const openWindows = new Map(); // sessionId -> BrowserWindow
 
@@ -54,7 +55,9 @@ function openRemoteWindow({ kind, connectionId, connectionName, host, sessionId 
     title,
     backgroundColor: "#080b11",
     autoHideMenuBar: true,
-    show: false,
+    // Show immediately: hidden windows can fail to receive ready-to-show
+    // with software rendering on Linux/Wayland, despite loading successfully.
+    show: true,
     icon: iconPath(),
     webPreferences: {
       nodeIntegration: false,
@@ -81,9 +84,8 @@ function openRemoteWindow({ kind, connectionId, connectionName, host, sessionId 
     search: query.toString(),
   });
   log.info(`Loading ${kind} window ${win.id} for session ${session.id}`);
-  win.once("ready-to-show", () => win.show());
 
-  win.on("closed", () => {
+  bindRemoteSessionLifecycle(win, () => {
     openWindows.delete(session.id);
     if (typeof global.__shieldpressCloseRemoteSession === "function") {
       try { global.__shieldpressCloseRemoteSession(session.id); } catch {}
@@ -97,9 +99,8 @@ function openRemoteWindow({ kind, connectionId, connectionName, host, sessionId 
 
 function openS3Window({ bucketId, bucketName }) {
   const title = `S3 Objects — ${bucketName || bucketId}`;
-  const win = new BrowserWindow({ width: 1280, height: 860, minWidth: 900, minHeight: 620, title, backgroundColor: "#080b11", autoHideMenuBar: true, show: false, icon: iconPath(), webPreferences: { nodeIntegration: false, contextIsolation: true, preload: preloadPath() } });
+  const win = new BrowserWindow({ width: 1280, height: 860, minWidth: 900, minHeight: 620, title, backgroundColor: "#080b11", autoHideMenuBar: true, show: true, icon: iconPath(), webPreferences: { nodeIntegration: false, contextIsolation: true, preload: preloadPath() } });
   win.loadFile(path.join(__dirname, "..", "..", "renderer", "s3-session.html"), { search: new URLSearchParams({ bucketId: String(bucketId), title }).toString() });
-  win.once("ready-to-show", () => win.show());
   return { success: true, windowId: win.id, title };
 }
 

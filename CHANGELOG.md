@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.5.57
+
+- Fixes Terminal, SFTP/FTP and S3 windows staying hidden while waiting for `ready-to-show` on Linux
+- Publishes updated Windows and Ubuntu installers
+
+- Updates Electron from 28.3.3 to 44.5.1 to address native allocation growth during long-running sessions
+- Releases remote connections when their renderer crashes or is destroyed, as well as when the window closes
+- Stops terminal output when its destination no longer exists and prevents delayed SSH shell replies from restoring closed sessions
+- Requires Node.js 22.12 or newer for source builds
+
 ## v2.5.56
 
 **Local services**
