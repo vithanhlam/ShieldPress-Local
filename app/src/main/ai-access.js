@@ -1,7 +1,7 @@
 const fs = require("fs-extra");
 const path = require("path");
 
-const CAPABILITIES = ["read", "create", "edit", "delete", "execute"];
+const CAPABILITIES = ["read", "create", "edit", "delete", "execute", "upload", "download"];
 const RESOURCE_TYPES = ["source", "database", "config", "vps", "s3"];
 
 function policyFile() {
@@ -37,8 +37,9 @@ function defaults() {
 function normalizeResource(item) {
   if (!item || !RESOURCE_TYPES.includes(item.type) || !String(item.id || "").trim()) return null;
   const permissions = {};
-  for (const capability of CAPABILITIES) permissions[capability] = item.permissions?.[capability] === true;
+  for (const capability of CAPABILITIES) permissions[capability] = item.fullAccess === true || item.permissions?.[capability] === true;
   return {
+    fullAccess: item.fullAccess === true,
     type: item.type,
     id: String(item.id),
     name: String(item.name || item.id).slice(0, 200),
@@ -56,11 +57,11 @@ async function getPolicy() {
       ...defaults(),
       ...saved,
       enabled: saved.enabled === true && !expired,
-      requireApproval: true,
+      requireApproval: saved.requireApproval !== false,
       backupBeforeWrite: saved.backupBeforeWrite !== false,
       redactSecrets: true,
-      sessionMinutes: Math.min(480, Math.max(5, Number(saved.sessionMinutes) || 60)),
-      sessionApproval: saved.sessionApproval === true && !!saved.sessionApprovalUntil && Date.parse(saved.sessionApprovalUntil) > Date.now(),
+      sessionMinutes: saved.sessionMinutes === 0 ? 0 : Math.min(480, Math.max(5, Number(saved.sessionMinutes) || 60)),
+      sessionApproval: saved.sessionApproval === true && (saved.sessionMinutes === 0 || (!!saved.sessionApprovalUntil && Date.parse(saved.sessionApprovalUntil) > Date.now())),
       sessionApprovalUntil: saved.sessionApprovalUntil || null,
       resources: Array.isArray(saved.resources) ? saved.resources.map(normalizeResource).filter(Boolean) : [],
       expiresAt,
@@ -82,18 +83,18 @@ async function appendAudit(entry) {
 
 async function savePolicy(input) {
   const current = await getPolicy();
-  const sessionMinutes = Math.min(480, Math.max(5, Number(input?.sessionMinutes) || 60));
+  const sessionMinutes = input?.sessionMinutes === 0 ? 0 : Math.min(480, Math.max(5, Number(input?.sessionMinutes) || 60));
   const next = {
     version: 1,
     enabled: input?.enabled === true,
-    requireApproval: true,
+    requireApproval: input?.requireApproval !== false,
     backupBeforeWrite: input?.backupBeforeWrite !== false,
     redactSecrets: true,
     sessionMinutes,
     sessionApproval: input?.sessionApproval === true,
-    sessionApprovalUntil: input?.sessionApproval === true ? new Date(Date.now() + sessionMinutes * 60 * 1000).toISOString() : null,
+    sessionApprovalUntil: input?.sessionApproval === true && sessionMinutes > 0 ? new Date(Date.now() + sessionMinutes * 60 * 1000).toISOString() : null,
     resources: Array.isArray(input?.resources) ? input.resources.map(normalizeResource).filter(Boolean) : [],
-    expiresAt: input?.enabled === true ? new Date(Date.now() + sessionMinutes * 60 * 1000).toISOString() : null,
+    expiresAt: input?.enabled === true && sessionMinutes > 0 ? new Date(Date.now() + sessionMinutes * 60 * 1000).toISOString() : null,
     updatedAt: new Date().toISOString(),
   };
   await fs.ensureDir(path.dirname(policyFile()));

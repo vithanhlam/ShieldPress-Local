@@ -2,7 +2,7 @@ window.AIAccess = {
   policy: null,
   resources: [],
   connectInfo: null,
-  capabilities: ["read", "create", "edit", "delete", "execute"],
+  capabilities: ["read", "create", "edit", "delete", "execute", "upload", "download"],
   currentTab: "source",
 
   async init() {
@@ -59,11 +59,11 @@ window.AIAccess = {
       this.policy = policy;
       this.resources = result.resources || [];
       document.getElementById("ai-enabled").checked = !!policy.enabled;
-      document.getElementById("ai-require-approval").checked = true;
+      document.getElementById("ai-require-approval").checked = policy.requireApproval !== false;
       document.getElementById("ai-session-approval").checked = !!policy.sessionApproval;
       document.getElementById("ai-backup-before-write").checked = policy.backupBeforeWrite !== false;
       document.getElementById("ai-redact-secrets").checked = true;
-      document.getElementById("ai-session-minutes").value = String(policy.sessionMinutes || 60);
+      document.getElementById("ai-session-minutes").value = String(policy.sessionMinutes ?? 60);
       this.render();
       const reqnora = await api.aiAccessGetReqnora?.();
       const keyInput = document.getElementById("reqnora-api-key");
@@ -97,8 +97,6 @@ window.AIAccess = {
     }
     root.innerHTML = this.resources.map((resource, index) => {
       const saved = this.savedFor(resource);
-      const key = this.escape(this.key(resource.type, resource.id));
-      const permissions = saved?.permissions || {};
       const enabled = !!saved;
       const host = resource.type === "vps" ? String(resource.host || "") : "";
       return `<div class="ai-resource-card" data-type="${this.escape(resource.type)}" data-id="${this.escape(resource.id)}" data-name="${this.escape(resource.name)}" data-host="${this.escape(host)}" data-order="${index}" data-scope="${this.escape(saved?.scope || resource.scope)}">
@@ -109,9 +107,6 @@ window.AIAccess = {
             ${host ? `<div class="ai-resource-host"><span>IP / Host: ${this.escape(host)}</span><button class="btn btn-ghost btn-xs ai-copy" type="button" title="Copy IP / Host" aria-label="Copy IP / Host" onclick="AIAccess.copyResource(this, 'host')"><i class="fas fa-copy"></i></button></div>` : ""}
             <input class="fi ai-scope" value="${this.escape(saved?.scope || resource.scope)}" placeholder="Allowed path, schema, or prefix" ${enabled ? "" : "disabled"}/>
           </div>
-        </div>
-        <div class="ai-permissions ${enabled ? "" : "disabled"}" aria-label="Permissions for ${key}">
-          ${this.capabilities.map((cap) => `<label class="ai-permission ai-${cap}"><input type="checkbox" data-cap="${cap}" ${permissions[cap] ? "checked" : ""} ${enabled ? "" : "disabled"}/><span>${cap.charAt(0).toUpperCase() + cap.slice(1)}</span></label>`).join("")}
         </div>
       </div>`;
     }).join("");
@@ -175,8 +170,6 @@ window.AIAccess = {
   toggleCard(input) {
     const card = input.closest(".ai-resource-card");
     card.querySelector(".ai-scope").disabled = !input.checked;
-    card.querySelector(".ai-permissions").classList.toggle("disabled", !input.checked);
-    card.querySelectorAll(".ai-permissions input").forEach((el) => { el.disabled = !input.checked; });
     this.sortCards();
     this.updateTabCounts();
     this.filterCards();
@@ -196,13 +189,13 @@ window.AIAccess = {
   collect() {
     const resources = [...document.querySelectorAll(".ai-resource-card")].filter((card) => card.querySelector(".ai-resource-enabled").checked).map((card) => {
       const permissions = {};
-      card.querySelectorAll("[data-cap]").forEach((input) => { permissions[input.dataset.cap] = input.checked; });
-      return { type: card.dataset.type, id: card.dataset.id, name: card.dataset.name, scope: card.querySelector(".ai-scope").value.trim(), permissions };
+      this.capabilities.forEach(cap => { permissions[cap] = true; });
+      return { fullAccess: true, type: card.dataset.type, id: card.dataset.id, name: card.dataset.name, scope: card.querySelector(".ai-scope").value.trim(), permissions };
     });
     return {
       enabled: document.getElementById("ai-enabled").checked,
-      requireApproval: true,
-      sessionApproval: document.getElementById("ai-session-approval").checked,
+      requireApproval: false,
+      sessionApproval: false,
       backupBeforeWrite: document.getElementById("ai-backup-before-write").checked,
       redactSecrets: true,
       sessionMinutes: Number(document.getElementById("ai-session-minutes").value),
@@ -266,6 +259,13 @@ window.AIAccess = {
     item.className = "ai-pending-item";
     item.dataset.requestId = request.id;
     item.innerHTML = `<strong>${this.escape(request.operation)}</strong><span>${this.escape(request.summary)}</span><small>${this.escape(request.resourceId)}${request.path ? ` — ${this.escape(request.path)}` : ""}</small><span class="ai-pending-actions"><button class="btn btn-primary btn-xs" onclick="AIAccess.resolve('${this.escape(request.id)}', true)">Approve</button><button class="btn btn-ghost btn-xs" onclick="AIAccess.resolve('${this.escape(request.id)}', false)">Deny</button></span>`;
+    const details = request.command || request.sql || request.args?.content;
+    if (details) {
+      const preview = document.createElement("pre");
+      preview.textContent = details;
+      preview.style.cssText = "white-space:pre-wrap;overflow:auto;max-height:300px";
+      item.appendChild(preview);
+    }
     list.prepend(item);
   },
 

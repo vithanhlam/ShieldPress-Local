@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.57)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.57)**
+**[⬇ Download Latest Version (v2.5.58)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.58)**
 
 | File | Description |
 | ---- | ----------- |
-| [ShieldPress.Local.Setup.2.5.57.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.57/ShieldPress.Local.Setup.2.5.57.exe) | Windows NSIS installer |
-| [shieldpresslocal_2.5.57_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.57/shieldpresslocal_2.5.57_amd64.deb) | Ubuntu/Debian installer |
+| [ShieldPress.Local.Setup.2.5.58.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.58/ShieldPress.Local.Setup.2.5.58.exe) | Windows NSIS installer |
+| [shieldpresslocal_2.5.58_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.58/shieldpresslocal_2.5.58_amd64.deb) | Ubuntu/Debian installer |
 
 ---
 
@@ -158,8 +158,8 @@ Each resource tab counts only checked resources and lists them first. Search by 
 
 1. Open **AI Access** and enable the master switch.
 2. Select a resource tab: **Projects**, **Database**, **Config**, **VPS / SFTP / FTP**, or **S3**.
-3. Grant only the required capabilities: **Read**, **Create**, **Edit**, **Delete**, and, only when needed, **Execute**.
-4. Keep **Require approval** enabled for normal operation. **Approve all for this session** is time-limited and should only be enabled for a trusted maintenance window.
+3. Select the resources and allowed paths. Saving grants **full access** within those scopes, including writes, deletion, uploads, downloads, database changes, and VPS commands. Existing granular policies remain effective until saved again.
+4. Choose the access lifetime, including **No expiry**, then **Save policy**. Full-access resources run without a second approval in ShieldPress or Reqnora; the AI asks directly in chat when confirmation is needed.
 5. Use **Debug Logs** to review every request, approval, command, and result.
 
 The MCP client command is:
@@ -170,9 +170,13 @@ codex mcp add shieldpress -- node /opt/ShieldPressLocal/resources/shieldpress-mc
 
 The installed client connects only to the local ShieldPress gateway. It does not read SSH passwords or call `sshpass` directly.
 
-#### Reqnora approval workflow
+MCP opens a dedicated connection using the saved VPS settings; no Terminal window is required. Use `shieldpress.run_remote_command` with `workingDirectory` when needed. Commands run on independent SSH channels and return stdout, stderr, and exit status. Use `shieldpress.file_operation` for concrete writes, deletion, uploads, and downloads; transfers identify both the authorized remote resource and local resource. `shieldpress.query_database` supports authorized local database changes with a backup when configured.
 
-Reqnora can be used to approve an AI request from the mobile app. In **AI Access → Reqnora**, enter:
+Results are persisted as `applied` or `failed`. Use `shieldpress.get_request` with `requestId` to check a previous operation without executing it again. Retrying an identical pending request reuses its ID. Older approved requests with no saved execution result are reported as `unknown`; inspect the target before deciding to retry.
+
+#### Reqnora notifications and legacy approvals
+
+Reqnora can send execution result notifications and approve requests under existing granular policies. Full-access resources do not create Reqnora approval requests. In **AI Access → Reqnora**, enter:
 
 - API URL: `https://app.reqnora.com`
 - Project API key: `ak_live_...`
@@ -220,15 +224,15 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download [ShieldPress.Local.Setup.2.5.57.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.57/ShieldPress.Local.Setup.2.5.57.exe)
+1. Download [ShieldPress.Local.Setup.2.5.58.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.58/ShieldPress.Local.Setup.2.5.58.exe)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download [shieldpresslocal_2.5.57_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.57/shieldpresslocal_2.5.57_amd64.deb)
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.57_amd64.deb`
+1. Download [shieldpresslocal_2.5.58_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.58/shieldpresslocal_2.5.58_amd64.deb)
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.58_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.5.58
+
+**AI Access / MCP**
+- Removes the redundant full-access badge from resource cards
+- Grants full access within selected resource scopes instead of separate operation checkboxes; existing policies are upgraded when saved
+- Adds concrete file writes, deletion, and uploads/downloads between authorized local resources and VPS/SFTP/FTP or S3
+- Supports local database changes with a backup when required
+- Removes in-app approval for full-access resources; AI asks for necessary confirmation directly in chat
+- Reuses pending request IDs, persists execution results, and adds MCP request-status lookup
+- Prevents duplicate execution from concurrent approvals and reports missing legacy execution results as unknown
+- Adds persistent access with the No expiry session option
+- Opens a dedicated AI connection using saved VPS settings without requiring a terminal window
+- Runs MCP commands on fresh SSH exec channels without terminal directory state, with optional working directories and separate stdout, stderr and exit status
+- Allows SSH execution and inspection when the server does not provide an SFTP subsystem
+- Serializes pending request persistence and rechecks authorization before executing approved operations
+
+**Release**
+- Publishes updated Windows NSIS (.exe) and Ubuntu/Debian (.deb) installers
+
 ## v2.5.57
 
 - Fixes Terminal, SFTP/FTP and S3 windows staying hidden while waiting for `ready-to-show` on Linux

@@ -561,6 +561,28 @@ async function connectInternal(storageKey, connectionId, progressCb, { allowReus
   return result;
 }
 
+// AI owns a transport independent of terminal window sessions. Deduplicate
+// simultaneous tool calls so they do not replace each other's SSH connection.
+const aiConnectionRequests = new Map();
+async function ensureAiConnection(connectionId, { requireSftp = false, requireSsh = false } = {}) {
+  const id = String(connectionId);
+  const storageKey = `ai:${id}`;
+  let pending = aiConnectionRequests.get(id);
+  if (!pending) {
+    pending = connectInternal(storageKey, id, null, { allowReuse: true });
+    aiConnectionRequests.set(id, pending);
+  }
+  let result;
+  try { result = await pending; }
+  finally { if (aiConnectionRequests.get(id) === pending) aiConnectionRequests.delete(id); }
+  if (!result.success) return result;
+  const active = getActive(storageKey);
+  if (!active) return { success: false, message: 'AI connection closed before use' };
+  if (requireSsh && !['ssh', 'sftp'].includes(active.type)) return { success: false, message: 'Command execution requires an SSH connection; FTP does not support shell commands' };
+  if (requireSftp && active.type === 'ssh') return { success: false, code: 'SFTP_UNAVAILABLE', message: `SSH is connected but file transfer is unavailable: ${active.sftpError || 'SFTP subsystem disabled'}` };
+  return { success: true, activeId: storageKey, transport: active.type };
+}
+
 async function ensureConnected(id) {
   if (!getActive(id)) return { success: false, message: "Not connected" };
   const alive = await pingConnection(id);
@@ -1944,7 +1966,7 @@ async function getRemoteSystemInfo(id) {
   if (remoteSystemCache[id]) return { success: true, ...remoteSystemCache[id] };
   const activeId = resolveActiveConnectionId(id);
   const ac = activeId ? activeConnections[activeId] : null;
-  if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
+  if (!ac || !["sftp", "ssh"].includes(ac.type)) return { success: false, message: "Not connected via SSH" };
   const command = "printf '__OS__\\n'; cat /etc/os-release 2>/dev/null; printf '__TOOLS__\\n'; for c in apt apt-get dnf yum apk pacman zypper systemctl service; do command -v $c >/dev/null 2>&1 && printf '%s\\n' $c; done; printf '__SHELL__\\n'; printf '%s\\n' \"$SHELL\"";
   return new Promise((resolve) => {
     ac.client.exec(command, (error, stream) => {
@@ -2035,7 +2057,7 @@ async function getRemoteStats(id) {
 async function getRemoteStatsOnce(id) {
   const activeId = resolveActiveConnectionId(id);
   const ac = activeId ? activeConnections[activeId] : null;
-  if (!ac || ac.type !== "sftp") return { success: false, message: "Not connected via SSH" };
+  if (!ac || !["sftp", "ssh"].includes(ac.type)) return { success: false, message: "Not connected via SSH" };
   const command = [
     "printf '__CPU__\\n'",
     "grep '^cpu ' /proc/stat",
@@ -2096,15 +2118,39 @@ async function getRemoteStatsOnce(id) {
   };
 }
 
-async function execCommand(id, command) {
+async function execCommand(id, command, options = {}) {
   const ac = activeConnections[id];
-  if (!ac || ac.type !== "sftp") {
+  if (!ac || !["sftp", "ssh"].includes(ac.type)) {
     return { success: false, message: "Not connected via SSH" };
+  }
+
+  if (options.isolated) {
+    // A fresh exec channel, no PTY and no terminalCwd state. Never replay a
+    // failed command automatically: it may already have changed remote state.
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (result) => { if (!settled) { settled = true; resolve(result); } };
+      const directory = options.workingDirectory;
+      const independentCommand = directory ? `cd -- '${String(directory).replace(/'/g, "'\\''")}' && ${command}` : command;
+      ac.client.exec(independentCommand, { pty: false }, (error, stream) => {
+        if (error) return finish({ success: false, message: error.message });
+        const stdout = new StringDecoder('utf8');
+        const stderr = new StringDecoder('utf8');
+        let output = '', errors = '';
+        stream.on('data', chunk => { output += stdout.write(chunk); });
+        stream.stderr?.on('data', chunk => { errors += stderr.write(chunk); });
+        stream.on('error', error => finish({ success: false, message: error.message, output, stderr: errors }));
+        stream.on('close', (code, signal) => {
+          output += stdout.end(); errors += stderr.end();
+          finish({ success: code === 0, output, stderr: errors, exitCode: code ?? null, signal: signal || null, message: code === 0 ? undefined : (errors || output || `Remote command ended with ${signal || code || 'no exit status'}`) });
+        });
+      });
+    });
   }
 
   // Handle cd command locally to maintain cwd across commands
   const trimCmd = command.trim();
-  if (trimCmd.startsWith("cd ")) {
+  if (!options.isolated && trimCmd.startsWith("cd ")) {
     const dir = trimCmd.slice(3).trim();
     // Resolve relative to current cwd
     const cwd = terminalCwd[id] || "~";
@@ -2140,7 +2186,7 @@ async function execCommand(id, command) {
   }
 
   // Wrap command with cd to cwd first, so user maintains directory context
-  const cwd = terminalCwd[id];
+  const cwd = options.isolated ? null : terminalCwd[id];
   const fullCmd = cwd ? `cd ${cwd} && ${command}` : command;
 
   return new Promise((resolve) => {
@@ -2429,7 +2475,7 @@ async function backupRemoteFile(id, remotePath) {
       const escapedSrc = remotePath.replace(/'/g, `'\\''`);
       const escapedDest = backupPath.replace(/'/g, `'\\''`);
       const escapedDir = backupDir.replace(/'/g, `'\\''`);
-      const result = await execCommand(id, `mkdir -p '${escapedDir}' && cp -a '${escapedSrc}' '${escapedDest}'`);
+      const result = await execCommand(id, `mkdir -p '${escapedDir}' && cp -a '${escapedSrc}' '${escapedDest}'`, { isolated: true });
       if (!result.success) return { success: false, message: result.error || result.output || "Backup failed" };
       return { success: true, backupPath };
     }
@@ -2922,6 +2968,7 @@ module.exports = {
   connectSession,
   getConnectionStatus,
   resolveActiveConnectionId,
+  ensureAiConnection,
   disconnect,
   disconnectAll,
   closeSession,
@@ -2947,6 +2994,7 @@ module.exports = {
   deleteRemote,
   readRemoteFile,
   writeRemoteFile,
+  backupRemoteFile,
   validateFileContent,
   detectEditorLanguage,
   uploadAndExtract,

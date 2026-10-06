@@ -35,13 +35,13 @@ test("AI Access policy defaults closed and enforces safety invariants", async (t
   });
 
   assert.equal(result.success, true);
-  assert.equal(result.policy.requireApproval, true);
+  assert.equal(result.policy.requireApproval, false);
   assert.equal(result.policy.redactSecrets, true);
   assert.equal(result.policy.sessionMinutes, 480);
   assert.ok(Date.parse(result.policy.expiresAt) > Date.now());
   assert.equal(result.policy.resources.length, 1);
   assert.deepEqual(result.policy.resources[0].permissions, {
-    read: true, create: false, edit: true, delete: false, execute: false,
+    read: true, create: false, edit: true, delete: false, execute: false, upload: false, download: false,
   });
   assert.ok(aiAccess.RESOURCE_TYPES.includes("config"));
 

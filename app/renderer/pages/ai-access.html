@@ -1,24 +1,24 @@
 <div class="page-header">
   <div>
     <h1><i class="fas fa-robot" style="color:var(--accent)"></i> AI Access</h1>
-    <p>Grant AI access per resource and operation. Credentials always remain inside ShieldPress Local.</p>
+    <p>Grant full AI access to selected resources. Credentials always remain inside ShieldPress Local.</p>
   </div>
   <button class="btn btn-primary" onclick="AIAccess.save()"><i class="fas fa-save"></i> Save policy</button>
 </div>
 
 <div class="ai-notice">
   <i class="fas fa-shield-alt"></i>
-  <div><strong>Ask first, act second.</strong><br/>AI must name the project, database, configuration, VPS/SFTP/FTP, or S3 target and receive your approval before access. Create, edit, delete, database writes, file transfers, and remote state changes require fresh confirmation. <strong>Execute command</strong> is a separate high-risk permission and is off by default.</div>
+  <div><strong>Choose how AI operates.</strong><br/>Selecting a resource grants full access, including upload, download and command execution. Full-access resources execute without approval in this app. AI asks for confirmation in chat when needed. Choose No expiry for persistent access.</div>
 </div>
 
 <div class="settings-card ai-settings-grid">
   <label class="ai-toggle-row"><span><strong>Enable AI Access</strong><small>Master switch for all authorized resources</small></span><input id="ai-enabled" type="checkbox"/></label>
-  <label class="ai-toggle-row"><span><strong>Require approval</strong><small>Ask before every sensitive operation</small></span><input id="ai-require-approval" type="checkbox" checked disabled/></label>
-  <label class="ai-toggle-row ai-session-approval-row"><span><strong>Approve all for this session</strong><small>Auto-approve authorized requests until the session expires; execute remains fully audited</small></span><input id="ai-session-approval" type="checkbox"/></label>
+  <label class="ai-toggle-row" style="display:none"><span><strong>Require approval</strong><small>Also ask before ordinary writes and commands</small></span><input id="ai-require-approval" type="checkbox"/></label>
+  <label class="ai-toggle-row ai-session-approval-row" style="display:none"><span><strong>Approve all for this session</strong><small>Auto-approve ordinary requests; dangerous operations still require confirmation</small></span><input id="ai-session-approval" type="checkbox"/></label>
   <label class="ai-toggle-row"><span><strong>Backup before write</strong><small>Require a recoverable backup before edit/delete</small></span><input id="ai-backup-before-write" type="checkbox" checked/></label>
   <label class="ai-toggle-row"><span><strong>Redact secrets</strong><small>Hide passwords, tokens, keys, cookies, and connection strings</small></span><input id="ai-redact-secrets" type="checkbox" checked disabled/></label>
-  <label class="ai-session-row"><span><strong>Session lifetime</strong><small>Access expires when the approved session ends</small></span>
-    <select class="fi" id="ai-session-minutes"><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="480">8 hours</option></select>
+  <label class="ai-session-row"><span><strong>Session lifetime</strong><small>Choose when resource access expires</small></span>
+    <select class="fi" id="ai-session-minutes"><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="480">8 hours</option><option value="0">No expiry</option></select>
   </label>
 </div>
 
@@ -30,7 +30,7 @@
 </div>
 
 <div class="ai-section-head">
-  <div><h2>Authorized resources</h2><p>Select a resource first, then grant only the operations AI needs.</p></div>
+  <div><h2>Authorized resources</h2><p>Select resources to grant full access within their configured scope.</p></div>
   <button class="btn btn-ghost" onclick="AIAccess.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
 </div>
 <div class="ai-resource-tabs" role="tablist" aria-label="AI resource types">

@@ -297,5 +297,15 @@ async function deleteObject(id, key) {
   catch (e) { const c = await readAll().then((x) => x.find((v) => v.id === id)); const info = formatError(e, "DeleteObject", c); log.err(`S3 ${JSON.stringify(info.meta)}`); return { success: false, message: info.message, details: info.meta }; }
 }
 
+async function uploadObject(id, key, localPath) {
+  const job = { cancelled: false }; activeJobs.add(job);
+  try {
+    const c = await raw(id);
+    await uploadOneFile({ ...c, prefix: '' }, { local: localPath, relative: key }, job);
+    return { success: true, key };
+  } catch (error) { return { success: false, message: error.message }; }
+  finally { activeJobs.delete(job); }
+}
+
 function cancel() { for (const job of activeJobs) job.cancelled = true; return { success: true }; }
-module.exports = { getBuckets, saveBucket, deleteBucket, test, listObjects, upload, uploadPaths, download, downloadPrefix, downloadObject, deleteObject, cancel };
+module.exports = { getBuckets, saveBucket, deleteBucket, test, listObjects, upload, uploadPaths, download, downloadPrefix, downloadObject, uploadObject, deleteObject, cancel };
