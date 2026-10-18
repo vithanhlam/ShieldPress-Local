@@ -139,6 +139,10 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("ai-access-get-policy", () => aiAccess.getPolicy());
   ipcMain.handle("ai-access-save-policy", (_e, policy) => aiAccess.savePolicy(policy));
   ipcMain.handle("ai-access-get-resources", () => aiAccess.getResources());
+  ipcMain.handle("ai-access-get-default-local-folder", () => {
+    const electronApp = require("electron").app;
+    return process.platform === "win32" ? electronApp.getPath("temp") : "/tmp";
+  });
   ipcMain.handle("ai-access-get-connect-info", () => aiGateway.getConnectInfo());
   ipcMain.handle("ai-access-get-skill", () => aiAccess.getSkill());
   ipcMain.handle("ai-access-get-audit", (_e, limit) => aiAccess.getAudit(limit));

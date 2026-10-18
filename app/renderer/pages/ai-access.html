@@ -1,14 +1,14 @@
 <div class="page-header">
   <div>
     <h1><i class="fas fa-robot" style="color:var(--accent)"></i> AI Access</h1>
-    <p>Grant full AI access to selected resources. Credentials always remain inside ShieldPress Local.</p>
+    <p>Choose which project, server, and local file resources AI can use. Credentials always remain inside ShieldPress Local.</p>
   </div>
   <button class="btn btn-primary" onclick="AIAccess.save()"><i class="fas fa-save"></i> Save policy</button>
 </div>
 
 <div class="ai-notice">
   <i class="fas fa-shield-alt"></i>
-  <div><strong>Choose how AI operates.</strong><br/>Selecting a resource grants full access, including upload, download and command execution. Full-access resources execute without approval in this app. AI asks for confirmation in chat when needed. Choose No expiry for persistent access.</div>
+  <div><strong>Choose how AI operates.</strong><br/>Project, VPS and S3 resources grant full access within their scope, including file transfer and command execution. Local file resources grant read access only and can be used as upload sources. Full-access resources execute without approval in this app. Choose No expiry for persistent access.</div>
 </div>
 
 <div class="settings-card ai-settings-grid">
@@ -30,16 +30,22 @@
 </div>
 
 <div class="ai-section-head">
-  <div><h2>Authorized resources</h2><p>Select resources to grant full access within their configured scope.</p></div>
+  <div><h2>Authorized resources</h2><p>Select resources to grant AI access within their configured scope. Local files grant read access only.</p></div>
   <button class="btn btn-ghost" onclick="AIAccess.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
 </div>
 <div class="ai-resource-tabs" role="tablist" aria-label="AI resource types">
   <button class="btn btn-ghost active" data-ai-tab="source" onclick="AIAccess.tab('source')"><i class="fas fa-code"></i> Projects <span></span></button>
+  <button class="btn btn-ghost" data-ai-tab="local" onclick="AIAccess.tab('local')"><i class="fas fa-file-alt"></i> Local files <span></span></button>
   <button class="btn btn-ghost" data-ai-tab="database" onclick="AIAccess.tab('database')"><i class="fas fa-database"></i> Database <span></span></button>
   <button class="btn btn-ghost" data-ai-tab="config" onclick="AIAccess.tab('config')"><i class="fas fa-cogs"></i> Config <span></span></button>
   <button class="btn btn-ghost" data-ai-tab="vps" onclick="AIAccess.tab('vps')"><i class="fas fa-server"></i> VPS / SFTP / FTP <span></span></button>
   <button class="btn btn-ghost" data-ai-tab="s3" onclick="AIAccess.tab('s3')"><i class="fas fa-cloud"></i> S3 <span></span></button>
   <button class="btn btn-ghost" data-ai-tab="debug" onclick="AIAccess.tab('debug')"><i class="fas fa-bug"></i> Debug Logs</button>
+</div>
+<div class="ai-local-actions" id="ai-local-actions" style="display:none;margin:0 0 12px;align-items:center;gap:8px;flex-wrap:wrap">
+  <button class="btn btn-ghost" onclick="AIAccess.addLocalPath('file')"><i class="fas fa-file-plus"></i> Add file</button>
+  <button class="btn btn-ghost" onclick="AIAccess.addLocalPath('folder')"><i class="fas fa-folder-plus"></i> Add folder</button>
+  <span class="ai-muted">Local resources grant read access only.</span>
 </div>
 <div class="ai-resource-search" id="ai-resource-search-wrap">
   <i class="fas fa-search" aria-hidden="true"></i>

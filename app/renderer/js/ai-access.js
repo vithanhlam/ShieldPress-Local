@@ -88,8 +88,8 @@ window.AIAccess = {
   render() {
     const root = document.getElementById("ai-resource-list");
     if (!root) return;
-    const labels = { source: "Project", database: "Database", config: "Config", vps: "VPS / SFTP / FTP", s3: "S3" };
-    const icons = { source: "fa-code", database: "fa-database", config: "fa-cogs", vps: "fa-server", s3: "fa-cloud" };
+    const labels = { source: "Project", local: "Local file / folder", database: "Database", config: "Config", vps: "VPS / SFTP / FTP", s3: "S3" };
+    const icons = { source: "fa-code", local: "fa-file-alt", database: "fa-database", config: "fa-cogs", vps: "fa-server", s3: "fa-cloud" };
     if (!this.resources.length) {
       root.innerHTML = '<div class="empty-state"><i class="fas fa-folder-open"></i><p>No projects, databases, VPS connections, or S3 buckets found.</p></div>';
       this.updateTabCounts();
@@ -103,7 +103,7 @@ window.AIAccess = {
         <div class="ai-resource-main">
           <label class="ai-resource-check"><input type="checkbox" class="ai-resource-enabled" ${enabled ? "checked" : ""} onchange="AIAccess.toggleCard(this)"/><i class="fas ${icons[resource.type]}"></i></label>
           <div class="ai-resource-info">
-            <div class="ai-resource-title"><span class="ai-type">${labels[resource.type]}</span><strong title="${this.escape(resource.name)}">${this.escape(resource.name)}</strong><button class="btn btn-ghost btn-xs ai-copy" type="button" title="Copy name" aria-label="Copy name" onclick="AIAccess.copyResource(this, 'name')"><i class="fas fa-copy"></i></button></div>
+            <div class="ai-resource-title"><span class="ai-type">${labels[resource.type]}</span><strong title="${this.escape(resource.name)}">${this.escape(resource.name)}</strong><button class="btn btn-ghost btn-xs ai-copy" type="button" title="Copy name" aria-label="Copy name" onclick="AIAccess.copyResource(this, 'name')"><i class="fas fa-copy"></i></button>${resource.type === "local" ? `<button class="btn btn-ghost btn-xs ai-local-remove" type="button" title="Remove local resource" aria-label="Remove local resource" onclick="AIAccess.removeLocalPath(this)"><i class="fas fa-trash"></i> Remove</button>` : ""}</div>
             ${host ? `<div class="ai-resource-host"><span>IP / Host: ${this.escape(host)}</span><button class="btn btn-ghost btn-xs ai-copy" type="button" title="Copy IP / Host" aria-label="Copy IP / Host" onclick="AIAccess.copyResource(this, 'host')"><i class="fas fa-copy"></i></button></div>` : ""}
             <input class="fi ai-scope" value="${this.escape(saved?.scope || resource.scope)}" placeholder="Allowed path, schema, or prefix" ${enabled ? "" : "disabled"}/>
           </div>
@@ -138,6 +138,8 @@ window.AIAccess = {
     document.querySelectorAll(".ai-resource-tabs ~ #ai-resource-list, .ai-resource-list, .ai-section-head").forEach((el) => { el.style.display = debug ? "none" : ""; });
     const search = document.getElementById("ai-resource-search-wrap");
     if (search) search.style.display = debug ? "none" : "";
+    const localActions = document.getElementById("ai-local-actions");
+    if (localActions) localActions.style.display = type === "local" ? "flex" : "none";
     const debugPanel = document.getElementById("ai-debug-panel");
     if (debugPanel) debugPanel.style.display = debug ? "block" : "none";
     document.querySelectorAll("[data-ai-tab]").forEach((button) => button.classList.toggle("active", button.dataset.aiTab === type));
@@ -175,6 +177,38 @@ window.AIAccess = {
     this.filterCards();
   },
 
+  async addLocalPath(kind) {
+    const properties = kind === "folder" ? ["openDirectory"] : ["openFile"];
+    const defaultPath = kind === "folder" ? await api.aiAccessGetDefaultLocalFolder?.() : undefined;
+    const paths = await api.openFileDialog({ properties, ...(defaultPath ? { defaultPath } : {}) });
+    const scope = Array.isArray(paths) ? paths[0] : paths;
+    if (!scope) return;
+    if (this.resources.some((resource) => resource.type === "local" && resource.scope === scope)) {
+      this.currentTab = "local";
+      this.render();
+      return toast("This local path is already listed", "info");
+    }
+    const name = scope.split(/[\\/]/).filter(Boolean).pop() || scope;
+    this.resources.push({ type: "local", id: scope, name, scope });
+    this.currentTab = "local";
+    this.render();
+    const card = [...document.querySelectorAll(".ai-resource-card")].find((item) => item.dataset.type === "local" && item.dataset.id === scope);
+    const toggle = card?.querySelector(".ai-resource-enabled");
+    if (toggle) {
+      toggle.checked = true;
+      this.toggleCard(toggle);
+    }
+  },
+
+  removeLocalPath(button) {
+    const card = button.closest(".ai-resource-card");
+    const id = card?.dataset.id;
+    if (!id) return;
+    this.resources = this.resources.filter((resource) => !(resource.type === "local" && String(resource.id) === id));
+    this.render();
+    toast("Local resource removed from the list. Save policy to revoke its access.", "info", 5000);
+  },
+
   async copyResource(button, field) {
     const value = button.closest(".ai-resource-card")?.dataset[field];
     if (!value) return;
@@ -189,8 +223,8 @@ window.AIAccess = {
   collect() {
     const resources = [...document.querySelectorAll(".ai-resource-card")].filter((card) => card.querySelector(".ai-resource-enabled").checked).map((card) => {
       const permissions = {};
-      this.capabilities.forEach(cap => { permissions[cap] = true; });
-      return { fullAccess: true, type: card.dataset.type, id: card.dataset.id, name: card.dataset.name, scope: card.querySelector(".ai-scope").value.trim(), permissions };
+      this.capabilities.forEach(cap => { permissions[cap] = card.dataset.type === "local" ? cap === "read" : true; });
+      return { fullAccess: card.dataset.type !== "local", type: card.dataset.type, id: card.dataset.id, name: card.dataset.name, scope: card.querySelector(".ai-scope").value.trim(), permissions };
     });
     return {
       enabled: document.getElementById("ai-enabled").checked,

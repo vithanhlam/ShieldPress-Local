@@ -17,7 +17,7 @@ function remotePath(r, target) {
   return value;
 }
 async function localPath(r, target) {
-  if (!['source', 'config'].includes(r.type)) throw new Error('A local source or config resource is required');
+  if (!['source', 'local', 'config'].includes(r.type)) throw new Error('A local source or config resource is required');
   const root = await fs.realpath(path.resolve(r.scope));
   const value = path.resolve(String(target || ''));
   let ancestor = value;

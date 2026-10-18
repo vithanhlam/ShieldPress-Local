@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.5.60
+
+**AI Access / MCP**
+- Adds local file and folder resources for MCP uploads, with read-only access to their selected scope
+- Adds a Remove action for local resources; saving the policy revokes their access
+- Opens the Add folder picker at the system temporary directory (`%TEMP%` on Windows and `/tmp` on Ubuntu/Linux)
+
+**SSH Terminal**
+- Reports disk usage for the filesystem containing `/home`, falling back to `/` when `/home` is unavailable
+
+**Release**
+- Builds updated Windows NSIS (.exe) and Ubuntu/Debian (.deb) installers
+
 ## v2.5.58
 
 **AI Access / MCP**

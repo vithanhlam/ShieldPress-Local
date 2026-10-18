@@ -2066,7 +2066,7 @@ async function getRemoteStatsOnce(id) {
     "printf '__MEM__\\n'",
     "awk '/MemTotal:/{t=$2} /MemAvailable:/{a=$2} END{print t+0,a+0}' /proc/meminfo",
     "printf '__DISK__\\n'",
-    "df -P / | awk 'NR==2{gsub(/%/,\"\",$5); print $2+0,$3+0,$5+0}'",
+    "df -Pk /home 2>/dev/null | awk 'NR==2{gsub(/%/,\"\",$5); print $2+0,$3+0,$5+0,$6; found=1} END{if(!found) exit 1}' || df -Pk / | awk 'NR==2{gsub(/%/,\"\",$5); print $2+0,$3+0,$5+0,$6}'",
     "printf '__NET__\\n'",
     "awk 'NR>2 && $1 !~ /lo:/ {rx+=$2; tx+=$10} END{print rx+0, tx+0}' /proc/net/dev",
   ].join("; ");
@@ -2082,6 +2082,7 @@ async function getRemoteStatsOnce(id) {
   const cpuCores = parseInt(coresLine, 10);
   const [memTotal, memAvail] = memLine.split(/\s+/).map(Number);
   const [diskTotal, diskUsed, diskPctRaw] = diskLine.split(/\s+/).map(Number);
+  const diskPath = diskLine.trim().split(/\s+/)[3] || "/";
   const [rx, tx] = netLine.split(/\s+/).map(Number);
   const now = Date.now();
   const prev = remoteStatsCache[id];
@@ -2108,6 +2109,7 @@ async function getRemoteStatsOnce(id) {
     cpuCores: Number.isFinite(cpuCores) && cpuCores > 0 ? cpuCores : null,
     ramPct,
     diskPct,
+    diskPath,
     ramUsedKb: memTotal > 0 ? memTotal - memAvail : null,
     ramTotalKb: memTotal || null,
     diskUsedKb: diskUsed || null,

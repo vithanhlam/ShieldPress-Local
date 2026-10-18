@@ -2268,8 +2268,8 @@ window.SFTP = {
       ? `RAM ${this._formatSizeKb(stats.ramUsedKb)} / ${ramSize}`
       : "RAM usage";
     const diskTitle = stats?.diskTotalKb
-      ? `Disk ${this._formatSizeKb(stats.diskUsedKb)} / ${diskSize}`
-      : "Disk usage (/)";
+      ? `Disk ${this._formatSizeKb(stats.diskUsedKb)} / ${diskSize} (${stats.diskPath || "/"})`
+      : `Disk usage (${stats?.diskPath || "/"})`;
     const remoteIp = stats?.remoteIp || "--";
     el.innerHTML = `
       <span class="sftp-term-metric" style="color:${cpuColor}" title="CPU usage${cores ? ` · ${cores}` : ""}"><i class="fas fa-microchip"></i> CPU ${this._formatPct(cpu)}${this._metricExtra(cores)}</span>

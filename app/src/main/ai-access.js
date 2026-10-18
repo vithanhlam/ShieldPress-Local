@@ -2,7 +2,7 @@ const fs = require("fs-extra");
 const path = require("path");
 
 const CAPABILITIES = ["read", "create", "edit", "delete", "execute", "upload", "download"];
-const RESOURCE_TYPES = ["source", "database", "config", "vps", "s3"];
+const RESOURCE_TYPES = ["source", "local", "database", "config", "vps", "s3"];
 
 function policyFile() {
   return path.join(global.CONST.DATA_DIR, "ai-access.json");
@@ -116,6 +116,7 @@ async function getResources() {
   const projectItems = Array.isArray(projects) ? projects : (projects.projects || []);
   const connections = connectionsResult.connections || connectionsResult || [];
   const buckets = bucketsResult.buckets || bucketsResult || [];
+  const policy = await getPolicy();
   const configResources = [
     { type: "config", id: "shieldpress", name: "ShieldPress settings", scope: global.CONST.CONFIG_FILE },
     { type: "config", id: "mariadb", name: "MariaDB configuration", scope: path.join(global.CONST.MARIADB_DIR, process.platform === "win32" ? "my.ini" : "my.cnf") },
@@ -136,6 +137,9 @@ async function getResources() {
       ...projectItems.map((project) => ({
         type: "source", id: String(project.id), name: project.name || project.id,
         scope: project.path || path.join(global.CONST.PROJECTS_DIR, String(project.id), "www"),
+      })),
+      ...policy.resources.filter((resource) => resource.type === "local").map((resource) => ({
+        type: "local", id: resource.id, name: resource.name, scope: resource.scope,
       })),
       ...projectItems.filter((project) => project.dbName).map((project) => ({
         type: "database", id: String(project.dbName), name: project.dbName, scope: project.dbName,
