@@ -17,10 +17,10 @@
     Delete "$TEMP\shieldpress_portable_backup.txt"
 
   ; PHP 8.4/8.5 (VS17) need the 2015-2022 x64 runtime. Install quietly when
-  ; the machine has no VC++ 14 runtime, or an older build than 14.40.
+  ; the machine has no VC++ 14 runtime, or an older build than 14.44.35211.
   StrCpy $0 0
   ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Bld"
-  IntCmpU $0 32000 _sp_vc_ok _sp_vc_install _sp_vc_ok
+  IntCmpU $0 35211 _sp_vc_ok _sp_vc_install _sp_vc_ok
   _sp_vc_install:
     IfFileExists "$INSTDIR\resources\vc_redist.x64.exe" 0 _sp_vc_ok
       DetailPrint "Installing Microsoft Visual C++ Redistributable (x64)..."

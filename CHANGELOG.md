@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.5.62
+
+**PHP Security**
+- Updates bundled PHP 8.4 to the upstream security release 8.4.27 on Windows and Ubuntu
+- Verifies the Linux source archive SHA-256, bundles runtime libraries, and refreshes workspace runtimes
+- Stages a clean Windows PHP 8.4 runtime to exclude obsolete DLLs and unsupported extension directives
+- Installs the bundled Visual C++ Runtime when the Windows host has a build older than 14.44.35211
+
+**SFTP / SSH**
+- Adds Scan LAN with live progress, cancellation, searchable device cards, and connection creation
+- Adds encrypted Ed25519 SSH keys in data/ssh-keys with restricted directory and file permissions
+- Generates random passphrases and defaults blank key names to the selected VPS name
+- Saves passphrases encrypted in Vault; viewing or copying them requires the Vault password again
+- Exports encrypted key backups and clears revealed passphrases after 45 seconds
+- Uploads the public key, tests key-only authentication, and saves the VPS login in one action
+- Preserves existing authorized_keys and re-encrypts saved key passphrases when changing the Vault password
+
+**Release**
+- Builds Windows NSIS (.exe) and Ubuntu/Debian (.deb) installers
+- Validates the Ubuntu UI, LAN scanning, encrypted backup recovery, and SSH setup against an isolated local SSH server
+
 ## v2.5.60
 
 **AI Access / MCP**

@@ -28,6 +28,8 @@
     <button class="btn btn-ghost" id="sftp-vault-change-btn" onclick="SFTP.openChangeVault()" title="Change vault password" style="display:none">
       <i class="fas fa-key"></i> Change pass
     </button>
+    <button class="btn btn-ghost" onclick="SFTP.openLocal()"><i class="fas fa-network-wired"></i> Scan LAN</button>
+    <button class="btn btn-ghost" onclick="SFTP.openKeys()"><i class="fas fa-key"></i> SSH Keys</button>
     <button class="btn btn-primary" onclick="SFTP.openAdd()">
       <i class="fas fa-plus"></i> New Connection
     </button>
@@ -452,5 +454,49 @@
       <button class="btn btn-danger-ghost" id="sftp-sync-stop-btn" onclick="SFTP.stopSync()"><i class="fas fa-stop"></i> Stop</button>
       <button class="btn btn-ghost" onclick="SFTP.closeSyncProgress()">Close</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="m-sftp-local" onclick="closeIfOverlay(event,'m-sftp-local')">
+  <div class="modal remote-tools-modal lan-modal">
+    <div class="remote-tools-heading"><div class="remote-tools-icon"><i class="fas fa-network-wired"></i></div><div><div class="modal-title">Scan LAN</div><p class="remote-tools-sub">Discover nearby servers and add an SSH connection.</p></div><button class="btn btn-ghost" aria-label="Close Scan LAN" onclick="closeModal('m-sftp-local')"><i class="fas fa-times"></i></button></div>
+    <div class="remote-tools-section">
+      <div class="lan-settings"><div class="remote-field"><label for="sftp-local-network">Local network</label><select class="fi" id="sftp-local-network"></select></div><div class="remote-field"><label for="sftp-local-port">SSH port</label><input class="fi" id="sftp-local-port" type="number" min="1" max="65535" value="22"/></div><button class="btn btn-primary" id="sftp-local-scan" onclick="SFTP.scanLocal()"><i class="fas fa-search"></i> Scan network</button></div>
+      <p class="remote-tools-hint">Checks the selected /24 network. Sign in to confirm SSH access.</p>
+    </div>
+    <div class="lan-results-header"><span id="sftp-local-count">Devices</span><div class="search-wrap"><i class="fas fa-search"></i><input class="fi" id="sftp-local-search" placeholder="Search IP, name or port…" oninput="SFTP.filterLocal()"/></div></div>
+    <div class="lan-progress" id="sftp-local-progress" hidden><div></div></div>
+    <div id="sftp-local-status" class="remote-tools-hint" role="status"></div>
+    <div id="sftp-local-results" class="lan-results"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('m-sftp-local')">Done</button></div>
+  </div>
+</div>
+<div class="overlay" id="m-sftp-keys" onkeydown="if(event.key==='Escape')SFTP.closeKeys()" onclick="if(event.target===this)SFTP.closeKeys()">
+  <div class="modal remote-tools-modal keys-modal">
+    <div class="remote-tools-heading"><div class="remote-tools-icon"><i class="fas fa-key"></i></div><div><div class="modal-title">SSH Keys</div><p class="remote-tools-sub">Create once. Keep your passphrase protected in Vault.</p></div><button class="btn btn-ghost" aria-label="Close SSH Keys" onclick="SFTP.closeKeys()"><i class="fas fa-times"></i></button></div>
+    <div class="remote-field"><label for="sftp-key-server">VPS connection</label><select class="fi" id="sftp-key-server" onchange="SFTP.keyServerChanged()"></select></div>
+    <details class="remote-tools-section key-create-section" id="sftp-key-create-section" open>
+      <summary class="remote-section-title"><span><i class="fas fa-plus-circle"></i> Create a key</span><span class="remote-tools-badge">Ed25519 <i class="fas fa-chevron-down"></i></span></summary>
+      <div class="remote-field"><label for="sftp-key-name">Name <span class="remote-tools-hint">· defaults to VPS name</span></label><input class="fi" id="sftp-key-name" maxlength="100" placeholder="Uses the selected VPS name"/></div>
+      <div class="remote-field"><label for="sftp-key-create-pass">Passphrase</label><div class="key-pass-row"><input class="fi" id="sftp-key-create-pass" type="password" autocomplete="new-password" placeholder="Leave empty to generate securely"/><button class="btn btn-ghost" onclick="SFTP.randomKeyPass()" title="Generate a random passphrase"><i class="fas fa-dice"></i> Random</button><button class="btn btn-ghost" onclick="SFTP.copyNewKeyPass()" title="Copy the new passphrase"><i class="fas fa-copy"></i></button></div><span class="remote-tools-hint">Saved automatically as encrypted data in Vault. Custom passphrases need 12+ characters.</span></div>
+      <button class="btn btn-primary" id="sftp-key-create-btn" onclick="SFTP.createKey(this)"><i class="fas fa-plus"></i> Create & save to Vault</button>
+    </details>
+    <div class="remote-tools-section">
+      <div class="remote-section-title"><span><i class="fas fa-shield-alt"></i> Saved key</span><span id="sftp-key-secret-state" class="remote-tools-badge">Encrypted</span></div>
+      <div class="remote-field"><label class="sr-only" for="sftp-managed-key">Saved key</label><select class="fi" id="sftp-managed-key" onchange="SFTP.showKey()"></select></div>
+      <div id="sftp-key-info" class="key-info"></div>
+      <div class="key-secondary-actions"><button class="btn btn-ghost btn-sm" data-key-action onclick="SFTP.openKeySecret()"><i class="fas fa-lock"></i> View / copy passphrase</button><button class="btn btn-ghost btn-sm" data-key-action onclick="SFTP.exportKey(this)"><i class="fas fa-download"></i> Encrypted backup</button><button class="btn btn-ghost btn-sm" data-key-action onclick="SFTP.copyPublicKey()"><i class="fas fa-copy"></i> Public key</button></div>
+      <div id="sftp-key-legacy-pass" class="remote-field" hidden><label for="sftp-key-existing-pass">Save an existing key’s passphrase</label><div class="key-pass-row"><input id="sftp-key-existing-pass" class="fi" type="password" autocomplete="off" placeholder="Enter the key passphrase once"/><button class="btn btn-ghost" onclick="SFTP.saveExistingKeyPass(this)">Save to Vault</button></div></div>
+    </div>
+    <div id="sftp-key-result" class="remote-result" role="status" aria-live="polite"></div>
+    <div class="key-footer"><div class="remote-tools-hint"><i class="fas fa-lock"></i> Private key stays on this computer.<br/>Only the public key is uploaded.</div><div class="key-footer-actions"><button class="btn btn-ghost" data-key-action onclick="SFTP.keyAction('test',this)">Test key</button><button class="btn btn-ghost" data-key-action onclick="SFTP.useKey(this)">Use key</button><button class="btn btn-primary" data-key-action onclick="SFTP.keyAction('setup',this)"><i class="fas fa-bolt"></i> Upload & test</button></div></div>
+  </div>
+</div>
+<div class="overlay overlay-nested" id="m-sftp-key-secret" onclick="if(event.target===this)SFTP.closeKeySecret()" onkeydown="if(event.key==='Escape'){event.stopPropagation();SFTP.closeKeySecret()}">
+  <div class="modal remote-tools-modal key-secret-modal">
+    <div class="modal-title"><i class="fas fa-lock"></i> Unlock passphrase</div><p class="remote-tools-sub">Enter your Vault password to view or copy this saved passphrase.</p>
+    <div class="remote-field"><label for="sftp-key-master">Vault password</label><input class="fi" id="sftp-key-master" type="password" autocomplete="off" onkeydown="if(event.key==='Enter')SFTP.revealKeySecret()"/></div>
+    <div id="sftp-key-revealed-row" class="remote-field" hidden><label for="sftp-key-revealed">Passphrase · hidden again after 45 seconds</label><div class="key-pass-row"><input class="fi" id="sftp-key-revealed" readonly autocomplete="off"/><button class="btn btn-ghost" onclick="SFTP.copyRevealedKeySecret()"><i class="fas fa-copy"></i> Copy</button></div></div>
+    <div id="sftp-key-secret-result" class="remote-result" role="status"></div><div class="modal-footer"><button class="btn btn-ghost" onclick="SFTP.closeKeySecret()">Close</button><button class="btn btn-primary" id="sftp-key-reveal-btn" onclick="SFTP.revealKeySecret()">Unlock</button></div>
   </div>
 </div>

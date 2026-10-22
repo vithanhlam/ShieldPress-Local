@@ -19,12 +19,12 @@
 
 ## Download
 
-**[⬇ Download Latest Version (v2.5.60)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.60)**
+**[⬇ Download Latest Version (v2.5.62)](https://github.com/vithanhlam/ShieldPress-Local/releases/tag/v2.5.62)**
 
 | File | Description |
 | ---- | ----------- |
-| [ShieldPress.Local.Setup.2.5.60.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.60/ShieldPress.Local.Setup.2.5.60.exe) | Windows NSIS installer |
-| [shieldpresslocal_2.5.60_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.60/shieldpresslocal_2.5.60_amd64.deb) | Ubuntu/Debian installer |
+| [ShieldPress.Local.Setup.2.5.62.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.62/ShieldPress.Local.Setup.2.5.62.exe) | Windows NSIS installer |
+| [shieldpresslocal_2.5.62_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.62/shieldpresslocal_2.5.62_amd64.deb) | Ubuntu/Debian installer |
 
 ---
 
@@ -224,15 +224,15 @@ Both `npm start` and `npm run dev` start the Electron app from the local source 
 
 ### Windows
 
-1. Download [ShieldPress.Local.Setup.2.5.60.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.60/ShieldPress.Local.Setup.2.5.60.exe)
+1. Download [ShieldPress.Local.Setup.2.5.62.exe](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.62/ShieldPress.Local.Setup.2.5.62.exe)
 2. Run the installer and follow the wizard
 3. Choose where to store your project data when prompted
 4. Launch **ShieldPress Local** from the desktop shortcut
 
 ### Ubuntu
 
-1. Download [shieldpresslocal_2.5.60_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.60/shieldpresslocal_2.5.60_amd64.deb)
-2. Install it with `sudo apt install ./shieldpresslocal_2.5.60_amd64.deb`
+1. Download [shieldpresslocal_2.5.62_amd64.deb](https://github.com/vithanhlam/ShieldPress-Local/releases/download/v2.5.62/shieldpresslocal_2.5.62_amd64.deb)
+2. Install it with `sudo apt install ./shieldpresslocal_2.5.62_amd64.deb`
 3. Launch **ShieldPress Local** from the application menu
 4. Select a writable workspace when prompted; Windows workspaces are migrated to the isolated MariaDB port automatically
 
@@ -321,3 +321,13 @@ Official releases come only from [vithanhlam/ShieldPress-Local](https://github.c
 
 Copyright © 2026 ShieldPress. All rights reserved.  
 See [`LICENSE`](LICENSE) and [`TRADEMARK.md`](TRADEMARK.md).
+
+### LAN discovery and SSH keys
+
+In **SFTP & FTP → Scan LAN**, select a private IPv4 network and SSH port, then scan. Discovery checks up to 254 addresses in the selected /24 segment with live progress and cancellation. Filter results by IP, saved connection name, or port, then choose Connect. An open port does not confirm the service is SSH.
+
+In **SFTP & FTP → SSH Keys**, create an Ed25519 key using a random passphrase or a custom passphrase of at least 12 characters. A blank key name defaults to the selected VPS name. Encrypted private keys and public keys are stored under the configured workspace `data/ssh-keys/`. Linux uses directory permissions 0700 and file permissions 0600; Windows restricts the directory ACL to the current user. Passphrases are saved with AES-256-GCM in the local credential Vault file. Viewing or copying a saved passphrase requires entering the Vault password again, even when Vault is unlocked; the view clears after 45 seconds. Encrypted backup exports contain the encrypted private key, public key, encrypted passphrase and the Vault KDF metadata needed for recovery using the Vault password at export time.
+
+Choose an existing VPS connection and **Upload & test** to append the public key to that account's `~/.ssh/authorized_keys`, verify key authentication in a separate connection, and save the key for future VPS logins. Existing keys are preserved. The initial connection needs a working password or another key. **Test key** uses the passphrase stored in the unlocked Vault; **Use key** verifies the key before assigning it to the connection.
+
+PHP 8.4 is pinned to the upstream security release **8.4.27**. Windows preparation downloads the official NTS VS17 x64 runtime. Linux preparation builds the official source archive, verifies its SHA-256, and records a runtime marker so installed workspaces receive the new binaries. Linux build dependencies are listed in `scripts/build-linux-php84.sh`.

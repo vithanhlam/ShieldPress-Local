@@ -109,12 +109,11 @@ mkdir -p "${OUT_DIR}"
 install_php_series "8.3" "8.3.6-0ubuntu0.24.04.11" "20230831" "${PROJECT_DIR}/assets/php83.ini"
 vendor_compat_libs "${OUT_DIR}/8.3"
 wrap_php_binaries "${OUT_DIR}/8.3"
-# 8.4/8.5 track the current Ubuntu LTS packages (Resolute uses OpenSSL 3 / libsodium23).
+# 8.4 builds the upstream security release; 8.5 uses the Ubuntu LTS package.
 # Do not use newer archive builds that link libssl.so.4 — they fail to start on 26.04.
-install_php_series "8.4" "8.4.11-1ubuntu1.2" "20240924" "${PROJECT_DIR}/assets/php84.ini"
+bash "${PROJECT_DIR}/scripts/build-linux-php84.sh" "${OUT_DIR}/8.4"
 install_php_series "8.5" "8.5.4-0ubuntu1" "20250925" "${PROJECT_DIR}/assets/php85.ini"
 # Record the exact package build so workspace sync can invalidate stale runtimes.
 printf '%s\n' "8.5.4-0ubuntu1" > "${OUT_DIR}/8.5/.shieldpress-php-source"
-printf '%s\n' "8.4.11-1ubuntu1.2" > "${OUT_DIR}/8.4/.shieldpress-php-source"
 printf '%s\n' "8.3.6-0ubuntu0.24.04.11" > "${OUT_DIR}/8.3/.shieldpress-php-source"
 echo "Prepared PHP runtimes in ${OUT_DIR}"

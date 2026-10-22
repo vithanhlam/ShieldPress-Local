@@ -546,6 +546,21 @@ function register(ipcMain, shell, dialog) {
   ipcMain.handle("window-close", () => require("electron").app.quit());
 
   // ── SFTP & FTP ──
+  for (const [channel, method] of Object.entries({
+    "sftp-local-networks": "localNetworks", "sftp-find-local": "findLocal", "sftp-cancel-lan": "cancelLocalScan",
+    "sftp-keys-list": "listSshKeys", "sftp-keys-create": "createSshKey",
+    "sftp-keys-upload": "uploadSshKey", "sftp-keys-test": "testSshKey",
+    "sftp-keys-save-pass": "saveSshKeyPassphrase", "sftp-keys-reveal": "revealSshKeyPassphrase",
+    "sftp-keys-bind": "bindSshKey", "sftp-keys-export": "exportSshKey",
+  })) {
+    ipcMain.handle(channel, async (_e, data) => {
+      try {
+        if (method === "findLocal") return await sftp.findLocal(data, progress => { if (!_e.sender.isDestroyed()) _e.sender.send("sftp-lan-progress", progress); });
+        return await sftp[method](data);
+      }
+      catch (error) { return { success: false, message: error.message }; }
+    });
+  }
   ipcMain.handle("sftp-vault-status", () => sftp.getVaultStatus());
   ipcMain.handle("sftp-vault-setup", (_e, password) => sftp.setupVault(password));
   ipcMain.handle("sftp-vault-unlock", (_e, password) => sftp.unlockVault(password));

@@ -160,8 +160,10 @@ async function changeVaultPassword(currentPassword, newPassword) {
     }
   }
   const plaintextPasswords = [];
+  const plaintextPassphrases = [];
   try {
     for (const connection of connections) {
+      plaintextPassphrases.push(connection.passphrase ? vaultCrypto.open(connection.passphrase, currentKey) : "");
       if (!connection.password || !String(connection.password).startsWith("v2:")) {
         const plaintext = connection.password ? decryptLegacy(connection.password) : "";
         if (connection.password && !plaintext) {
@@ -177,8 +179,12 @@ async function changeVaultPassword(currentPassword, newPassword) {
   }
 
   const created = vaultCrypto.createMetadata(nextPassword);
+  try {
+    created.metadata.sshKeyPassphrases = Object.fromEntries(Object.entries(metadata.sshKeyPassphrases || {}).map(([id, value]) => [id, vaultCrypto.seal(vaultCrypto.open(value, currentKey), created.key)]));
+  } catch { return { success: false, message: "An SSH key passphrase could not be decrypted" }; }
   const rekeyedConnections = connections.map((connection, index) => ({
     ...connection,
+    passphrase: plaintextPassphrases[index] ? vaultCrypto.seal(plaintextPassphrases[index], created.key) : "",
     password: plaintextPasswords[index]
       ? vaultCrypto.seal(plaintextPasswords[index], created.key)
       : "",
@@ -189,8 +195,10 @@ async function changeVaultPassword(currentPassword, newPassword) {
   await fs.writeJson(paths.vaultNext, created.metadata, { spaces: 2, mode: 0o600 });
   const stagedMetadata = await fs.readJson(paths.vaultNext);
   const stagedKey = vaultCrypto.unlock(nextPassword, stagedMetadata);
+  for (const value of Object.values(stagedMetadata.sshKeyPassphrases || {})) vaultCrypto.open(value, stagedKey);
   const stagedConnections = await fs.readJson(paths.connectionsNext);
   for (const connection of stagedConnections) {
+    if (connection.passphrase) vaultCrypto.open(connection.passphrase, stagedKey);
     if (connection.password && String(connection.password).startsWith("v2:")) {
       vaultCrypto.open(connection.password, stagedKey);
     }
@@ -214,8 +222,10 @@ async function changeVaultPassword(currentPassword, newPassword) {
     // Verify the actual committed files, not only the staged copies.
     const committedMetadata = await fs.readJson(paths.vault);
     const committedKey = vaultCrypto.unlock(nextPassword, committedMetadata);
+    for (const value of Object.values(committedMetadata.sshKeyPassphrases || {})) vaultCrypto.open(value, committedKey);
     const committedConnections = await fs.readJson(paths.connections);
     for (const connection of committedConnections) {
+      if (connection.passphrase) vaultCrypto.open(connection.passphrase, committedKey);
       if (connection.password && String(connection.password).startsWith("v2:")) {
         vaultCrypto.open(connection.password, committedKey);
       }
@@ -373,6 +383,7 @@ async function getRawConnection(id) {
   const conns = JSON.parse(await fs.readFile(file, "utf8"));
   const conn = conns.find((c) => c.id === id);
   if (!conn) return null;
+  if (conn.passphrase && !vaultKey) return { ...conn, password: "", passphrase: "", credentialError: "VAULT_LOCKED" };
   const passphrase = conn.passphrase && String(conn.passphrase).startsWith("v2:") && vaultKey
     ? (() => { try { return vaultCrypto.open(conn.passphrase, vaultKey); } catch { return ""; } })()
     : "";
@@ -1998,7 +2009,7 @@ async function getRemoteSystemInfo(id) {
   });
 }
 
-function sshExecText(ac, command, timeoutMs = 8000) {
+function sshExecText(ac, command, timeoutMs = 8000, requireZeroExit = false) {
   return new Promise((resolve) => {
     let settled = false;
     let stream = null;
@@ -2026,9 +2037,10 @@ function sshExecText(ac, command, timeoutMs = 8000) {
         // turn one probe into an unbounded renderer payload.
         if (output.length < 65536) output += chunk.toString().slice(0, 65536 - output.length);
       });
-      stream.stderr.on("data", () => {});
-      stream.on("close", () => {
-        finish({ success: true, output });
+      let errors = "";
+      stream.stderr.on("data", chunk => { if (errors.length < 65536) errors += chunk.toString().slice(0, 65536 - errors.length); });
+      stream.on("close", code => {
+        finish({ success: !requireZeroExit || code === 0, output, ...(requireZeroExit && code !== 0 ? { message: errors || output || `Remote command exited with ${code}` } : {}) });
       });
       stream.on("error", (err) => finish({ success: false, message: err.message || "SSH stream error" }));
     }); } catch (err) {
@@ -2955,7 +2967,206 @@ function stopFileWatcher(id, remotePath) {
   return { success: true };
 }
 
+// Local discovery only probes directly attached private IPv4 /24 segments.
+let localScanRunning = false;
+let localScanCanceled = false;
+function cancelLocalScan() { localScanCanceled = true; return { success: true }; }
+function localNetworks() {
+  const networks = [];
+  for (const [name, entries] of Object.entries(require("os").networkInterfaces())) {
+    for (const entry of entries || []) {
+      if (entry.internal || entry.family !== "IPv4") continue;
+      const parts = entry.address.split(".").map(Number);
+      if (!(parts[0] === 10 || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 192 && parts[1] === 168))) continue;
+      const prefix = parts.slice(0, 3).join(".");
+      if (!networks.some(n => n.prefix === prefix)) networks.push({ name, address: entry.address, prefix });
+    }
+  }
+  return { success: true, networks };
+}
+async function findLocal({ prefix, port = 22 } = {}, progressCb) {
+  port = Number(port);
+  if (!localNetworks().networks.some(n => n.prefix === prefix) || !Number.isInteger(port) || port < 1 || port > 65535)
+    return { success: false, message: "Select an attached LAN network and a valid port" };
+  if (localScanRunning) return { success: false, message: "A LAN scan is already running" };
+  localScanRunning = true;
+  localScanCanceled = false;
+  let scanned = 0;
+  const hosts = [];
+  let next = 1;
+  try {
+    await Promise.all(Array.from({ length: 32 }, async () => {
+      while (next < 255 && !localScanCanceled) {
+        const host = `${prefix}.${next++}`;
+        await new Promise(resolve => {
+          const socket = new (require("net").Socket)();
+          let done = false;
+          const finish = found => {
+            if (done) return;
+            done = true;
+            socket.destroy();
+            if (found) hosts.push({ host, port });
+            scanned++;
+            if (progressCb && (found || scanned % 8 === 0 || scanned === 254)) progressCb({ scanned, total: 254, ...(found ? { host: { host, port } } : {}) });
+            resolve();
+          };
+          socket.setTimeout(600);
+          socket.once("connect", () => finish(true));
+          socket.once("error", () => finish(false));
+          socket.once("timeout", () => finish(false));
+          socket.connect(port, host);
+        });
+      }
+    }));
+    hosts.sort((a, b) => Number(a.host.split(".").pop()) - Number(b.host.split(".").pop()));
+    return { success: true, hosts, canceled: localScanCanceled };
+  } finally { localScanRunning = false; }
+}
+function sshKeysDir() {
+  const dir = path.join(global.CONST.DATA_DIR, "ssh-keys");
+  fs.ensureDirSync(dir, { mode: 0o700 });
+  if (process.platform === "win32") {
+    const account = require("os").userInfo().username;
+    const result = require("child_process").spawnSync("icacls", [dir, "/inheritance:r", "/grant:r", `${account}:(OI)(CI)F`], { windowsHide: true, encoding: "utf8" });
+    if (result.status !== 0) throw new Error("Cannot restrict SSH key directory permissions");
+  } else fs.chmodSync(dir, 0o700);
+  return dir;
+}
+function managedKeyPath(id) {
+  if (!/^[a-f0-9]{32}$/.test(String(id))) throw new Error("Invalid SSH key ID");
+  return path.join(sshKeysDir(), id);
+}
+async function listSshKeys() {
+  const keys = [];
+  const dir = sshKeysDir();
+  const vault = await readVaultMetadata();
+  for (const file of await fs.readdir(dir)) {
+    if (!/^[a-f0-9]{32}\.json$/.test(file)) continue;
+    const id = file.slice(0, -5);
+    const metadata = await fs.readJson(path.join(dir, file));
+    keys.push({ ...metadata, id, privateKey: path.join(dir, id), hasSavedPassphrase: !!vault?.sshKeyPassphrases?.[id] });
+  }
+  return { success: true, keys };
+}
+async function createSshKey({ name, passphrase } = {}) {
+  if (!vaultKey) return { success: false, code: "VAULT_LOCKED", message: "Unlock Vault to create and securely save an SSH key" };
+  passphrase = passphrase || crypto.randomBytes(24).toString("base64url");
+  if (typeof passphrase !== "string" || passphrase.length < 12)
+    return { success: false, message: "Use a key passphrase of at least 12 characters" };
+  const id = crypto.randomBytes(16).toString("hex");
+  const filename = managedKeyPath(id);
+  const keys = await new Promise((resolve, reject) => require("ssh2").utils.generateKeyPair("ed25519", {
+    cipher: "aes256-ctr", passphrase, rounds: 64, comment: "shieldpress-local",
+  }, (error, result) => error ? reject(error) : resolve(result)));
+  const publicKey = keys.public.trim();
+  const fingerprint = "SHA256:" + crypto.createHash("sha256").update(Buffer.from(publicKey.split(" ")[1], "base64")).digest("base64").replace(/=+$/, "");
+  const key = { id, name: String(name || "SSH Key").slice(0, 100), privateKey: filename, publicKey, fingerprint, createdAt: new Date().toISOString() };
+  await fs.writeFile(filename, keys.private, { mode: 0o600, flag: "wx" });
+  await fs.writeFile(filename + ".pub", publicKey + "\n", { mode: 0o600, flag: "wx" });
+  await fs.writeJson(filename + ".json", key, { mode: 0o600, flag: "wx", spaces: 2 });
+  let saved;
+  try { saved = await saveSshKeyPassphrase({ id, passphrase }); }
+  catch (error) { saved = { success: false, message: error.message }; }
+  if (!saved.success) {
+    for (const suffix of ["", ".pub", ".json"]) await fs.remove(filename + suffix);
+    return saved;
+  }
+  return { success: true, key: { ...key, hasSavedPassphrase: true } };
+}
+async function saveSshKeyPassphrase({ id, passphrase } = {}) {
+  if (!vaultKey) return { success: false, code: "VAULT_LOCKED", message: "Unlock Vault to save the passphrase" };
+  const filename = managedKeyPath(id);
+  const parsed = require("ssh2").utils.parseKey(await fs.readFile(filename), passphrase);
+  if (parsed instanceof Error) return { success: false, message: "This passphrase does not unlock the selected key" };
+  const metadata = await readVaultMetadata();
+  metadata.sshKeyPassphrases = { ...(metadata.sshKeyPassphrases || {}), [id]: vaultCrypto.seal(passphrase, vaultKey) };
+  const next = getVaultFile() + ".secret-next";
+  await fs.writeJson(next, metadata, { spaces: 2, mode: 0o600 });
+  await fs.rename(next, getVaultFile());
+  return { success: true };
+}
+async function revealSshKeyPassphrase({ id, masterPassword } = {}) {
+  managedKeyPath(id);
+  const metadata = await readVaultMetadata();
+  if (!metadata) return { success: false, message: "Set up Vault first" };
+  let key;
+  try { key = vaultCrypto.unlock(masterPassword, metadata); }
+  catch { return { success: false, message: "Invalid Vault password" }; }
+  const encrypted = metadata.sshKeyPassphrases?.[id];
+  if (!encrypted) return { success: false, message: "No saved passphrase for this key. Enter it once and choose Save to Vault." };
+  return { success: true, passphrase: vaultCrypto.open(encrypted, key) };
+}
+async function managedKeyPassphrase(id, supplied) {
+  if (supplied) return supplied;
+  if (!vaultKey) throw new Error("Unlock Vault to use the saved key passphrase");
+  const metadata = await readVaultMetadata();
+  const encrypted = metadata?.sshKeyPassphrases?.[id];
+  if (!encrypted) throw new Error("Save this key's passphrase to Vault first");
+  return vaultCrypto.open(encrypted, vaultKey);
+}
+async function bindSshKey({ id, connectionId, passphrase } = {}) {
+  const filename = managedKeyPath(id);
+  passphrase = await managedKeyPassphrase(id, passphrase);
+  const conn = await getRawConnection(connectionId);
+  if (!conn || conn.type === "ftp") return { success: false, message: "Select an SSH server" };
+  return saveConnection({ ...conn, password: undefined, privateKey: filename, passphrase });
+}
+async function exportSshKey({ id } = {}) {
+  if (!vaultKey) return { success: false, message: "Unlock Vault before exporting" };
+  const filename = managedKeyPath(id);
+  const metadata = await readVaultMetadata();
+  const key = await fs.readJson(filename + ".json");
+  const { dialog } = require("electron");
+  const result = await dialog.showSaveDialog(global.STATE.mainWindow, {
+    title: "Save encrypted SSH key backup", defaultPath: `${String(key.name).replace(/[^a-zA-Z0-9_-]/g, "_")}.ssh-key.json`,
+    filters: [{ name: "Encrypted SSH key backup", extensions: ["json"] }],
+  });
+  if (result.canceled || !result.filePath) return { success: false, canceled: true };
+  await fs.writeJson(result.filePath, { format: "shieldpress-ssh-key-v1", name: key.name, publicKey: key.publicKey,
+    privateKey: await fs.readFile(filename, "utf8"), passphrase: metadata.sshKeyPassphrases?.[id] || null,
+    vault: { version: metadata.version, kdf: metadata.kdf, check: metadata.check } }, { spaces: 2, mode: 0o600 });
+  await fs.chmod(result.filePath, 0o600);
+  return { success: true, message: "Encrypted backup saved. Its passphrase requires the Vault password used at export time." };
+}
+async function uploadSshKey({ id, connectionId } = {}) {
+  const key = await fs.readJson(managedKeyPath(id) + ".json");
+  const activeId = resolveActiveConnectionId(connectionId) || connectionId;
+  const connected = getActive(activeId) ? await ensureConnected(activeId) : await connect(connectionId);
+  if (!connected.success) return connected;
+  const ac = getActive(activeId);
+  if (!ac || !["ssh", "sftp"].includes(ac.type)) return { success: false, message: "An SSH connection is required" };
+  if (!/^ssh-ed25519 [A-Za-z0-9+/=]+(?: [^\r\n]*)?$/.test(key.publicKey)) throw new Error("Invalid public key");
+  const quoted = "'" + key.publicKey.replace(/'/g, "'\\''") + "'";
+  return sshExecText(ac, `set -eu; umask 077; test ! -L "$HOME/.ssh"; mkdir -p "$HOME/.ssh"; test ! -L "$HOME/.ssh/authorized_keys"; touch "$HOME/.ssh/authorized_keys"; chmod 700 "$HOME/.ssh"; chmod 600 "$HOME/.ssh/authorized_keys"; key=${quoted}; grep -qxF -- "$key" "$HOME/.ssh/authorized_keys" || printf '\n%s\n' "$key" >> "$HOME/.ssh/authorized_keys"`, 15000, true);
+}
+async function testSshKey({ id, connectionId, passphrase } = {}) {
+  const filename = managedKeyPath(id);
+  passphrase = await managedKeyPassphrase(id, passphrase);
+  const conn = await getRawConnection(connectionId);
+  if (!conn || conn.type === "ftp") return { success: false, message: "Select an SSH server" };
+  return new Promise(resolve => {
+    const client = new (require("ssh2").Client)();
+    let finished = false;
+    const finish = result => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      client.destroy();
+      resolve(result);
+    };
+    const timer = setTimeout(() => finish({ success: false, message: "SSH key test timed out" }), 20000);
+    client.on("error", error => finish({ success: false, message: error.message }));
+    client.on("close", () => finish({ success: false, message: "SSH connection closed" }));
+    client.on("ready", () => finish({ success: true, message: "SSH key authentication succeeded" }));
+    try {
+      client.connect({ host: conn.host, port: conn.port, username: conn.username, privateKey: fs.readFileSync(filename), passphrase, readyTimeout: 15000 });
+    } catch (error) { finish({ success: false, message: error.message }); }
+  });
+}
+
 module.exports = {
+  localNetworks, findLocal, cancelLocalScan, listSshKeys, createSshKey, uploadSshKey, testSshKey,
+  saveSshKeyPassphrase, revealSshKeyPassphrase, bindSshKey, exportSshKey,
   getVaultStatus,
   setupVault,
   unlockVault,

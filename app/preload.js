@@ -154,6 +154,18 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("clone-progress", (e, data) => cb(data)),
 
   // SFTP & FTP
+  sftpCancelLan: () => ipcRenderer.invoke("sftp-cancel-lan"),
+  onSftpLanProgress: (callback) => ipcRenderer.on("sftp-lan-progress", (_event, data) => callback(data)),
+  sftpLocalNetworks: () => ipcRenderer.invoke("sftp-local-networks"),
+  sftpFindLocal: (data) => ipcRenderer.invoke("sftp-find-local", data),
+  sftpKeysSavePass: (data) => ipcRenderer.invoke("sftp-keys-save-pass", data),
+  sftpKeysReveal: (data) => ipcRenderer.invoke("sftp-keys-reveal", data),
+  sftpKeysBind: (data) => ipcRenderer.invoke("sftp-keys-bind", data),
+  sftpKeysExport: (data) => ipcRenderer.invoke("sftp-keys-export", data),
+  sftpKeysList: () => ipcRenderer.invoke("sftp-keys-list"),
+  sftpKeysCreate: (data) => ipcRenderer.invoke("sftp-keys-create", data),
+  sftpKeysUpload: (data) => ipcRenderer.invoke("sftp-keys-upload", data),
+  sftpKeysTest: (data) => ipcRenderer.invoke("sftp-keys-test", data),
   sftpVaultStatus: () => ipcRenderer.invoke("sftp-vault-status"),
   sftpVaultSetup: (password) => ipcRenderer.invoke("sftp-vault-setup", password),
   sftpVaultUnlock: (password) => ipcRenderer.invoke("sftp-vault-unlock", password),

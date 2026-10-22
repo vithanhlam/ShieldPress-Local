@@ -161,6 +161,13 @@ async function syncLinuxPhpExtensionDir(phpDir) {
   const extDir = path.join(phpDir, "ext");
   if (!(await fs.pathExists(phpIni)) || !(await fs.pathExists(extDir))) return;
   let ini = await fs.readFile(phpIni, "utf8");
+  // A source runtime can build extensions into PHP itself. Preserve user
+  // settings while dropping stale directives that load old shared modules.
+  const builtins = new Set((await fs.readFile(path.join(phpDir, ".shieldpress-php-builtins"), "utf8").catch(() => "")).split(/\s+/).filter(Boolean));
+  if (builtins.size) ini = ini.split("\n").filter(line => {
+    const match = line.match(/^\s*extension\s*=\s*["']?([a-z0-9_]+)(?:\.so)?["']?\s*(?:;.*)?$/i);
+    return !match || !builtins.has(match[1]);
+  }).join("\n");
   const extDirFwd = extDir.replace(/\\/g, "/");
   if (/^\s*extension_dir\s*=/m.test(ini)) {
     ini = ini.replace(/^\s*extension_dir\s*=.*/m, `extension_dir="${extDirFwd}"`);

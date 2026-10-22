@@ -22,11 +22,286 @@ window.SFTP = {
   _termSortDir: 1,
   _monacoReady: false,
 
+  _lanHosts: [],
+  _lanBusy: false,
+  _lanScanned: false,
+  async openLocal() {
+    const result = await api.sftpLocalNetworks();
+    const select = document.getElementById('sftp-local-network');
+    const previous = select.value;
+    select.replaceChildren();
+    for (const network of result.networks || []) select.add(new Option(`${network.name} · ${network.prefix}.0/24`, network.prefix));
+    if ([...select.options].some(option => option.value === previous)) select.value = previous;
+    document.getElementById('sftp-local-status').textContent = select.options.length ? 'Select a network and scan to discover servers.' : 'Connect to a private IPv4 LAN to scan nearby servers.';
+    document.getElementById('sftp-local-scan').disabled = !select.options.length;
+    this.filterLocal();
+    openModal('m-sftp-local');
+  },
+  filterLocal() {
+    const output = document.getElementById('sftp-local-results');
+    const search = document.getElementById('sftp-local-search').value.trim().toLowerCase();
+    const hosts = this._lanHosts.map(host => ({ ...host, name: this._connections.find(conn => conn.host === host.host)?.name || 'SSH server' }));
+    const visible = hosts.filter(host => `${host.host} ${host.port} ${host.name}`.toLowerCase().includes(search));
+    output.replaceChildren();
+    document.getElementById('sftp-local-count').textContent = `${visible.length}${search ? ` / ${hosts.length}` : ''} device${visible.length === 1 ? '' : 's'}`;
+    if (!visible.length) {
+      const empty = document.createElement('div');
+      empty.className = 'lan-empty';
+      const icon = document.createElement('i');
+      icon.className = this._lanBusy ? 'fas fa-spinner fa-spin' : 'fas fa-network-wired';
+      const text = document.createElement('span');
+      text.textContent = search ? 'No devices match your search.' : this._lanBusy ? 'Looking for devices on your network…' : this._lanScanned ? 'No servers found. Check the SSH port or try another network.' : 'Nearby servers will appear here. Choose Scan network to begin.';
+      empty.append(icon, text);
+      output.appendChild(empty);
+    }
+    for (const host of visible) {
+      const row = document.createElement('div'); row.className = 'lan-device';
+      const icon = document.createElement('i'); icon.className = 'fas fa-server';
+      const info = document.createElement('div'); info.className = 'lan-device-info';
+      const name = document.createElement('div'); name.className = 'lan-device-name'; name.textContent = host.name;
+      const address = document.createElement('div'); address.className = 'lan-device-address'; address.textContent = `${host.host}:${host.port} · Port open`;
+      info.append(name, address);
+      const button = document.createElement('button'); button.className = 'btn btn-ghost btn-sm'; button.textContent = 'Connect';
+      button.onclick = () => this.connectLocalHost(host);
+      row.append(icon, info, button); output.appendChild(row);
+    }
+  },
+  async connectLocalHost(host) {
+    closeModal('m-sftp-local');
+    await this.openAdd();
+    const fill = () => {
+      document.getElementById('sftp-host').value = host.host;
+      document.getElementById('sftp-port').value = host.port;
+      document.getElementById('sftp-name').value = host.name === 'SSH server' ? host.host : host.name;
+      document.getElementById('sftp-user').focus();
+    };
+    if (this._vault.unlocked) fill();
+    else this._pendingVaultAction = async () => { await this.openAdd(); fill(); };
+  },
+  async scanLocal() {
+    if (this._lanBusy) { await api.sftpCancelLan(); return; }
+    const button = document.getElementById('sftp-local-scan');
+    const status = document.getElementById('sftp-local-status');
+    const progress = document.getElementById('sftp-local-progress');
+    this._lanBusy = true; this._lanScanned = true; this._lanHosts = [];
+    document.getElementById('sftp-local-search').value = '';
+    button.innerHTML = '<i class="fas fa-stop"></i> Stop scan';
+    progress.hidden = false; progress.firstElementChild.style.width = '0%';
+    status.textContent = 'Scanning your network…'; this.filterLocal();
+    const started = Date.now();
+    try {
+      const result = await api.sftpFindLocal({ prefix: document.getElementById('sftp-local-network').value, port: Number(document.getElementById('sftp-local-port').value) });
+      if (!result.success) throw new Error(result.message);
+      this._lanHosts = result.hosts;
+      status.textContent = `${result.canceled ? 'Scan stopped' : 'Scan complete'} · ${result.hosts.length} device${result.hosts.length === 1 ? '' : 's'} found · ${((Date.now() - started) / 1000).toFixed(1)}s`;
+      progress.firstElementChild.style.width = '100%';
+    } catch (error) { status.textContent = error.message; }
+    finally { this._lanBusy = false; button.innerHTML = '<i class="fas fa-search"></i> Scan again'; this.filterLocal(); }
+  },
+  _onLanProgress(data) {
+    if (!this._lanBusy || !document.getElementById('sftp-local-progress')) return;
+    document.getElementById('sftp-local-progress').firstElementChild.style.width = `${data.scanned / data.total * 100}%`;
+    document.getElementById('sftp-local-status').textContent = `Checking ${data.scanned} / ${data.total} addresses…`;
+    if (data.host) { this._lanHosts.push(data.host); this.filterLocal(); }
+  },
+  async openKeys() {
+    document.getElementById('sftp-key-create-pass').value = '';
+    this._keyResult('');
+    try { await this.loadKeys(); } catch (error) { return toast(error.message, 'error'); }
+    const select = document.getElementById('sftp-key-server');
+    const previous = select.value;
+    select.replaceChildren();
+    select.add(new Option('Choose a VPS…', ''));
+    for (const conn of this._connections.filter(c => c.type !== 'ftp')) select.add(new Option(`${conn.name} (${conn.username}@${conn.host})`, conn.id));
+    select.value = previous || this._connections.find(c => c.type !== 'ftp')?.id || '';
+    this.keyServerChanged();
+    openModal('m-sftp-keys');
+  },
+  keyServerChanged() {
+    const conn = this._connections.find(c => c.id === document.getElementById('sftp-key-server').value);
+    const input = document.getElementById('sftp-key-name');
+    if (!input.value.trim() || input.value === this._keyAutoName) {
+      input.value = conn?.name || '';
+      this._keyAutoName = input.value;
+    }
+    const matching = this._managedKeys?.find(key => key.privateKey === conn?.privateKey);
+    if (matching) { document.getElementById('sftp-managed-key').value = matching.id; this.showKey(); }
+  },
+  closeKeys() {
+    this.closeKeySecret();
+    for (const id of ['sftp-key-create-pass', 'sftp-key-existing-pass']) document.getElementById(id).value = '';
+    closeModal('m-sftp-keys');
+  },
+  async _withKeyVault(action) {
+    await this.refreshVaultStatus();
+    if (!this._vault.unlocked) {
+      closeModal('m-sftp-keys');
+      await this.openVault(async () => { openModal('m-sftp-keys'); await action(); });
+      return;
+    }
+    await action();
+  },
+  _keyResult(message, state = '') {
+    const output = document.getElementById('sftp-key-result');
+    output.textContent = message; output.dataset.state = state;
+  },
+  _selectedKey() { return this._managedKeys?.find(key => key.id === document.getElementById('sftp-managed-key').value); },
+  async loadKeys(selected) {
+    const result = await api.sftpKeysList();
+    if (!result.success) throw new Error(result.message);
+    this._managedKeys = result.keys;
+    document.getElementById("sftp-key-create-section").open = !result.keys.length;
+    const select = document.getElementById('sftp-managed-key');
+    const previous = selected || select.value;
+    select.replaceChildren();
+    if (!result.keys.length) select.add(new Option('Create your first key above', ''));
+    for (const key of result.keys) select.add(new Option(key.name, key.id));
+    if (result.keys.some(key => key.id === previous)) select.value = previous;
+    this.showKey();
+  },
+  showKey() {
+    this.closeKeySecret();
+    const key = this._selectedKey();
+    const info = document.getElementById('sftp-key-info');
+    info.replaceChildren();
+    if (key) {
+      for (const [label, text] of [['Fingerprint', key.fingerprint], ['Private key · encrypted', key.privateKey]]) {
+        const title = document.createElement('div'); title.className = 'key-info-label'; title.textContent = label;
+        const value = document.createElement('div'); value.textContent = text;
+        info.append(title, value);
+      }
+    } else info.textContent = 'Create a key to connect securely to your VPS.';
+    document.getElementById('sftp-key-secret-state').textContent = key?.hasSavedPassphrase ? 'Saved in Vault' : key ? 'Passphrase not saved' : 'Encrypted';
+    document.getElementById('sftp-key-legacy-pass').hidden = !key || !!key.hasSavedPassphrase;
+    document.getElementById('sftp-key-existing-pass').value = '';
+    document.querySelectorAll('#m-sftp-keys [data-key-action]').forEach(button => { button.disabled = !key; });
+  },
+  randomKeyPass() {
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    document.getElementById('sftp-key-create-pass').value = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_');
+    this._keyResult('Random passphrase ready. Create the key to save it in Vault.');
+  },
+  async copyNewKeyPass() {
+    const value = document.getElementById('sftp-key-create-pass').value;
+    if (!value) return this._keyResult('Choose Random or enter a new passphrase first.');
+    try { await navigator.clipboard.writeText(value); this._keyResult('New passphrase copied.'); }
+    catch { this._keyResult('Could not access the clipboard.', 'error'); }
+  },
+  async createKey(button) {
+    return this._withKeyVault(async () => {
+      if (this._keyBusy) return;
+      this._keyBusy = true; button.disabled = true;
+      this._keyResult('Creating an encrypted key and saving its passphrase to Vault…');
+      const conn = this._connections.find(c => c.id === document.getElementById('sftp-key-server').value);
+      try {
+        const result = await api.sftpKeysCreate({ name: document.getElementById('sftp-key-name').value.trim() || conn?.name || 'SSH Key', passphrase: document.getElementById('sftp-key-create-pass').value });
+        if (!result.success) throw new Error(result.message);
+        document.getElementById('sftp-key-create-pass').value = '';
+        await this.loadKeys(result.key.id);
+        this._keyResult('Key and passphrase saved securely. Choose Upload & test to finish VPS setup.', 'success');
+      } catch (error) { this._keyResult(error.message, 'error'); }
+      finally { this._keyBusy = false; button.disabled = false; }
+    });
+  },
+  async saveExistingKeyPass(button) {
+    const key = this._selectedKey(); if (!key) return;
+    return this._withKeyVault(async () => {
+      button.disabled = true;
+      try {
+        const result = await api.sftpKeysSavePass({ id: key.id, passphrase: document.getElementById('sftp-key-existing-pass').value });
+        if (!result.success) throw new Error(result.message);
+        await this.loadKeys(key.id); this._keyResult('Passphrase saved in Vault. Future tests use it automatically.', 'success');
+      } catch (error) { this._keyResult(error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+  },
+  openKeySecret() {
+    if (!this._selectedKey()) return;
+    this.closeKeySecret();
+    openModal('m-sftp-key-secret');
+    setTimeout(() => document.getElementById('sftp-key-master').focus(), 30);
+  },
+  closeKeySecret() {
+    clearTimeout(this._keyRevealTimer);
+    for (const id of ['sftp-key-master', 'sftp-key-revealed']) { const input = document.getElementById(id); if (input) input.value = ''; }
+    const row = document.getElementById('sftp-key-revealed-row'); if (row) row.hidden = true;
+    const button = document.getElementById('sftp-key-reveal-btn'); if (button) button.hidden = false;
+    const status = document.getElementById('sftp-key-secret-result'); if (status) status.textContent = '';
+    closeModal('m-sftp-key-secret');
+  },
+  async revealKeySecret() {
+    const key = this._selectedKey(); if (!key) return;
+    const button = document.getElementById('sftp-key-reveal-btn'); button.disabled = true;
+    try {
+      const result = await api.sftpKeysReveal({ id: key.id, masterPassword: document.getElementById('sftp-key-master').value });
+      document.getElementById('sftp-key-master').value = '';
+      if (!result.success) throw new Error(result.message);
+      if (!document.getElementById('m-sftp-key-secret').classList.contains('open') || this._selectedKey()?.id !== key.id) return;
+      document.getElementById('sftp-key-revealed').value = result.passphrase;
+      document.getElementById('sftp-key-revealed-row').hidden = false;
+      document.getElementById('sftp-key-secret-result').textContent = 'Unlocked for 45 seconds.';
+      button.hidden = true;
+      this._keyRevealTimer = setTimeout(() => this.closeKeySecret(), 45000);
+    } catch (error) { document.getElementById('sftp-key-secret-result').textContent = error.message; }
+    finally { button.disabled = false; }
+  },
+  async copyRevealedKeySecret() {
+    const value = document.getElementById('sftp-key-revealed').value;
+    if (!value || document.getElementById('sftp-key-revealed-row').hidden) return;
+    try { await navigator.clipboard.writeText(value); document.getElementById('sftp-key-secret-result').textContent = 'Copied. This view closes automatically after 45 seconds.'; }
+    catch { document.getElementById('sftp-key-secret-result').textContent = 'Could not access clipboard.'; }
+  },
+  async copyPublicKey() {
+    const key = this._selectedKey(); if (!key) return;
+    try { await navigator.clipboard.writeText(key.publicKey); this._keyResult('Public key copied.', 'success'); }
+    catch { this._keyResult('Could not access clipboard.', 'error'); }
+  },
+  async exportKey(button) {
+    const key = this._selectedKey(); if (!key) return;
+    return this._withKeyVault(async () => {
+      button.disabled = true;
+      try { const result = await api.sftpKeysExport({ id: key.id }); if (!result.canceled) this._keyResult(result.message, result.success ? 'success' : 'error'); }
+      catch (error) { this._keyResult(error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+  },
+  async useKey(button) { return this.keyAction('use', button); },
+  async keyAction(action, button) {
+    const key = this._selectedKey();
+    const data = { id: key?.id, connectionId: document.getElementById('sftp-key-server').value };
+    if (!data.id || !data.connectionId) return this._keyResult('Select a saved key and VPS connection.', 'error');
+    if (!key.hasSavedPassphrase) return this._keyResult('Enter this key’s passphrase once and save it to Vault above.', 'error');
+    return this._withKeyVault(async () => {
+      if (this._keyBusy) return;
+      this._keyBusy = true;
+      document.querySelectorAll('#m-sftp-keys [data-key-action]').forEach(btn => { btn.disabled = true; });
+      try {
+        if (action === 'setup') {
+          this._keyResult('1 / 3 · Uploading the public key…');
+          const uploaded = await api.sftpKeysUpload(data);
+          if (!uploaded.success) throw new Error(uploaded.message || 'Public key upload failed');
+        }
+        this._keyResult(action === 'setup' ? '2 / 3 · Testing key authentication…' : 'Testing key authentication…');
+        const tested = await api.sftpKeysTest(data);
+        if (!tested.success) throw new Error(tested.message);
+        if (action !== 'test') {
+          this._keyResult('3 / 3 · Saving this key for future VPS logins…');
+          const saved = await api.sftpKeysBind(data);
+          if (!saved.success) throw new Error(saved.message);
+          await this.load();
+        }
+        this._keyResult(action === 'test' ? 'SSH key authentication succeeded.' : 'All set. Key verified and saved for future VPS logins.', 'success');
+      } catch (error) { this._keyResult(error.message, 'error'); }
+      finally { this._keyBusy = false; this.showKey(); }
+    });
+  },
+
   async init() {
     // Page HTML is cached by the router. Ensure a previous terminal overlay can
     // never remain visible when the user returns to this page.
     if (!this._activeShellId) closeModal("m-sftp-terminal");
     if (!this._listening) {
+      api.onSftpLanProgress(data => this._onLanProgress(data));
       api.onSftpProgress((msg) => {
         const syncOut = document.getElementById("sftp-sync-output");
         if (syncOut && document.getElementById("m-sftp-sync")?.classList.contains("open") && typeof msg === "string") {

@@ -7,6 +7,7 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${1:-${PROJECT_DIR}/bin/php}"
 CACHE_DIR="${TMPDIR:-/tmp}/shieldpress-php-win"
+SELECT_SERIES="${2:-all}"
 
 mkdir -p "${OUT_DIR}" "${CACHE_DIR}"
 
@@ -33,7 +34,7 @@ PY
   fi
 }
 
-fetch_zip "8.3" "php-8.3.33-nts-Win32-vs16-x64.zip"
-fetch_zip "8.4" "php-8.4.24-nts-Win32-vs17-x64.zip"
-fetch_zip "8.5" "php-8.5.9-nts-Win32-vs17-x64.zip"
+if [[ "${SELECT_SERIES}" == "all" || "${SELECT_SERIES}" == "8.3" ]]; then fetch_zip "8.3" "php-8.3.33-nts-Win32-vs16-x64.zip"; fi
+if [[ "${SELECT_SERIES}" == "all" || "${SELECT_SERIES}" == "8.4" ]]; then fetch_zip "8.4" "php-8.4.27-nts-Win32-vs17-x64.zip"; fi
+if [[ "${SELECT_SERIES}" == "all" || "${SELECT_SERIES}" == "8.5" ]]; then fetch_zip "8.5" "php-8.5.9-nts-Win32-vs17-x64.zip"; fi
 echo "Prepared Windows PHP runtimes in ${OUT_DIR}"

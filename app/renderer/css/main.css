@@ -2067,3 +2067,58 @@ tr.remote-row-selected td {
   .ai-resource-card { grid-template-columns: 1fr; }
   .ai-permissions { justify-content: flex-start; padding-left: 30px; }
 }
+
+/* SFTP key management and LAN discovery */
+.remote-tools-modal { max-width:760px; padding:26px; display:flex; flex-direction:column; gap:20px; }
+.remote-tools-heading { display:flex; gap:14px; align-items:center; }
+.remote-tools-heading > div:nth-child(2) { flex:1; min-width:0; }
+.remote-tools-heading .modal-title { margin:0 0 5px; }
+.remote-tools-icon { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; background:rgba(249,146,30,.12); color:var(--accent); font-size:18px; flex-shrink:0; }
+.remote-tools-sub { margin:0; color:var(--text2); font-size:12px; line-height:1.65; }
+.remote-field { display:flex; flex-direction:column; gap:8px; min-width:0; }
+.remote-field > label { color:var(--text2); font-size:12px; font-weight:500; line-height:1.5; }
+.remote-field .fi { width:100%; min-width:0; }
+.remote-tools-section { display:flex; flex-direction:column; gap:16px; padding:18px; background:var(--bg3); border:1px solid var(--border); border-radius:12px; }
+.remote-section-title { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; font-weight:600; }
+.remote-section-title i { margin-right:6px; color:var(--accent); }
+.remote-tools-badge { font-size:10px; line-height:1.5; padding:4px 8px; color:var(--text2); background:var(--bg2); border:1px solid var(--border); border-radius:20px; white-space:nowrap; }
+.remote-tools-hint { color:var(--text3); font-size:11px; line-height:1.65; margin:0; font-weight:400; }
+.key-pass-row { display:flex; gap:8px; align-items:center; }
+.key-pass-row > .fi { flex:1; min-width:0; }
+.key-pass-row > button { flex-shrink:0; }
+.key-create-section > .btn { align-self:flex-start; }
+.key-info { font-family:var(--mono); color:var(--text2); font-size:11px; line-height:1.8; overflow-wrap:anywhere; user-select:text; }
+.key-info-label { color:var(--text3); font:10px var(--font); text-transform:uppercase; letter-spacing:.06em; margin-top:8px; }
+.key-secondary-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.remote-result { border-radius:8px; font-size:12px; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+.remote-result:empty { display:none; }
+.remote-result:not(:empty) { padding:10px 12px; background:var(--bg3); border:1px solid var(--border); }
+.remote-result[data-state="error"] { color:var(--red); }
+.remote-result[data-state="success"] { color:var(--green); }
+.key-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.key-footer-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.key-secret-modal { max-width:470px; }
+.lan-settings { display:grid; grid-template-columns:minmax(0,1fr) 95px auto; gap:12px; align-items:end; }
+.lan-results-header { display:flex; align-items:center; gap:14px; justify-content:space-between; font-size:13px; font-weight:600; }
+.lan-results-header .search-wrap { max-width:270px; flex:1; }
+.lan-results-header input { padding-left:32px; }
+.lan-results { min-height:150px; max-height:310px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+.lan-empty { display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:150px; gap:10px; text-align:center; color:var(--text3); font-size:12px; line-height:1.7; }
+.lan-empty > i { font-size:28px; opacity:.6; }
+.lan-device { display:flex; align-items:center; gap:12px; padding:13px 14px; border:1px solid var(--border); border-radius:10px; background:var(--bg3); }
+.lan-device > i { color:var(--green); font-size:19px; }
+.lan-device-info { flex:1; min-width:0; }
+.lan-device-name { font-size:13px; font-weight:500; }
+.lan-device-address { font-size:11px; color:var(--text3); margin-top:5px; }
+.lan-progress { height:3px; background:var(--bg3); border-radius:4px; overflow:hidden; }
+.lan-progress > div { height:100%; width:0; background:var(--accent); transition:width .2s; }
+.remote-tools-modal [hidden] { display:none !important; }
+.remote-tools-modal .modal-footer { margin-top:0; }
+@media(max-width:720px) { .remote-tools-modal { padding:20px; gap:16px; min-width:0; } .key-footer { flex-direction:column; align-items:stretch; } .key-footer-actions { justify-content:flex-start; } .lan-settings { grid-template-columns:minmax(0,1fr) 85px; } .lan-settings > button { grid-column:1/-1; } .key-pass-row { flex-wrap:wrap; } .key-pass-row > .fi { flex-basis:55%; } }
+
+.key-create-section > summary { cursor:pointer; list-style:none; }
+.key-create-section > summary::-webkit-details-marker { display:none; }
+.key-create-section[open] > .remote-field, .key-create-section[open] > .btn { margin-top:16px; }
+.key-create-section > summary .remote-tools-badge i { margin:0 0 0 5px; color:var(--text3); font-size:9px; }
+.key-footer { position:sticky; bottom:-26px; padding:14px 0 6px; background:var(--bg2); border-top:1px solid var(--border); }
+.remote-tools-modal .sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
