@@ -201,10 +201,10 @@
   <div class="card-body">
     <div style="display: flex; gap: 12px; align-items: center;">
       <div style="flex: 1">
-        <div style="font-weight: 500; margin-bottom: 4px;">Windows Hosts File</div>
-        <div style="font-size: 12px; color: var(--text2)">View or manually edit C:\Windows\System32\drivers\etc\hosts.</div>
+        <div id="hosts-file-title" style="font-weight: 500; margin-bottom: 4px;">Windows Hosts File</div>
+        <div id="hosts-file-description" style="font-size: 12px; color: var(--text2)">View or manually edit C:\Windows\System32\drivers\etc\hosts.</div>
       </div>
-      <button class="btn btn-ghost" onclick="Config.openHostsFile()">
+      <button id="hosts-file-button" class="btn btn-ghost" onclick="Config.openHostsFile()">
         <i class="fas fa-file-alt"></i> Edit Hosts File
       </button>
     </div>

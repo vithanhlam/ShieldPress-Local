@@ -26,7 +26,7 @@ test("setup merges defaults and builds a user-writable Linux Nginx layout", asyn
   };
   global.STATE = { runningProjects: {}, logBuffer: [], mainWindow: null };
   await fs.ensureDir(data);
-  await fs.writeJson(global.CONST.CONFIG_FILE, { projects_dir: root });
+  await fs.writeJson(global.CONST.CONFIG_FILE, { projects_dir: root, mysql: { root_password: "root" } });
 
   const setupPath = require.resolve("../app/src/main/setup");
   delete require.cache[setupPath];
@@ -34,11 +34,33 @@ test("setup merges defaults and builds a user-writable Linux Nginx layout", asyn
 
   const config = await fs.readJson(global.CONST.CONFIG_FILE);
   assert.equal(config.mysql.port, 3307);
+  assert.equal(config.mysql.root_password, "root");
   assert.equal(config.nginx.base_port, 8000);
   assert.equal(config.projects_dir, root);
   const nginxConfig = await fs.readFile(path.join(global.CONST.NGINX_DIR, "conf", "nginx.conf"), "utf8");
   assert.match(nginxConfig, /include\s+".*servers\/\*\.conf";/);
   assert.equal(await fs.pathExists(path.join(global.CONST.NGINX_DIR, "fastcgi_params")), true);
+});
+
+test("phpMyAdmin generates cookie login configuration when its config is missing", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "shieldpress-pma-"));
+  t.after(() => fs.remove(root));
+  global.CONST = {
+    PMA_DIR: path.join(root, "pma"), NGINX_DIR: path.join(root, "nginx"),
+    CONFIG_FILE: path.join(root, "config.json"),
+  };
+  await fs.ensureDir(global.CONST.PMA_DIR);
+  await fs.ensureDir(path.join(global.CONST.NGINX_DIR, "conf", "servers"));
+  await fs.writeJson(global.CONST.CONFIG_FILE, { mysql: { port: 3310, root_password: "changed" } });
+  const services = require("../app/src/main/services");
+  t.mock.method(services, "getAvailablePhpVersions", async () => ["8.3"]);
+  t.mock.method(services, "getPhpPort", () => 9083);
+  await require("../app/src/main/setup").setupPhpMyAdmin();
+  const config = await fs.readFile(path.join(global.CONST.PMA_DIR, "config.inc.php"), "utf8");
+  assert.match(config, /auth_type'\]\s*= 'cookie'/);
+  assert.match(config, /AllowNoPassword'\]\s*= false/);
+  assert.match(config, /port'\]\s*= 3310/);
+  assert.ok(!config.includes("changed"));
 });
 
 test("Linux database migration updates local WordPress ports but preserves PostgreSQL", async (t) => {
@@ -63,10 +85,10 @@ test("Linux database migration updates local WordPress ports but preserves Postg
 
   const wordpressProject = await fs.readJson(path.join(wordpress, "project.json"));
   assert.equal(wordpressProject.dbPort, 3307);
-  assert.equal(wordpressProject.dbPassword, "");
+  assert.equal(wordpressProject.dbPassword, "root");
   const wpConfig = await fs.readFile(path.join(wordpress, "www", "wp-config.php"), "utf8");
   assert.match(wpConfig, /127\.0\.0\.1:3307/);
-  assert.match(wpConfig, /DB_PASSWORD['"]\s*,\s*['"]['"]/);
+  assert.match(wpConfig, /DB_PASSWORD['"]\s*,\s*['"]root['"]/);
   const env = await fs.readFile(path.join(laravel, "www", ".env"), "utf8");
   assert.match(env, /DB_PORT=5432/);
   assert.match(env, /WP_DB_PORT=3307/);

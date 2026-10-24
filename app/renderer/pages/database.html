@@ -56,9 +56,14 @@
       This password is used by local WordPress and Laravel projects.
       Leave the new password empty to disable password authentication.
     </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn btn-ghost btn-sm" onclick="openModal('m-root-password')">
       <i class="fas fa-key"></i> Change password
     </button>
+    <button class="btn btn-danger-ghost btn-sm" id="db-root-password-remove" onclick="Database.removeRootPassword()" style="display:none">
+      <i class="fas fa-unlock"></i> Remove password
+    </button>
+    </div>
   </div>
 </div>
 

@@ -7,11 +7,23 @@ window.Config = {
   async load() {
     await this._loadPhpVersions();
     this._fillProjects();
+    this._updateHostsFileLabel();
+  },
+
+  async _updateHostsFileLabel() {
+    try {
+      const info = await api.getAppInfo();
+      if (info.platform === 'linux') {
+        document.querySelector('#hosts-file-title').textContent = 'Ubuntu Hosts File';
+        document.querySelector('#hosts-file-description').textContent = 'View or manually edit /etc/hosts. You may need administrator privileges to save changes.';
+        document.querySelector('#hosts-file-button').innerHTML = '<i class="fas fa-file-alt"></i> Open Hosts File';
+      }
+    } catch { }
   },
 
   openHostsFile() {
     api.openHostsFile();
-    toast("Opening Hosts file in Notepad. Make sure you have Administrator privileges to save it.", "info", 5000);
+    toast("Opening the Hosts file. You may need administrator privileges to save changes.", "info", 5000);
   },
 
   // ── Scan & render PHP version sub-tabs ──────────────────────────────────────

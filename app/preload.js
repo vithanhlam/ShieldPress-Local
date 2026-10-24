@@ -119,6 +119,7 @@ contextBridge.exposeInMainWorld("api", {
   aiAccessGetResources: () => ipcRenderer.invoke("ai-access-get-resources"),
   aiAccessGetDefaultLocalFolder: () => ipcRenderer.invoke("ai-access-get-default-local-folder"),
   aiAccessGetConnectInfo: () => ipcRenderer.invoke("ai-access-get-connect-info"),
+  aiAccessApplyMcp: () => ipcRenderer.invoke("ai-access-apply-mcp"),
   aiAccessGetSkill: () => ipcRenderer.invoke("ai-access-get-skill"),
   aiAccessGetAudit: (limit) => ipcRenderer.invoke("ai-access-get-audit", limit),
   aiAccessGetReqnora: () => ipcRenderer.invoke("ai-access-get-reqnora"),

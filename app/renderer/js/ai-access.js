@@ -48,6 +48,16 @@ window.AIAccess = {
     }
   },
 
+  async applyMcp() {
+    try {
+      const result = await api.aiAccessApplyMcp();
+      if (!result?.success) throw new Error(result?.message || "Could not apply MCP settings");
+      toast(`MCP applied to Codex. Restart Codex to load it. Settings: ${result.path}`, "success", 7000);
+    } catch (error) {
+      toast("Could not apply MCP settings: " + error.message, "error", 7000);
+    }
+  },
+
   async testConnect() {
     await this.loadConnectInfo();
     toast(this.connectInfo?.running ? "ShieldPress gateway is running" : "Open ShieldPress Local, then try again", this.connectInfo?.running ? "success" : "warn");
@@ -58,6 +68,7 @@ window.AIAccess = {
       const [policy, result] = await Promise.all([api.aiAccessGetPolicy(), api.aiAccessGetResources()]);
       this.policy = policy;
       this.resources = result.resources || [];
+      if (result.databaseError) toast("Could not load local databases: " + result.databaseError, "error");
       document.getElementById("ai-enabled").checked = !!policy.enabled;
       document.getElementById("ai-require-approval").checked = policy.requireApproval !== false;
       document.getElementById("ai-session-approval").checked = !!policy.sessionApproval;

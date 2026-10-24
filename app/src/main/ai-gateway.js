@@ -73,6 +73,55 @@ function getConnectInfo() {
     },
   };
 }
+
+function tomlString(value) {
+  return `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
+}
+
+function isShieldPressMcpSection(line) {
+  const match = line.match(/^\s*\[\[?([^\]]+)\]\]?\s*(?:#.*)?$/);
+  if (!match) return false;
+  const parts = match[1].replace(/["']/g, "").split(".").map((part) => part.trim());
+  return parts[0] === "mcp_servers" && parts[1] === "shieldpress";
+}
+
+async function applyToCodex() {
+  const { scriptPath, dataDir } = getConnectInfo();
+  const configDir = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+  const configPath = path.join(configDir, "config.toml");
+  await fs.ensureDir(configDir);
+
+  let current = "";
+  let fileMode = 0o600;
+  try {
+    current = await fs.readFile(configPath, "utf8");
+    fileMode = (await fs.stat(configPath)).mode & 0o777;
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  const kept = [];
+  let skipServer = false;
+  for (const line of current.split(/\r?\n/)) {
+    if (/^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/.test(line)) {
+      skipServer = isShieldPressMcpSection(line);
+    }
+    if (!skipServer) kept.push(line);
+  }
+  while (kept.length && !kept[kept.length - 1].trim()) kept.pop();
+  const entry = [
+    "[mcp_servers.shieldpress]",
+    `command = ${tomlString("node")}`,
+    `args = [${tomlString(scriptPath)}]`,
+    `env = { SHIELDPRESS_DATA_DIR = ${tomlString(dataDir)} }`,
+  ].join("\n");
+  const next = `${kept.length ? kept.join("\n") + "\n\n" : ""}${entry}\n`;
+  const tempPath = `${configPath}.${process.pid}.tmp`;
+  await fs.writeFile(tempPath, next, { encoding: "utf8", mode: fileMode });
+  try { await fs.chmod(tempPath, fileMode); } catch {}
+  await fs.rename(tempPath, configPath);
+  return { success: true, path: configPath, restartRequired: true };
+}
 async function loadPending() {
   try {
     const entries = await fs.readJson(pendingFile());
@@ -434,4 +483,4 @@ async function start() {
   return { port: server.address().port, token: gatewayToken };
 }
 async function stop() { if (!server) return; await new Promise((resolve) => server.close(resolve)); server = null; gatewayToken = null; try { await fs.remove(tokenFile()); } catch {} }
-module.exports = { start, stop, getConnectInfo, listPending, resolveApproval, getRequest };
+module.exports = { start, stop, getConnectInfo, applyToCodex, listPending, resolveApproval, getRequest };

@@ -17,9 +17,7 @@ function dumpBin() {
 function connectionArgsFor(platformName, mysqlConfig = {}) {
   const port = mysqlConfig.port || (platformName === "win32" ? 3306 : 3307);
   const args = ["-h", "127.0.0.1", "-P", String(port), "-u", "root"];
-  // The bundled Windows database is initialized with this root password.
-  // Linux uses a separate passwordless, user-owned MariaDB instance.
-  if (platformName === "win32") {
+  if (platformName === "win32" || mysqlConfig.root_password !== undefined) {
     const password = mysqlConfig.root_password === undefined ? "root" : mysqlConfig.root_password;
     args.push(`--password=${password}`);
   }
@@ -321,14 +319,23 @@ async function syncProjectDatabasePasswords(password) {
       project.dbPassword = password;
       await fs.writeJson(projectFile, project, { spaces: 2 });
 
-      const envFile = path.join(projectDir, "www", ".env");
-      if (await fs.pathExists(envFile)) {
+      for (const envName of [".env", ".env.local"]) {
+        const envFile = path.join(projectDir, "www", envName);
+        if (!(await fs.pathExists(envFile))) continue;
         let env = await fs.readFile(envFile, "utf8");
-        const line = `DB_PASSWORD=${password}`;
-        const pattern = /^\s*#?\s*DB_PASSWORD=.*$/m;
-        env = pattern.test(env)
-          ? env.replace(pattern, line)
-          : `${env}${env.endsWith("\n") ? "" : "\n"}${line}\n`;
+        env = env.replace(/^(\s*DB_PASSWORD=).*$/m, (_match, prefix) => prefix + JSON.stringify(password));
+        env = env.replace(/^(\s*DATABASE_URL=)([^\r\n]*)/gm, (match, prefix, value) => {
+          const quote = value.startsWith('"') || value.startsWith("'") ? value[0] : "";
+          const raw = quote && value.endsWith(quote) ? value.slice(1, -1) : value;
+          try {
+            const url = new URL(raw);
+            if (!["mysql:", "mariadb:"].includes(url.protocol) || url.username !== "root" ||
+                !["127.0.0.1", "localhost"].includes(url.hostname) ||
+                Number(url.port || 3306) !== Number(project.dbPort || (process.platform === "win32" ? 3306 : 3307))) return match;
+            url.password = encodeURIComponent(password);
+            return prefix + quote + url.toString() + quote;
+          } catch { return match; }
+        });
         await fs.writeFile(envFile, env, "utf8");
       }
 
@@ -400,5 +407,6 @@ module.exports = {
   dropDatabase,
   getRootPasswordStatus,
   changeRootPassword,
+  syncProjectDatabasePasswords,
   execRawSql,
 };

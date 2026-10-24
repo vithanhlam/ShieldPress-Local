@@ -108,15 +108,20 @@ async function savePolicy(input) {
 }
 
 async function getResources() {
-  const [projects, connectionsResult, bucketsResult] = await Promise.all([
+  const [projects, connectionsResult, bucketsResult, databaseResult] = await Promise.all([
     require("./projects").getProjects().catch(() => []),
     require("./sftp").getConnections().catch(() => ({ connections: [] })),
     require("./s3").getBuckets().catch(() => ({ buckets: [] })),
+    require("./database").listDatabases().catch((error) => ({ success: false, message: String(error) })),
   ]);
   const projectItems = Array.isArray(projects) ? projects : (projects.projects || []);
   const connections = connectionsResult.connections || connectionsResult || [];
   const buckets = bucketsResult.buckets || bucketsResult || [];
   const policy = await getPolicy();
+  const databaseNames = [...new Set([
+    ...(databaseResult.databases || []),
+    ...projectItems.map((project) => project.dbName).filter(Boolean),
+  ])];
   const configResources = [
     { type: "config", id: "shieldpress", name: "ShieldPress settings", scope: global.CONST.CONFIG_FILE },
     { type: "config", id: "mariadb", name: "MariaDB configuration", scope: path.join(global.CONST.MARIADB_DIR, process.platform === "win32" ? "my.ini" : "my.cnf") },
@@ -133,6 +138,7 @@ async function getResources() {
   } catch {}
   return {
     success: true,
+    databaseError: databaseResult.success ? null : databaseResult.message,
     resources: [
       ...projectItems.map((project) => ({
         type: "source", id: String(project.id), name: project.name || project.id,
@@ -141,8 +147,8 @@ async function getResources() {
       ...policy.resources.filter((resource) => resource.type === "local").map((resource) => ({
         type: "local", id: resource.id, name: resource.name, scope: resource.scope,
       })),
-      ...projectItems.filter((project) => project.dbName).map((project) => ({
-        type: "database", id: String(project.dbName), name: project.dbName, scope: project.dbName,
+      ...databaseNames.map((name) => ({
+        type: "database", id: String(name), name, scope: name,
       })),
       ...configResources,
       ...connections.map((connection) => ({

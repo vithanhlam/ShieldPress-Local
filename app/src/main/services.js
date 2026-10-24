@@ -667,38 +667,7 @@ async function runnableMariaDbServer() {
 function runMariaDbClient(port, sql) {
   const client = platform.executable("mysql");
   if (!client) return Promise.resolve({ ok: false, message: "MariaDB client not found" });
-    return spawnResult(client, ["-h", "127.0.0.1", "-P", String(port), "-u", "root", "-e", sql], { timeoutMs: 15000 });
-}
-
-async function repairLinuxRootAuthentication(mysqld, serverArgs, port) {
-  log.warn("Repairing Windows MariaDB root authentication for Ubuntu...");
-  await killProc(mariadbProc);
-  mariadbProc = null;
-  global.STATE.isDBRunning = false;
-  await delay(1000);
-
-  const repairProc = spawn(mysqld, [...serverArgs, "--skip-grant-tables"], {
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: false,
-    ...WIN_SPAWN,
-  });
-  let repairError = "";
-  repairProc.stderr.on("data", (data) => { repairError += data; });
-  if (!(await waitPort(port, 20))) {
-    await killProc(repairProc);
-    return { success: false, message: repairError.trim() || "MariaDB repair mode did not start" };
-  }
-
-  const sql =
-    "UPDATE mysql.global_priv " +
-    "SET Priv=JSON_REMOVE(JSON_SET(Priv,'$.plugin','mysql_native_password','$.authentication_string',''),'$.auth_or') " +
-    "WHERE User='root'; FLUSH PRIVILEGES;";
-  const repaired = await runMariaDbClient(port, sql);
-  await killProc(repairProc);
-  await delay(1000);
-  if (!repaired.ok) return { success: false, message: repaired.message };
-  log.ok("MariaDB root authentication migrated for Ubuntu");
-  return { success: true };
+  return spawnResult(client, [...require("./database").connectionArgs(), "-P", String(port), "-e", sql], { timeoutMs: 15000 });
 }
 
 async function initMariaDB() {
@@ -874,9 +843,7 @@ async function startMariaDB() {
     if (platform.isLinux) {
       const connection = await runMariaDbClient(port, "SELECT 1");
       if (!connection.ok) {
-        const repair = await repairLinuxRootAuthentication(mysqld, serverArgs, port);
-        if (!repair.success) return repair;
-        return startMariaDB();
+        return { success: false, message: `MariaDB started but root authentication failed. Check the saved root password: ${connection.message || "Connection failed"}` };
       }
     }
     global.STATE.isDBRunning = true;
@@ -894,11 +861,9 @@ async function stopMariaDB() {
       const port = await getMariaDBPort();
       let mysqlConfig = {};
       try { mysqlConfig = (await fs.readJson(global.CONST.CONFIG_FILE)).mysql || {}; } catch {}
-      const auth = platform.isWindows
-        ? [`--password=${mysqlConfig.root_password === undefined ? "root" : mysqlConfig.root_password}`]
-        : [];
+      const auth = require("./database").connectionArgsFor(process.platform, mysqlConfig);
       await new Promise((resolve) => {
-        const proc = spawn(mysqladmin, ["-h", "127.0.0.1", "-P", String(port), "-u", "root", ...auth, "shutdown"], { stdio: "ignore", ...WIN_SPAWN });
+        const proc = spawn(mysqladmin, [...auth, "-P", String(port), "shutdown"], { stdio: "ignore", ...WIN_SPAWN });
         const timer = setTimeout(() => { try { proc.kill(); } catch {} resolve(); }, 8000);
         proc.on("error", () => { clearTimeout(timer); resolve(); });
         proc.on("close", () => { clearTimeout(timer); resolve(); });

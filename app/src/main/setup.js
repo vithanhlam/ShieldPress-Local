@@ -37,11 +37,6 @@ async function migrateLinuxDatabasePort(projectsDir, fromPort = 3306, toPort = 3
       if (!project.dbPort || Number(project.dbPort) === fromPort) {
         project.dbPort = toPort;
       }
-      // Windows workspaces use root/root. ShieldPress's isolated Ubuntu
-      // instance intentionally uses passwordless local root authentication.
-      if ((project.dbUser || "root") === "root" && project.dbPassword === "root") {
-        project.dbPassword = "";
-      }
       await fs.writeJson(projectFile, project, { spaces: 2 });
 
       const wpConfig = path.join(projectDir, "www", "wp-config.php");
@@ -51,12 +46,6 @@ async function migrateLinuxDatabasePort(projectsDir, fromPort = 3306, toPort = 3
           /(define\(\s*['"]DB_HOST['"]\s*,\s*['"])(?:127\.0\.0\.1|localhost)(?::3306)?(['"]\s*\))/i,
           `$1127.0.0.1:${toPort}$2`,
         );
-        if (/define\(\s*['"]DB_USER['"]\s*,\s*['"]root['"]\s*\)/i.test(content)) {
-          content = content.replace(
-            /(define\(\s*['"]DB_PASSWORD['"]\s*,\s*['"])root(['"]\s*\))/i,
-            "$1$2",
-          );
-        }
         await fs.writeFile(wpConfig, content);
       }
 
@@ -66,9 +55,6 @@ async function migrateLinuxDatabasePort(projectsDir, fromPort = 3306, toPort = 3
         content = content.replace(/^WP_DB_PORT=3306\s*$/m, `WP_DB_PORT=${toPort}`);
         if (/^DB_CONNECTION=mysql\s*$/m.test(content)) {
           content = content.replace(/^DB_PORT=3306\s*$/m, `DB_PORT=${toPort}`);
-          if (/^DB_USERNAME=root\s*$/m.test(content)) {
-            content = content.replace(/^DB_PASSWORD=root\s*$/m, "DB_PASSWORD=");
-          }
         }
         await fs.writeFile(envFile, content);
       }
@@ -230,9 +216,6 @@ async function init() {
   const migrateLinuxPort = process.platform === "linux" && currentConfig.mysql?.port === 3306;
   if (migrateLinuxPort) {
     mergedConfig.mysql.port = 3307;
-  }
-  if (process.platform === "linux" && mergedConfig.mysql.root_password === "root") {
-    mergedConfig.mysql.root_password = "";
   }
   await fs.writeJson(CONFIG_FILE, mergedConfig, { spaces: 2 });
   if (process.platform === "linux") {
@@ -556,13 +539,14 @@ async function setupPhpMyAdmin() {
   const port = cfg.phpmyadmin?.port || 8080;
   const mysqlPort = cfg.mysql?.port || (process.platform === "win32" ? 3306 : 3307);
   const fastcgiParams = path.join(NGINX_DIR, "fastcgi_params").replace(/\\/g, "/");
+  const phpMyAdminConfigPath = String(CONFIG_FILE).replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
   // Escape space bằng cách dùng forward slash và escape
   const pmaRoot = PMA_DIR.replace(/\\/g, "/");
   const pmaPath = pmaRoot.includes(" ") ? `"${pmaRoot}"` : pmaRoot;
 
   // Update phpMyAdmin config.inc.php with correct MySQL port
   const pmaConfigPath = path.join(PMA_DIR, "config.inc.php");
-  if (fs.existsSync(pmaConfigPath)) {
+  {
     const pmaConf = `<?php
 $cfg['blowfish_secret'] = 'BmVy5EgowWCp8tTcvNrSsqjJiXPlxLeZ';
 $i = 0;
@@ -571,7 +555,7 @@ $cfg['Servers'][$i]['auth_type']      = 'cookie';
 $cfg['Servers'][$i]['host']           = '127.0.0.1';
 $cfg['Servers'][$i]['port']           = ${mysqlPort};
 $cfg['Servers'][$i]['compress']       = false;
-$cfg['Servers'][$i]['AllowNoPassword'] = true;
+$cfg['Servers'][$i]['AllowNoPassword'] = ${!(cfg.mysql?.root_password ?? (process.platform === "win32" ? "root" : ""))};
 $cfg['UploadDir'] = '';
 $cfg['SaveDir']   = '';
 `;
@@ -598,6 +582,7 @@ $cfg['SaveDir']   = '';
     location ~ \\.php$ {
         fastcgi_pass 127.0.0.1:${fastcgiPort};
         include "${fastcgiParams}";
+        fastcgi_param SHIELDPRESS_CONFIG_FILE "${phpMyAdminConfigPath}";
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     }
 }

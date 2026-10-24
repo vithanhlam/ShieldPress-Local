@@ -132,15 +132,13 @@ async function installLaravel({ id, phpVersion }, onProgress) {
 
   // Read app config for MariaDB port
   let dbPort = proj.dbPort || (process.platform === "win32" ? 3306 : 3307);
-  let dbPassword = platform.isWindows
-    ? (proj.dbPassword === undefined ? "root" : proj.dbPassword)
-    : "";
+  let dbPassword = proj.dbPassword ?? (platform.isWindows ? "root" : "");
   try {
     const cfg = await fs.readJson(CONFIG_FILE);
     dbPort = cfg.mysql?.port || (process.platform === "win32" ? 3306 : 3307);
-    dbPassword = platform.isWindows
-      ? (cfg.mysql?.root_password === undefined ? dbPassword : cfg.mysql.root_password)
-      : (proj.dbUser && proj.dbUser !== "root" ? (proj.dbPassword || "") : "");
+    dbPassword = proj.dbUser && proj.dbUser !== "root"
+      ? (proj.dbPassword || "")
+      : (cfg.mysql?.root_password ?? dbPassword);
   } catch (_) {}
 
   emit("Starting Laravel installation...", onProgress);

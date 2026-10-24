@@ -1,5 +1,35 @@
 # Changelog
 
+## v2.5.64
+
+**Database / phpMyAdmin**
+- Connects phpMyAdmin to ShieldPress's configured MariaDB port and root password, including after password changes
+- Adds a direct Remove password action for MariaDB root and updates local project connection strings
+
+**AI Access / MCP**
+- Adds one-click installation of the ShieldPress MCP server into the user's global Codex configuration
+
+**Ubuntu Settings**
+- Adds a link to open `/etc/hosts` from Settings
+
+**Release**
+- Builds updated Windows NSIS (`.exe`) and Ubuntu/Debian (`.deb`) installers
+
+## v2.5.63
+
+**Database / phpMyAdmin**
+- Uses the configured MariaDB root password on Linux for database listing, project setup, and service checks
+- Keeps the saved root password during startup instead of silently clearing it or attempting an automatic authentication repair
+- Updates local MySQL `DATABASE_URL` values in `.env.local` when the root password changes
+- Regenerates phpMyAdmin login settings and opens a fresh cookie login session
+
+**AI Access**
+- Lists every local database, including databases not attached to a ShieldPress project
+- Shows a connection error when the database list cannot be loaded
+
+**Release**
+- Builds an updated Ubuntu/Debian `.deb` installer
+
 ## v2.5.62
 
 **PHP Security**

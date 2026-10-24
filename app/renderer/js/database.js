@@ -184,6 +184,16 @@ window.Database = {
     }
     status.textContent = r.hasPassword ? "Password configured" : "No password required";
     status.style.color = r.hasPassword ? "var(--yellow)" : "var(--green)";
+    const remove = document.getElementById("db-root-password-remove");
+    if (remove) remove.style.display = r.hasPassword ? "inline-flex" : "none";
+  },
+
+  async removeRootPassword() {
+    if (!confirm("Remove the MariaDB root password? ShieldPress will update local projects and phpMyAdmin will use passwordless root access.")) return;
+    const result = await api.changeRootPassword("");
+    if (!result.success) return toast("Could not remove root password: " + result.message, "error");
+    await this.loadRootPasswordStatus();
+    toast("MariaDB root password removed", "success");
   },
 
   async changeRootPassword() {

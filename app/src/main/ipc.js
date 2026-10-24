@@ -144,6 +144,7 @@ function register(ipcMain, shell, dialog) {
     return process.platform === "win32" ? electronApp.getPath("temp") : "/tmp";
   });
   ipcMain.handle("ai-access-get-connect-info", () => aiGateway.getConnectInfo());
+  ipcMain.handle("ai-access-apply-mcp", () => aiGateway.applyToCodex());
   ipcMain.handle("ai-access-get-skill", () => aiAccess.getSkill());
   ipcMain.handle("ai-access-get-audit", (_e, limit) => aiAccess.getAudit(limit));
   ipcMain.handle("ai-access-get-reqnora", () => aiAccess.getReqnora());
@@ -430,6 +431,7 @@ function register(ipcMain, shell, dialog) {
     name: global.CONST.APP_NAME,
     version: global.CONST.APP_VERSION,
     author: global.CONST.APP_AUTHOR,
+    platform: process.platform,
   }));
 
   // ── Check for updates (GitHub Releases API) ──
@@ -510,7 +512,7 @@ function register(ipcMain, shell, dialog) {
     if (!(await svc.waitPort(pmaPort, 10))) {
       return { success: false, message: `phpMyAdmin did not start on port ${pmaPort}` };
     }
-    shell.openExternal(`http://localhost:${pmaPort}`);
+    shell.openExternal(`http://localhost:${pmaPort}/index.php?route=/logout`);
     return { success: true };
   });
 

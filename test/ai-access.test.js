@@ -4,6 +4,30 @@ const fs = require("fs-extra");
 const os = require("os");
 const path = require("path");
 
+test("AI Access discovers standalone databases and reports connection failures", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "shieldpress-db-resources-"));
+  t.after(() => fs.remove(root));
+  global.CONST = {
+    DATA_DIR: root, PROJECTS_DIR: root, CONFIG_FILE: path.join(root, "config.json"),
+    MARIADB_DIR: root, NGINX_DIR: root, PHP_BASE_DIR: root,
+  };
+  t.mock.method(require("../app/src/main/projects"), "getProjects", async () => [
+    { id: "one", dbName: "shared" }, { id: "two", dbName: "shared" },
+  ]);
+  t.mock.method(require("../app/src/main/sftp"), "getConnections", async () => ({ connections: [] }));
+  t.mock.method(require("../app/src/main/s3"), "getBuckets", async () => ({ buckets: [] }));
+  const db = require("../app/src/main/database");
+  const listing = t.mock.method(db, "listDatabases", async () => ({ success: true, databases: ["shared", "standalone"] }));
+  const ai = require("../app/src/main/ai-access");
+  const result = await ai.getResources();
+  assert.deepEqual(result.resources.filter((r) => r.type === "database").map((r) => r.id), ["shared", "standalone"]);
+  assert.equal(result.databaseError, null);
+  listing.mock.mockImplementation(async () => ({ success: false, message: "Access denied" }));
+  const failed = await ai.getResources();
+  assert.equal(failed.databaseError, "Access denied");
+  assert.equal(failed.resources.filter((r) => r.type === "database").length, 1);
+});
+
 test("AI Access policy defaults closed and enforces safety invariants", async (t) => {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "shieldpress-ai-access-"));
   t.after(() => fs.remove(dataDir));
