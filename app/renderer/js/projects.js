@@ -354,6 +354,7 @@ window.Projects = {
     });
     if (r.success) {
       toast("Settings saved", "success");
+      if (r.warning) toast(r.warning, "warn", 6000);
       closeModal("m-edit");
       await this.load();
     } else toast("Save failed: " + r.message, "error");

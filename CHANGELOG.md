@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.5.66
+
+**Node.js**
+- Adds a Node.js page in the sidebar: lists listening Node ports (PID, project, command), with Stop for any listed process
+- Starts, stops and restarts Node/Next.js project dev servers from the app with a configurable start command and captured logs
+- Warns when a project's Node port is already in use; managed Node processes stop when the app quits
+
+**WordPress install**
+- Download retries over IPv4 and shows the real network error instead of an empty message
+- Uses a unique temp folder per install, handles redirects/HTTP errors, and reports extraction failures instead of hanging the button
+
+**Release**
+- Windows build script downloads PHP 8.4.27-1 from `downloads.php.net` and falls back to `archives/` for superseded builds
+- Node.js page scans listening ports with a single PowerShell query on Windows
+- Builds updated Windows NSIS (`.exe`) and Ubuntu/Debian (`.deb`) installers
+
+**PHP versions**
+- Changing a project's PHP version now validates the version and starts its php-cgi (no more 502 after switching)
+- PHP versions other than 8.x use their own CGI port range so 7.4 and 8.4 no longer collide
+
 ## v2.5.64
 
 **Database / phpMyAdmin**

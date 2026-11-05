@@ -13,6 +13,49 @@ function wpSalt() {
   return crypto.randomBytes(48).toString("base64").replace(/'/g, "\\'");
 }
 
+function describeError(e) {
+  if (!e) return "unknown error";
+  const parts = [];
+  const list = Array.isArray(e.errors) && e.errors.length ? e.errors : [e];
+  for (const x of list) {
+    const t = [x.code, x.message].filter(Boolean).join(" ");
+    if (t && !parts.includes(t)) parts.push(t);
+  }
+  return parts.join("; ") || String(e.name || e);
+}
+
+function httpDownload(url, dest, { family, redirects = 5, timeout = 30000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { family, timeout, headers: { "User-Agent": "ShieldPressLocal" } }, (res) => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+        res.resume();
+        if (redirects <= 0) return reject(new Error("Too many redirects"));
+        const next = new URL(res.headers.location, url).toString();
+        return httpDownload(next, dest, { family, redirects: redirects - 1, timeout }).then(resolve, reject);
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error("HTTP " + res.statusCode)); }
+      const file = fs.createWriteStream(dest);
+      res.on("error", (e) => { file.destroy(); reject(e); });
+      file.on("error", reject);
+      file.on("finish", () => file.close(() => resolve()));
+      res.pipe(file);
+    });
+    req.on("timeout", () => req.destroy(new Error("Connection timed out")));
+    req.on("error", reject);
+  });
+}
+
+// Try default network stack first, then force IPv4 (fixes broken IPv6 / AggregateError with empty message)
+async function downloadFile(url, dest) {
+  try {
+    await httpDownload(url, dest);
+  } catch (e1) {
+    log.warn("Download failed (" + describeError(e1) + "), retrying over IPv4...");
+    try { await httpDownload(url, dest, { family: 4 }); }
+    catch (e2) { throw new Error(describeError(e2)); }
+  }
+}
+
 async function installWordPress(data) {
   const { id, siteTitle, adminUser, adminPassword, adminEmail, force } = data;
   const { PROJECTS_DIR, CONFIG_FILE, NGINX_DIR } = global.CONST;
@@ -44,28 +87,30 @@ async function installWordPress(data) {
   log.info(`Installing WordPress for ${proj.name}...`);
 
   // Download
-  const wpZip = path.join(os.tmpdir(), "wordpress.zip");
+  const tmpBase    = await fs.mkdtemp(path.join(os.tmpdir(), "shieldpress-wp-"));
+  const wpZip      = path.join(tmpBase, "wordpress.zip");
+  const tmpExtract = path.join(tmpBase, "extract");
   log.info("Downloading WordPress...");
   try {
-    await new Promise((resolve, reject) => {
-      const file = fs.createWriteStream(wpZip);
-      https.get("https://wordpress.org/latest.zip", (res) => {
-        res.pipe(file);
-        file.on("finish", () => { file.close(); resolve(); });
-      }).on("error", reject);
-    });
+    await downloadFile("https://wordpress.org/latest.zip", wpZip);
     log.ok("WordPress downloaded");
-  } catch (e) { return { success: false, message: "Download failed: " + e.message }; }
+  } catch (e) {
+    await fs.remove(tmpBase).catch(() => {});
+    return { success: false, message: "Download failed: " + e.message };
+  }
 
   // Extract
-  const extract    = require("extract-zip");
-  const tmpExtract = path.join(os.tmpdir(), "wp-extract");
-  await fs.ensureDir(tmpExtract);
-  await extract(wpZip, { dir: tmpExtract });
-  await fs.copy(path.join(tmpExtract, "wordpress"), wwwDir, { overwrite: true });
-  await fs.remove(tmpExtract);
-  await fs.remove(wpZip);
-  log.ok("WordPress extracted");
+  try {
+    const extract = require("extract-zip");
+    await fs.ensureDir(tmpExtract);
+    await extract(wpZip, { dir: tmpExtract });
+    await fs.copy(path.join(tmpExtract, "wordpress"), wwwDir, { overwrite: true });
+    log.ok("WordPress extracted");
+  } catch (e) {
+    return { success: false, message: "Extract failed: " + describeError(e) };
+  } finally {
+    await fs.remove(tmpBase).catch(() => {});
+  }
 
   // wp-config.php
   const wpConfig = `<?php
@@ -210,14 +255,7 @@ async function downloadWpCli() {
   await fs.ensureDir(path.dirname(WP_CLI));
   log.info("Downloading WP-CLI...");
   try {
-    await new Promise((resolve, reject) => {
-      const file = fs.createWriteStream(WP_CLI);
-      https.get("https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar", (res) => {
-        if (res.statusCode !== 200) { reject(new Error("HTTP " + res.statusCode)); return; }
-        res.pipe(file);
-        file.on("finish", () => { file.close(); resolve(); });
-      }).on("error", reject);
-    });
+    await downloadFile("https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar", WP_CLI);
     log.ok("WP-CLI downloaded to " + WP_CLI);
     return { success: true };
   } catch (e) {

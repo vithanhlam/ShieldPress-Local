@@ -1,5 +1,13 @@
 // renderer/js/app.js
 
+// Must match getPhpPort() in src/main/services.js
+function phpPortFor(version) {
+  const parts = String(version || "8.3").split(".");
+  const major = parseInt(parts[0] || "8", 10);
+  const minor = parseInt(parts[1] || "3", 10);
+  return major === 8 ? 9080 + minor : 9100 + major * 10 + minor;
+}
+
 window.App = {
   projects: [],
   currentPage: "projects",
@@ -90,6 +98,8 @@ window.nav = async function (page) {
   if (page === "sftp" && typeof SFTP !== "undefined") SFTP.init();
   if (page === "s3" && typeof S3 !== "undefined") S3.init();
   if (page === "ai-access" && typeof AIAccess !== "undefined") AIAccess.init();
+  if (App.currentPage !== "node" && typeof NodeManager !== "undefined") NodeManager.stop();
+  if (page === "node" && typeof NodeManager !== "undefined") NodeManager.init();
   if (page === "cache" && typeof CacheManager !== "undefined") CacheManager.init();
   if (page === "extensions" && typeof Extensions !== "undefined") Extensions.init();
   if (page === "email" && typeof EmailTest !== "undefined") EmailTest.init();
@@ -208,8 +218,7 @@ async function updateSvcPorts(s) {
       const versions = _svcPortsCache.phpVersions || [];
       if (versions.length > 0) {
         const ports = versions.map((v) => {
-          const minor = parseInt((v.split(".")[1] || "3"), 10);
-          return `:${9080 + minor}`;
+          return `:${phpPortFor(v)}`;
         });
         phpEl.textContent = ports.join(" ");
       }

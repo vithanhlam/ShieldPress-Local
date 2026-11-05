@@ -97,7 +97,7 @@ window.Config = {
       const running = s.php;
       dot.style.color  = running ? 'var(--green)' : 'var(--text3)';
       text.textContent = running
-        ? `PHP ${version} — CGI running on :${9080 + parseInt((version.split('.')[1] || '3'), 10)}`
+        ? `PHP ${version} — CGI running on :${phpPortFor(version)}`
         : `PHP ${version} — not running`;
     } catch { }
   },

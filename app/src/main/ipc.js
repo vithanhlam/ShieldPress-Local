@@ -6,6 +6,7 @@ const svc = require("./services");
 const proj = require("./projects");
 const db = require("./database");
 const wp = require("./wordpress");
+const nodeMgr = require("./node-manager");
 const bk = require("./backup");
 const laravel = require("./laravel");
 const ssl     = require("./ssl");
@@ -229,6 +230,17 @@ function register(ipcMain, shell, dialog) {
 
   // ── WordPress ──
   ipcMain.handle("install-wordpress", (e, d) => wp.installWordPress(d));
+
+  // Node.js process manager
+  ipcMain.handle("node-list-processes", () => nodeMgr.listProcesses());
+  ipcMain.handle("node-list-projects", () => nodeMgr.listNodeProjects());
+  ipcMain.handle("node-kill", (e, d) => nodeMgr.killProcess(d || {}));
+  ipcMain.handle("node-set-command", (e, d) => nodeMgr.setCommand(d || {}));
+  ipcMain.handle("node-start", (e, d) => nodeMgr.startProjectProcess(d || {}));
+  ipcMain.handle("node-stop", (e, d) => nodeMgr.stopProjectProcess(d || {}));
+  ipcMain.handle("node-restart", (e, d) => nodeMgr.restartProjectProcess(d || {}));
+  ipcMain.handle("node-logs", (e, d) => nodeMgr.getLogs(d || {}));
+  ipcMain.handle("node-check-port", (e, d) => nodeMgr.checkPort(d || {}));
   ipcMain.handle("wp-get-users", (_e, id) => wp.wpGetUsers({ id }));
   ipcMain.handle("wp-auto-login", (_e, d) => wp.wpAutoLogin(d));
   ipcMain.handle("wp-reset-password", (e, d) => wp.wpResetPassword(d));

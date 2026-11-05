@@ -741,6 +741,23 @@ async function updateProjectSettings(data) {
     return { success: false, message: "Not found" };
 
   const proj = await fs.readJson(cfgPath);
+
+  // Validate PHP version before touching anything
+  const phpChanged = !!phpVersion && phpVersion !== (proj.phpVersion || "8.3");
+  if (phpChanged) {
+    const available = await svc.getAvailablePhpVersions().catch(() => []);
+    if (!available.includes(phpVersion))
+      return { success: false, message: `PHP ${phpVersion} is not installed (available: ${available.join(", ") || "none"})` };
+    // Make sure the new php-cgi can actually start, otherwise nginx would return 502
+    const r = await svc.startPhpCgi(phpVersion);
+    if (!r.success)
+      return { success: false, message: `PHP ${phpVersion} failed to start: ${r.message || "unknown error"}` };
+  }
+  let warning;
+  if (nodePort && parseInt(nodePort) !== proj.nodePort && (proj.projectType === "node" || proj.projectType === "nextjs")) {
+    const c = await require("./node-manager").checkPort({ port: parseInt(nodePort), excludeProjectId: id });
+    if (c.busy) warning = `Port ${nodePort} is already in use${c.owner ? ` by PID ${c.owner.pid} (${c.owner.name})` : ""}.`;
+  }
   if (uploadLimit) proj.uploadLimit = uploadLimit;
   if (nginxTimeout) proj.nginxTimeout = parseInt(nginxTimeout);
   if (nodePort) proj.nodePort = parseInt(nodePort);
@@ -780,7 +797,7 @@ async function updateProjectSettings(data) {
   }
 
   invalidateProjectListCache();
-  return { success: true };
+  return { success: true, warning };
 }
 
 async function getNginxConfig(id) {

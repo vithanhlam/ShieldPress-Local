@@ -14,10 +14,14 @@ mkdir -p "${OUT_DIR}" "${CACHE_DIR}"
 fetch_zip() {
   local version="$1"
   local filename="$2"
-  local url="https://windows.php.net/downloads/releases/${filename}"
+  local base="https://downloads.php.net/~windows/releases"
   local zip_path="${CACHE_DIR}/${filename}"
   if [[ ! -s "${zip_path}" ]]; then
-    curl -fL "${url}" -o "${zip_path}"
+    # Superseded point releases move to archives/
+    if ! curl -fL "${base}/${filename}" -o "${zip_path}"; then
+      rm -f "${zip_path}"
+      curl -fL "${base}/archives/${filename}" -o "${zip_path}"
+    fi
   fi
   local dest="${OUT_DIR}/${version}"
   mkdir -p "${dest}"
@@ -35,6 +39,6 @@ PY
 }
 
 if [[ "${SELECT_SERIES}" == "all" || "${SELECT_SERIES}" == "8.3" ]]; then fetch_zip "8.3" "php-8.3.33-nts-Win32-vs16-x64.zip"; fi
-if [[ "${SELECT_SERIES}" == "all" || "${SELECT_SERIES}" == "8.4" ]]; then fetch_zip "8.4" "php-8.4.27-nts-Win32-vs17-x64.zip"; fi
+if [[ "${SELECT_SERIES}" == "all" || "${SELECT_SERIES}" == "8.4" ]]; then fetch_zip "8.4" "php-8.4.27-1-nts-Win32-vs17-x64.zip"; fi
 if [[ "${SELECT_SERIES}" == "all" || "${SELECT_SERIES}" == "8.5" ]]; then fetch_zip "8.5" "php-8.5.9-nts-Win32-vs17-x64.zip"; fi
 echo "Prepared Windows PHP runtimes in ${OUT_DIR}"

@@ -369,10 +369,13 @@ async function ensurePhpIni(phpDir) {
 }
 
 function getPhpPort(version) {
-  // "8.3" => 9083, "8.4" => 9084, "8.5" => 9085
+  // PHP 8.x keeps its historical ports: "8.3" => 9083, "8.4" => 9084, "8.5" => 9085.
+  // Other majors get their own range so 7.4 and 8.4 never share a port: "7.4" => 9174.
+  // Keep in sync with phpPortFor() in renderer/js/app.js.
   const parts = String(version || "8.3").split(".");
+  const major = parseInt(parts[0] || "8", 10);
   const minor = parseInt(parts[1] || "3", 10);
-  return 9080 + minor;
+  return major === 8 ? 9080 + minor : 9100 + major * 10 + minor;
 }
 
 async function getAvailablePhpVersions() {
@@ -894,6 +897,7 @@ async function stopAll() {
       await projects.stopProject(id);
     } catch (e) {}
   }
+  try { await require("./node-manager").stopAllManaged(); } catch (e) {}
   await stopPhpCgi();
   await stopMariaDB();
   await stopNginx();

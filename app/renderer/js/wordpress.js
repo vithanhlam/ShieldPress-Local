@@ -72,7 +72,9 @@ window.WordPress = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Installing...'; }
     toast("Installing WordPress... this may take a minute", "info", 8000);
 
-    const r = await api.installWordPress({ id });
+    let r;
+    try { r = await api.installWordPress({ id }); }
+    catch (e) { r = { success: false, message: String(e?.message || e) }; }
 
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fab fa-wordpress"></i> Install WordPress (latest)'; }
 
@@ -106,7 +108,9 @@ window.WordPress = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Reinstalling...'; }
     toast("Reinstalling WordPress... please wait", "info", 10000);
 
-    const r = await api.installWordPress({ id, force: true });
+    let r;
+    try { r = await api.installWordPress({ id, force: true }); }
+    catch (e) { r = { success: false, message: String(e?.message || e) }; }
 
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-redo"></i> Reinstall'; }
 
