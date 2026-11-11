@@ -122,6 +122,47 @@ async function applyToCodex() {
   await fs.rename(tempPath, configPath);
   return { success: true, path: configPath, restartRequired: true };
 }
+async function applyToJsonClient(configPath, label, extra = {}) {
+  const { scriptPath, dataDir } = getConnectInfo();
+  await fs.ensureDir(path.dirname(configPath));
+  let config = {};
+  let fileMode = 0o600;
+  try {
+    const raw = await fs.readFile(configPath, "utf8");
+    fileMode = (await fs.stat(configPath)).mode & 0o777;
+    if (raw.trim()) {
+      try { config = JSON.parse(raw); } catch { throw new Error(`${configPath} is not valid JSON; fix it before applying ${label}`); }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error(`${configPath} has an unexpected format`);
+  if (!config.mcpServers || typeof config.mcpServers !== "object") config.mcpServers = {};
+  config.mcpServers.shieldpress = { ...extra, command: "node", args: [scriptPath], env: { SHIELDPRESS_DATA_DIR: dataDir } };
+  const tempPath = `${configPath}.${process.pid}.tmp`;
+  await fs.writeFile(tempPath, JSON.stringify(config, null, 2) + "\n", { encoding: "utf8", mode: fileMode });
+  try { await fs.chmod(tempPath, fileMode); } catch {}
+  await fs.rename(tempPath, configPath);
+  return { success: true, path: configPath, restartRequired: true, client: label };
+}
+
+async function applyToCursor() {
+  return applyToJsonClient(path.join(os.homedir(), ".cursor", "mcp.json"), "Cursor");
+}
+
+async function applyToClaude() {
+  const base = process.env.CLAUDE_CONFIG_DIR || os.homedir();
+  return applyToJsonClient(path.join(base, ".claude.json"), "Claude", { type: "stdio" });
+}
+
+async function applyMcp(client = "codex") {
+  const key = String(client || "codex").toLowerCase();
+  if (key === "cursor") return applyToCursor();
+  if (key === "claude") return applyToClaude();
+  if (key === "codex") return { ...(await applyToCodex()), client: "Codex" };
+  throw new Error(`Unsupported AI client: ${client}`);
+}
+
 async function loadPending() {
   try {
     const entries = await fs.readJson(pendingFile());
@@ -483,4 +524,4 @@ async function start() {
   return { port: server.address().port, token: gatewayToken };
 }
 async function stop() { if (!server) return; await new Promise((resolve) => server.close(resolve)); server = null; gatewayToken = null; try { await fs.remove(tokenFile()); } catch {} }
-module.exports = { start, stop, getConnectInfo, applyToCodex, listPending, resolveApproval, getRequest };
+module.exports = { start, stop, getConnectInfo, applyToCodex, applyToCursor, applyToClaude, applyMcp, listPending, resolveApproval, getRequest };

@@ -48,11 +48,12 @@ window.AIAccess = {
     }
   },
 
-  async applyMcp() {
+  async applyMcp(client = "codex") {
     try {
-      const result = await api.aiAccessApplyMcp();
+      const result = await api.aiAccessApplyMcp(client);
       if (!result?.success) throw new Error(result?.message || "Could not apply MCP settings");
-      toast(`MCP applied to Codex. Restart Codex to load it. Settings: ${result.path}`, "success", 7000);
+      const name = result.client || client;
+      toast(`MCP applied to ${name}. Restart ${name} to load it. Settings: ${result.path}`, "success", 7000);
     } catch (error) {
       toast("Could not apply MCP settings: " + error.message, "error", 7000);
     }

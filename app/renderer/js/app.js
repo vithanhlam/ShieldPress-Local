@@ -104,7 +104,7 @@ window.nav = async function (page) {
   if (page === "extensions" && typeof Extensions !== "undefined") Extensions.init();
   if (page === "email" && typeof EmailTest !== "undefined") EmailTest.init();
   if (page === "plugins" && typeof Plugins !== "undefined") Plugins.load();
-  if (page === "settings") { StorageSettings.init(); EditorSettings.init(); PhpPathSettings.init(); GitHubSettings.init(); GDriveSettings.init(); }
+  if (page === "settings") { StorageSettings.init(); EditorSettings.init(); PhpPathSettings.init(); GitHubSettings.init(); GDriveSettings.init(); Config._updateHostsFileLabel(); }
 };
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -441,6 +441,10 @@ document.addEventListener("contextmenu", (e) => {
   }
   if (typeof SFTP !== "undefined" && SFTP.isTerminalClipboardTarget(e.target)) {
     SFTP.pasteIntoTerminal();
+    return;
+  }
+  if (e.target.closest && e.target.closest("pre, input, textarea, [data-copyable]")) {
+    ContextMenu.showCopy(e.clientX, e.clientY, e.target);
     return;
   }
   // Check if right-clicked on a project card

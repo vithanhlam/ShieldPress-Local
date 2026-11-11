@@ -55,10 +55,10 @@
 
 <div class="ai-bottom-grid">
   <div class="settings-card ai-connect-card">
-    <div class="ai-connect-head"><div><h2><i class="fas fa-plug"></i> AI Connect</h2><p class="ai-muted">Add ShieldPress once in your AI client's MCP settings. Every new Codex project and chat can then reuse it.</p></div><span id="ai-connect-status" class="ai-connect-status">Checking gateway…</span></div>
-    <ol class="ai-connect-steps"><li>Keep ShieldPress Local open and save your AI Access policy.</li><li>Apply the MCP configuration to Codex once; it is saved in your user-level Codex settings.</li><li>Restart Codex, then ask AI to list ShieldPress resources.</li></ol>
+    <div class="ai-connect-head"><div><h2><i class="fas fa-plug"></i> AI Connect</h2><p class="ai-muted">Add ShieldPress once in your AI client's MCP settings. Every new Codex, Cursor or Claude project and chat can then reuse it.</p></div><span id="ai-connect-status" class="ai-connect-status">Checking gateway…</span></div>
+    <ol class="ai-connect-steps"><li>Keep ShieldPress Local open and save your AI Access policy.</li><li>Apply the MCP configuration to Codex, Cursor or Claude once; it is saved in that client's user-level settings.</li><li>Restart the client, then ask AI to list ShieldPress resources.</li></ol>
     <pre id="ai-connect-config" class="ai-code-preview ai-connect-config">Loading…</pre>
-    <div class="ai-skill-actions"><button class="btn btn-primary" onclick="AIAccess.applyMcp()"><i class="fas fa-check"></i> Apply to Codex</button><button class="btn btn-ghost" onclick="AIAccess.copyConnectConfig()"><i class="fas fa-copy"></i> Copy config</button><button class="btn btn-ghost" onclick="AIAccess.testConnect()"><i class="fas fa-heartbeat"></i> Test gateway</button></div>
+    <div class="ai-skill-actions"><button class="btn btn-primary" onclick="AIAccess.applyMcp('codex')"><i class="fas fa-check"></i> Apply to Codex</button><button class="btn btn-primary" onclick="AIAccess.applyMcp('cursor')"><i class="fas fa-check"></i> Apply to Cursor</button><button class="btn btn-primary" onclick="AIAccess.applyMcp('claude')"><i class="fas fa-check"></i> Apply to Claude</button><button class="btn btn-ghost" onclick="AIAccess.copyConnectConfig()"><i class="fas fa-copy"></i> Copy config</button><button class="btn btn-ghost" onclick="AIAccess.testConnect()"><i class="fas fa-heartbeat"></i> Test gateway</button></div>
   </div>
   <div class="settings-card">
     <h2><i class="fas fa-scroll"></i> Safety SKILL</h2>

@@ -145,7 +145,7 @@ function register(ipcMain, shell, dialog) {
     return process.platform === "win32" ? electronApp.getPath("temp") : "/tmp";
   });
   ipcMain.handle("ai-access-get-connect-info", () => aiGateway.getConnectInfo());
-  ipcMain.handle("ai-access-apply-mcp", () => aiGateway.applyToCodex());
+  ipcMain.handle("ai-access-apply-mcp", (_e, client) => aiGateway.applyMcp(client));
   ipcMain.handle("ai-access-get-skill", () => aiAccess.getSkill());
   ipcMain.handle("ai-access-get-audit", (_e, limit) => aiAccess.getAudit(limit));
   ipcMain.handle("ai-access-get-reqnora", () => aiAccess.getReqnora());

@@ -94,6 +94,47 @@ window.ContextMenu = {
     this._position(x, y);
   },
 
+  showCopy(x, y, target) {
+    if (!this.el) this.init();
+    const field = target.closest("input, textarea");
+    const selected = field && typeof field.selectionStart === "number"
+      ? field.value.slice(field.selectionStart, field.selectionEnd)
+      : String(window.getSelection() || "");
+    this._copyTarget = { field, text: selected, container: target.closest("pre, [data-copyable]") };
+    const has = !!selected;
+    this.el.innerHTML = `
+      <div class="ctx-item ${has ? "" : "ctx-disabled"}" onclick="ContextMenu.copySelection();ContextMenu.hide()"><i class="fas fa-copy"></i> Copy</div>
+      <div class="ctx-item" onclick="ContextMenu.copyAll();ContextMenu.hide()"><i class="fas fa-clone"></i> Copy All</div>
+      <div class="ctx-item" onclick="ContextMenu.selectAll();ContextMenu.hide()"><i class="fas fa-i-cursor"></i> Select All</div>
+    `;
+    this._position(x, y);
+  },
+
+  async _writeClipboard(text) {
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); toast("Copied", "success"); }
+    catch { toast("Could not copy", "error"); }
+  },
+
+  copySelection() { return this._writeClipboard(this._copyTarget?.text); },
+
+  copyAll() {
+    const t = this._copyTarget || {};
+    return this._writeClipboard(t.field ? t.field.value : t.container?.innerText || "");
+  },
+
+  selectAll() {
+    const t = this._copyTarget || {};
+    if (t.field) { t.field.focus(); t.field.select(); return; }
+    if (t.container) {
+      const range = document.createRange();
+      range.selectNodeContents(t.container);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  },
+
   showRemote(x, y, target) {
     if (!this.el) this.init();
     const item = target.item;

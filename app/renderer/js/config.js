@@ -13,10 +13,18 @@ window.Config = {
   async _updateHostsFileLabel() {
     try {
       const info = await api.getAppInfo();
-      if (info.platform === 'linux') {
-        document.querySelector('#hosts-file-title').textContent = 'Ubuntu Hosts File';
-        document.querySelector('#hosts-file-description').textContent = 'View or manually edit /etc/hosts. You may need administrator privileges to save changes.';
-        document.querySelector('#hosts-file-button').innerHTML = '<i class="fas fa-file-alt"></i> Open Hosts File';
+      const title = document.querySelector('#hosts-file-title');
+      const desc = document.querySelector('#hosts-file-description');
+      const button = document.querySelector('#hosts-file-button');
+      if (!title || !desc || !button) return;
+      if (info.platform === 'win32') {
+        title.textContent = 'Windows Hosts File';
+        desc.textContent = 'View or manually edit C:\\Windows\\System32\\drivers\\etc\\hosts.';
+        button.innerHTML = '<i class="fas fa-file-alt"></i> Edit Hosts File';
+      } else {
+        title.textContent = info.platform === 'darwin' ? 'macOS Hosts File' : 'Ubuntu Hosts File';
+        desc.textContent = 'View or manually edit /etc/hosts. You may need administrator privileges to save changes.';
+        button.innerHTML = '<i class="fas fa-file-alt"></i> Open Hosts File';
       }
     } catch { }
   },

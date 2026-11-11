@@ -168,6 +168,8 @@ The MCP client command is:
 codex mcp add shieldpress -- node /opt/ShieldPressLocal/resources/shieldpress-mcp.js
 ```
 
+Or open **AI Access → AI Connect** and click **Apply to Codex**, **Apply to Cursor** or **Apply to Claude**. This writes `~/.codex/config.toml`, `~/.cursor/mcp.json` or `~/.claude.json` respectively.
+
 The installed client connects only to the local ShieldPress gateway. It does not read SSH passwords or call `sshpass` directly.
 
 MCP opens a dedicated connection using the saved VPS settings; no Terminal window is required. Use `shieldpress.run_remote_command` with `workingDirectory` when needed. Commands run on independent SSH channels and return stdout, stderr, and exit status. Use `shieldpress.file_operation` for concrete writes, deletion, uploads, and downloads; transfers identify both the authorized remote resource and local resource. `shieldpress.query_database` supports authorized local database changes with a backup when configured.

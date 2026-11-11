@@ -2122,3 +2122,5 @@ tr.remote-row-selected td {
 .key-create-section > summary .remote-tools-badge i { margin:0 0 0 5px; color:var(--text3); font-size:9px; }
 .key-footer { position:sticky; bottom:-26px; padding:14px 0 6px; background:var(--bg2); border-top:1px solid var(--border); }
 .remote-tools-modal .sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+
+.ctx-item.ctx-disabled { opacity: .45; pointer-events: none; }

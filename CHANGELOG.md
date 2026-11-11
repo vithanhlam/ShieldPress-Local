@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.5.68
+
+**AI Access / MCP**
+- AI Connect can now install the ShieldPress MCP server into Cursor (`~/.cursor/mcp.json`) and Claude (`~/.claude.json`) as well as Codex
+- Existing MCP servers in those files are preserved; invalid JSON is reported instead of overwritten
+
+**UI**
+- Right-click in Debug Logs, code previews and text fields shows Copy / Copy All / Select All
+- Settings now detects the OS for the Hosts File entry (Windows `System32\drivers\etc\hosts`, Ubuntu/macOS `/etc/hosts`)
+
+**Release**
+- Builds updated Windows NSIS (`.exe`) and Ubuntu/Debian (`.deb`) installers
+
 ## v2.5.66
 
 **Node.js**
