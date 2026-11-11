@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.5.70
+
+**UI**
+- Projects, Database, SFTP and S3 pages get a List / Grid toggle and a sort menu (A → Z, Z → A, recently opened/connected, newest/oldest, size, running first); the choice is remembered per page
+- AI Connect buttons wrap instead of being cut off on narrow windows
+
+**Release**
+- Builds updated Windows NSIS (`.exe`) and Ubuntu/Debian (`.deb`) installers
+
 ## v2.5.68
 
 **AI Access / MCP**

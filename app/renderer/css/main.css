@@ -2124,3 +2124,24 @@ tr.remote-row-selected td {
 .remote-tools-modal .sr-only { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
 
 .ctx-item.ctx-disabled { opacity: .45; pointer-events: none; }
+
+/* ── List / Grid view + sort controls ────────────────────────────────────────── */
+.vc-bar { display: inline-flex; align-items: center; gap: 8px; }
+.vc-bar .vc-sort { width: auto; min-width: 150px; min-height: 36px; }
+.vc-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--rs); overflow: hidden; }
+.vc-toggle button {
+  background: var(--bg2); color: var(--text3); border: 0; padding: 8px 11px; cursor: pointer; font-size: 13px;
+}
+.vc-toggle button + button { border-left: 1px solid var(--border); }
+.vc-toggle button:hover { color: var(--text1); }
+.vc-toggle button.active { background: var(--accent); color: #fff; }
+.vc-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.vc-grid > .proj-card, .vc-grid > .card { margin-bottom: 0 !important; height: 100%; }
+.vc-grid .db-row { flex-wrap: wrap; margin-bottom: 0; }
+.vc-grid .db-row .db-name { flex: 1 1 100%; }
+.ai-skill-actions { flex-wrap: wrap; }

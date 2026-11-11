@@ -83,9 +83,22 @@ window.Projects = {
     });
   },
 
+  _sortOptions: [
+    { value: "default", label: "Default order" },
+    { value: "name-asc", label: "Name A → Z", cmp: ViewControls.byName((p) => p.name) },
+    { value: "name-desc", label: "Name Z → A", cmp: (a, b) => ViewControls.byName((p) => p.name)(b, a) },
+    { value: "recent", label: "Recently opened", cmp: (a, b) => ViewControls.recent("projects", b.id) - ViewControls.recent("projects", a.id) },
+    { value: "newest", label: "Newest created", cmp: (a, b) => new Date(b.createdAt) - new Date(a.createdAt) },
+    { value: "oldest", label: "Oldest created", cmp: (a, b) => new Date(a.createdAt) - new Date(b.createdAt) },
+    { value: "running", label: "Running first", cmp: (a, b) => (!!(b.isRunning || b.status === "running")) - (!!(a.isRunning || a.status === "running")) },
+  ],
+
   render(list) {
     const el = document.getElementById("project-list");
     if (!el) return;
+    if (!document.querySelector("#vc-projects .vc-sort")) ViewControls.mount("projects", this._sortOptions, () => this.filter());
+    ViewControls.apply(el, "projects");
+    list = ViewControls.sort("projects", list, { pinStarred: true });
 
     if (list.length === 0) {
       el.innerHTML = `<div class="empty-state"><i class="fas fa-folder-open"></i><p>No projects found</p></div>`;
@@ -166,6 +179,7 @@ window.Projects = {
   },
 
   async start(id) {
+    ViewControls.touch("projects", id);
     const btn = document.querySelector(`[data-id="${id}"] .btn-success`);
     if (btn) {
       btn.disabled = true;
@@ -264,6 +278,7 @@ window.Projects = {
   },
 
   async openBrowser(id) {
+    ViewControls.touch("projects", id);
     const r = await api.openProjectWebsite(id);
     if (r.success) {
       await this.load();
@@ -273,11 +288,13 @@ window.Projects = {
   },
 
   async openFolder(id) {
+    ViewControls.touch("projects", id);
     const p = App.projects.find((x) => x.id === id);
     if (p) api.openFolder(p.path.replace(/[\\/]+$/, "") + "/www");
   },
 
   async openInEditor(id) {
+    ViewControls.touch("projects", id);
     const r = await api.openInEditor(id);
     if (r.success) {
       toast(`Opened in ${r.editor}`, "success");

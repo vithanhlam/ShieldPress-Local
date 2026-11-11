@@ -485,13 +485,15 @@ window.SFTP = {
         || (status === "disconnected" && !live);
       return matchQ && matchType && matchStatus;
     });
-    filtered.sort((a, b) => {
-      const sa = a.starred ? 1 : 0;
-      const sb = b.starred ? 1 : 0;
-      if (sa !== sb) return sb - sa;
-      return String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" });
-    });
-    this._render(filtered);
+    if (!document.querySelector("#vc-sftp .vc-sort")) {
+      ViewControls.mount("sftp", [
+        { value: "name-asc", label: "Name A → Z", cmp: ViewControls.byName((c) => c.name) },
+        { value: "name-desc", label: "Name Z → A", cmp: (a, b) => ViewControls.byName((c) => c.name)(b, a) },
+        { value: "recent", label: "Recently connected", cmp: (a, b) => new Date(b.lastConnectedAt || 0) - new Date(a.lastConnectedAt || 0) },
+        { value: "host", label: "Host", cmp: ViewControls.byName((c) => c.host) },
+      ], () => this.filter());
+    }
+    this._render(ViewControls.sort("sftp", filtered, { pinStarred: true }));
     this._syncStatusFilterUi();
   },
 
@@ -525,6 +527,7 @@ window.SFTP = {
       return;
     }
 
+    ViewControls.apply(el, "sftp");
     el.innerHTML = list.map((c) => {
       const isConn = this._connStatus[c.id] === "connected";
       const sshOnly = isConn && c.transport === "ssh";

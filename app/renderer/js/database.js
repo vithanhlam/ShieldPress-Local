@@ -26,7 +26,24 @@ window.Database = {
 
     this._bindProgress();
     const details = r.databaseDetails || r.databases.map((name) => ({ name, tables: 0, size: 0 }));
-    el.innerHTML = details
+    this._details = details;
+    this._renderList();
+  },
+
+  _sortOptions: [
+    { value: "name-asc", label: "Name A → Z", cmp: ViewControls.byName((d) => d.name) },
+    { value: "name-desc", label: "Name Z → A", cmp: (a, b) => ViewControls.byName((d) => d.name)(b, a) },
+    { value: "size-desc", label: "Largest first", cmp: (a, b) => (b.size || 0) - (a.size || 0) },
+    { value: "size-asc", label: "Smallest first", cmp: (a, b) => (a.size || 0) - (b.size || 0) },
+    { value: "tables-desc", label: "Most tables", cmp: (a, b) => (b.tables || 0) - (a.tables || 0) },
+  ],
+
+  _renderList() {
+    const el = document.getElementById("db-list");
+    if (!el || !this._details) return;
+    if (!document.querySelector("#vc-database .vc-sort")) ViewControls.mount("database", this._sortOptions, () => this._renderList());
+    ViewControls.apply(el, "database");
+    el.innerHTML = ViewControls.sort("database", this._details)
       .map(
         (db) => `
 <div class="db-row">

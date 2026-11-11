@@ -1,6 +1,7 @@
 <div class="page-sticky">
   <div class="page-header"><div><div class="page-title"><i class="fas fa-cloud" style="color:var(--accent)"></i> S3 Bucket</div><div class="page-sub">Connect Amazon S3 or any S3-compatible provider, then sync folders with configurable concurrency.</div></div><div style="display:flex;gap:8px;margin-left:auto"><button class="btn btn-ghost" onclick="S3.openVault()"><i class="fas fa-lock"></i> Vault</button><button class="btn btn-primary" onclick="S3.newBucket()"><i class="fas fa-plus"></i> Add bucket</button></div></div>
 </div>
+<div style="display:flex;justify-content:flex-end;margin-top:12px"><span id="vc-s3"></span></div>
 <div id="s3-list" class="s3-list"></div>
 <div class="overlay" id="m-s3" onclick="closeIfOverlay(event,'m-s3')"><div class="modal s3-modal"><div class="modal-title"><i class="fas fa-cloud"></i> <span id="s3-modal-title">Add S3 Bucket</span></div><input type="hidden" id="s3-id"/><div class="grid-2 s3-form">
   <div class="fg"><div class="fl">Name</div><input class="fi" id="s3-name" placeholder="Production assets"/></div><div class="fg"><div class="fl">Provider / endpoint</div><input class="fi" id="s3-endpoint" placeholder="https://s3.amazonaws.com"/></div>
